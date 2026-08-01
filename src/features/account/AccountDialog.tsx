@@ -12,7 +12,6 @@ import {
   RefreshCw,
   UserRound,
   X,
-  Zap,
 } from 'lucide-react';
 import { trpc } from '@/providers/trpc';
 import PadButton from '@/components/PadButton';
@@ -297,46 +296,37 @@ function ConflictView() {
 /* ---------------- 登录/注册主体（弹窗关闭时卸载，重开自动回到「一键生成」） ---------------- */
 
 function AuthView() {
-  const [tab, setTab] = useState<'gen' | 'login'>('gen');
   return (
-    <>
-      {/* 选项卡（走线指示条风格） */}
-      <div className="mb-5 flex gap-1 border-b border-ink-700">
-        {(
-          [
-            ['gen', '一键生成账号', Zap],
-            ['login', '老用户登录', UserRound],
-          ] as const
-        ).map(([key, label, Icon]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={cn(
-              'relative flex items-center gap-1.5 px-4 py-2 text-sm transition-colors',
-              tab === key ? 'text-pcb-300' : 'text-silk-500 hover:text-silk-100',
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-            {tab === key && (
-              <svg
-                className="absolute -bottom-px left-0 h-[6px] w-full"
-                viewBox="0 0 100 6"
-                preserveAspectRatio="none"
-              >
-                <path
-                  d="M0 5 L40 5 L46 1 L54 1 L60 5 L100 5"
-                  fill="none"
-                  stroke="#3FC47F"
-                  strokeWidth="2"
-                />
-              </svg>
-            )}
-          </button>
-        ))}
+    <div className="flex flex-col gap-6">
+      {/* 新焊友：一键生成 */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <span className="border border-dashed border-silk-500 px-1.5 font-mono text-[10px] uppercase tracking-wider text-silk-300">
+            NEW · 新焊友
+          </span>
+          <span className="text-xs text-silk-500">没有账号？一键生成一组，马上开通云存档</span>
+        </div>
+        <GenerateView />
+      </section>
+
+      {/* 分隔 */}
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-ink-700" />
+        <span className="text-xs text-silk-600">或</span>
+        <div className="h-px flex-1 bg-ink-700" />
       </div>
-      {tab === 'gen' ? <GenerateView /> : <LoginView />}
-    </>
+
+      {/* 老焊友：手动登录 */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <span className="border border-dashed border-silk-500 px-1.5 font-mono text-[10px] uppercase tracking-wider text-silk-300">
+            BACK · 老焊友
+          </span>
+          <span className="text-xs text-silk-500">已有账号？输入账号密码登录并同步云端存档</span>
+        </div>
+        <LoginView />
+      </section>
+    </div>
   );
 }
 
@@ -373,7 +363,7 @@ export default function AccountDialog() {
             exit={{ scale: 0.96, y: 12, opacity: 0 }}
             transition={{ duration: 0.28, ease: EASE }}
             onClick={e => e.stopPropagation()}
-            className="panel-raised w-full max-w-md rounded-lg p-6"
+            className="panel-raised max-h-[85vh] w-full max-w-md overflow-y-auto rounded-lg p-6"
             role="dialog"
             aria-modal="true"
             aria-label="账号与云存档"
