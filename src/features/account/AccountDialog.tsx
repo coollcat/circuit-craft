@@ -354,7 +354,7 @@ export default function AccountDialog() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-ink-950/70 p-6 backdrop-blur-[8px]"
+          className="fixed inset-0 z-[90] flex overflow-y-auto bg-ink-950/70 p-6 backdrop-blur-[8px]"
           onClick={closeDialog}
         >
           <motion.div
@@ -363,7 +363,7 @@ export default function AccountDialog() {
             exit={{ scale: 0.96, y: 12, opacity: 0 }}
             transition={{ duration: 0.28, ease: EASE }}
             onClick={e => e.stopPropagation()}
-            className="panel-raised max-h-[85vh] w-full max-w-md overflow-y-auto rounded-lg p-6"
+            className="panel-raised m-auto w-full max-w-md rounded-lg p-6"
             role="dialog"
             aria-modal="true"
             aria-label="账号与云存档"
