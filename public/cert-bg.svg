@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1131" width="1600" height="1131">
+  <!-- 毕业证书底图：PCB 走线边框，四角芯片焊盘装饰，中央留白 -->
+  <rect width="1600" height="1131" fill="#0A100D"/>
+  <!-- gerber grid dots -->
+  <g fill="#3FC47F" opacity="0.07">
+    <circle cx="100" cy="100" r="1.2"/><circle cx="200" cy="100" r="1.2"/><circle cx="300" cy="100" r="1.2"/><circle cx="400" cy="100" r="1.2"/><circle cx="500" cy="100" r="1.2"/><circle cx="600" cy="100" r="1.2"/><circle cx="700" cy="100" r="1.2"/><circle cx="800" cy="100" r="1.2"/><circle cx="900" cy="100" r="1.2"/><circle cx="1000" cy="100" r="1.2"/><circle cx="1100" cy="100" r="1.2"/><circle cx="1200" cy="100" r="1.2"/><circle cx="1300" cy="100" r="1.2"/><circle cx="1400" cy="100" r="1.2"/><circle cx="1500" cy="100" r="1.2"/>
+    <circle cx="100" cy="1031" r="1.2"/><circle cx="200" cy="1031" r="1.2"/><circle cx="300" cy="1031" r="1.2"/><circle cx="400" cy="1031" r="1.2"/><circle cx="500" cy="1031" r="1.2"/><circle cx="600" cy="1031" r="1.2"/><circle cx="700" cy="1031" r="1.2"/><circle cx="800" cy="1031" r="1.2"/><circle cx="900" cy="1031" r="1.2"/><circle cx="1000" cy="1031" r="1.2"/><circle cx="1100" cy="1031" r="1.2"/><circle cx="1200" cy="1031" r="1.2"/><circle cx="1300" cy="1031" r="1.2"/><circle cx="1400" cy="1031" r="1.2"/><circle cx="1500" cy="1031" r="1.2"/>
+  </g>
+  <!-- outer trace border: 45° chamfered rectangle -->
+  <path d="M120 60 L1480 60 L1540 120 L1540 1011 L1480 1071 L120 1071 L60 1011 L60 120 Z"
+        fill="none" stroke="#C9803C" stroke-width="4"/>
+  <path d="M140 84 L1460 84 L1516 140 L1516 991 L1460 1047 L140 1047 L84 991 L84 140 Z"
+        fill="none" stroke="#1F7A4C" stroke-width="2"/>
+  <!-- corner vias -->
+  <g fill="#C9803C">
+    <circle cx="120" cy="120" r="10"/><circle cx="1480" cy="120" r="10"/>
+    <circle cx="120" cy="1011" r="10"/><circle cx="1480" cy="1011" r="10"/>
+  </g>
+  <g fill="#060A08">
+    <circle cx="120" cy="120" r="4.5"/><circle cx="1480" cy="120" r="4.5"/>
+    <circle cx="120" cy="1011" r="4.5"/><circle cx="1480" cy="1011" r="4.5"/>
+  </g>
+  <!-- corner chip pad decorations (QFP-style pads) -->
+  <g fill="#C9803C" opacity="0.85">
+    <rect x="190" y="98" width="34" height="10" rx="2"/><rect x="236" y="98" width="34" height="10" rx="2"/><rect x="282" y="98" width="34" height="10" rx="2"/>
+    <rect x="1284" y="98" width="34" height="10" rx="2"/><rect x="1330" y="98" width="34" height="10" rx="2"/><rect x="1376" y="98" width="34" height="10" rx="2"/>
+    <rect x="190" y="1023" width="34" height="10" rx="2"/><rect x="236" y="1023" width="34" height="10" rx="2"/><rect x="282" y="1023" width="34" height="10" rx="2"/>
+    <rect x="1284" y="1023" width="34" height="10" rx="2"/><rect x="1330" y="1023" width="34" height="10" rx="2"/><rect x="1376" y="1023" width="34" height="10" rx="2"/>
+  </g>
+  <!-- silkscreen labels -->
+  <text x="800" y="104" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="20" letter-spacing="6" fill="#8E8976">CIRCUITCRAFT · GRADUATION CERTIFICATE · REV A</text>
+  <text x="800" y="1052" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="16" letter-spacing="4" fill="#55524A">J1 — KEEP OUT — 回路工坊 — 2L 1.6MM HASL</text>
+  <!-- center blank panel (subtle) -->
+  <rect x="200" y="180" width="1200" height="770" rx="12" fill="#0E1611" opacity="0.6"/>
+  <rect x="200" y="180" width="1200" height="770" rx="12" fill="none" stroke="#1B2E24" stroke-width="1.5" stroke-dasharray="8 6"/>
+</svg>

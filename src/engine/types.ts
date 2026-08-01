@@ -1,0 +1,56 @@
+// 回路工坊 — 全站共享类型契约（冻结，任何代理不得修改）
+export type NPCId = 'laozhou' | 'xiaohan' | 'lingong';
+export interface DialogueLine { speaker: NPCId; text: string; }
+
+export type ComponentType =
+  | 'vsrc' | 'battery' | 'gnd'
+  | 'resistor' | 'capacitor' | 'inductor' | 'pot'
+  | 'diode' | 'led' | 'zener'
+  | 'switch' | 'button'
+  | 'npn' | 'pmos' | 'nmos'
+  | 'opamp'
+  | 'crystal' | 'antenna' | 'sensor' | 'mcu' | 'ic' | 'fuse'
+  | 'funcgen' | 'voltmeter' | 'ammeter' | 'module';
+
+export interface PortRef { comp: string; port: string; }
+export interface WireSpec { id: string; from: PortRef; to: PortRef; }
+
+export interface ComponentSpec {
+  id: string;
+  type: ComponentType;
+  x: number; y: number;
+  rotation?: 0 | 90 | 180 | 270;
+  params?: Record<string, number | string | boolean>;
+  locked?: boolean;
+}
+export interface CircuitSpec { components: ComponentSpec[]; wires: WireSpec[]; }
+
+export type GoalCheck =
+  | { kind: 'connected'; a: PortRef; b: PortRef }
+  | { kind: 'component-placed'; type: ComponentType; count?: number }
+  | { kind: 'param'; comp: string; param: string; min?: number; max?: number }
+  | { kind: 'node-voltage'; node: PortRef; min: number; max: number }
+  | { kind: 'branch-current'; comp: string; min: number; max: number }
+  | { kind: 'led-lit'; comp: string }
+  | { kind: 'custom'; id: string; description: string };
+
+export interface StarCondition { id: string; label: string; check: 'no-hint' | 'first-try' | 'time' | 'custom'; value?: number; }
+
+export interface LevelDef {
+  id: string;
+  track: 'main' | 'side-a' | 'side-b';
+  chapter: number;
+  index: number;
+  title: string;
+  subtitle?: string;
+  briefing: string;
+  intro: DialogueLine[];
+  outro: DialogueLine[];
+  palette: ComponentSpec[];
+  preset: CircuitSpec;
+  goals: GoalCheck[];
+  stars: StarCondition[];
+  hints: [string, string, string];
+  knowledge: { title: string; body: string };
+  sim?: { duration?: number; probes?: PortRef[] };
+}

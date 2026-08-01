@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 672 96" width="672" height="96">
+  <!-- 章节徽章 sprite: 7 × 96×96，铜色线稿 + 阻焊绿底圆牌 -->
+  <defs>
+    <style>
+      .bd { fill: #0E1611; stroke: #1F7A4C; stroke-width: 2.5; }
+      .cu { fill: none; stroke: #C9803C; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .cuf { fill: #C9803C; }
+    </style>
+  </defs>
+  <!-- 1 闪电：电是什么 -->
+  <g id="badge-1" transform="translate(0,0)">
+    <circle class="bd" cx="48" cy="48" r="40"/>
+    <path class="cuf" d="M54 20 L34 52 L46 52 L40 76 L62 42 L50 42 Z"/>
+  </g>
+  <!-- 2 电阻电容：认识元器件 -->
+  <g id="badge-2" transform="translate(96,0)">
+    <circle class="bd" cx="48" cy="48" r="40"/>
+    <path class="cu" d="M16 40 L26 40 L30 32 L38 48 L46 32 L54 48 L58 40 L66 40"/>
+    <path class="cu" d="M16 62 L38 62 M42 56 L42 68 M46 56 L46 68 M50 62 L72 62" stroke-width="2.5"/>
+  </g>
+  <!-- 3 原理图纸张：原理图设计 -->
+  <g id="badge-3" transform="translate(192,0)">
+    <circle class="bd" cx="48" cy="48" r="40"/>
+    <path class="cu" d="M30 26 L58 26 L66 34 L66 70 L30 70 Z"/>
+    <path class="cu" d="M58 26 L58 34 L66 34" stroke-width="2"/>
+    <path class="cu" d="M36 44 L44 44 L48 38 L56 52 L60 46 L62 46" stroke-width="2"/>
+    <circle class="cuf" cx="38" cy="58" r="2.5"/>
+    <circle class="cuf" cx="58" cy="58" r="2.5"/>
+  </g>
+  <!-- 4 走线折线：PCB 布局布线 -->
+  <g id="badge-4" transform="translate(288,0)">
+    <circle class="bd" cx="48" cy="48" r="40"/>
+    <path class="cu" d="M22 66 L40 48 L40 32 L58 32"/>
+    <path class="cu" d="M28 74 L48 54 L62 54 L74 42" stroke-width="2"/>
+    <circle class="cuf" cx="22" cy="66" r="4"/>
+    <circle class="cuf" cx="58" cy="32" r="4"/>
+    <circle class="cuf" cx="74" cy="42" r="3"/>
+  </g>
+  <!-- 5 正弦波：信号处理 -->
+  <g id="badge-5" transform="translate(384,0)">
+    <circle class="bd" cx="48" cy="48" r="40"/>
+    <path class="cu" d="M18 48 C26 28 34 28 42 48 C50 68 58 68 66 48 C70 38 74 34 78 34"/>
+    <path class="cu" d="M18 48 L78 48" stroke-width="1.5" opacity="0.45"/>
+  </g>
+  <!-- 6 天线波纹：无线通信 -->
+  <g id="badge-6" transform="translate(480,0)">
+    <circle class="bd" cx="48" cy="48" r="40"/>
+    <path class="cu" d="M48 72 L48 44 M38 56 L48 44 L58 56"/>
+    <path class="cu" d="M34 34 C40 26 56 26 62 34" stroke-width="2.5"/>
+    <path class="cu" d="M27 25 C37 14 59 14 69 25" stroke-width="2" opacity="0.7"/>
+    <circle class="cuf" cx="48" cy="72" r="3.5"/>
+  </g>
+  <!-- 7 奖章齿轮：选型实战 -->
+  <g id="badge-7" transform="translate(576,0)">
+    <circle class="bd" cx="48" cy="48" r="40"/>
+    <circle class="cu" cx="48" cy="42" r="14"/>
+    <circle class="cu" cx="48" cy="42" r="6" stroke-width="2.5"/>
+    <path class="cu" d="M40 54 L34 72 L48 64 L62 72 L56 54"/>
+  </g>
+</svg>
