@@ -68,11 +68,11 @@ export const C5_LEVELS: LevelDef[] = [
     title: '有源滤波：只留下想要的频率',
     subtitle: 'RC + 运放 = 会思考的滤波器',
     briefing:
-      '1kHz 方波混着你不需要的跳变沿。这次给 RC 低通（1.6kΩ + 100nF，fc≈1kHz）加一级运放缓冲，让滤波器带得起负载。接好 RC → 运放跟随器链路，输出直流均值落在 2.3~2.7V。',
+      '1kHz 方波混着你不需要的跳变沿。这次给 RC 低通（16kΩ + 1µF，fc≈10Hz ≪ 1kHz 信号）加一级运放缓冲，让滤波器带得起负载。接好 RC → 运放跟随器链路，输出直流均值落在 2.3~2.7V。',
     intro: [
       { speaker: 'laozhou', text: '无源 RC 滤波有个老毛病：一接负载，截止频率就漂移。解法是给 RC 后面跟一级运放缓冲——它输出电阻几乎为零，谁来接都不怕。' },
       { speaker: 'xiaohan', text: '跟随器 = 增益为 1 的放大器：输出直接接回反相端！「电压搬运工」，只出力不改数！' },
-      { speaker: 'laozhou', text: 'fc = 1/(2πRC) = 1/(2π×1.6k×100n) ≈ 1kHz。信号频率和 fc 相当时输出剩七成——滤波不是只有「过」与「不过」，中间地带才是学问。' },
+      { speaker: 'laozhou', text: 'fc = 1/(2πRC) = 1/(2π×16k×1µ) ≈ 10Hz，远低于 1kHz 信号——跳变沿被彻底抹平，输出只剩平均值。滤波不是只有「过」与「不过」，衰减多少倍，全看频率离 fc 多远。' },
     ],
     outro: [
       { speaker: 'xiaohan', text: '输出又稳又干净！带多少负载都不塌！' },
@@ -82,8 +82,8 @@ export const C5_LEVELS: LevelDef[] = [
     preset: {
       components: [
         { id: 'FG1', type: 'funcgen', x: 64, y: 176, params: { waveform: 'square', freq: 1000, vmin: 0, vmax: 5, duty: 0.5 }, locked: true },
-        { id: 'R1', type: 'resistor', x: 224, y: 96, params: { resistance: 1600 }, locked: true },
-        { id: 'C1', type: 'capacitor', x: 224, y: 272, params: { capacitance: 100e-9 }, locked: true },
+        { id: 'R1', type: 'resistor', x: 224, y: 96, params: { resistance: 16000 }, locked: true },
+        { id: 'C1', type: 'capacitor', x: 224, y: 272, params: { capacitance: 1e-6 }, locked: true },
         { id: 'U1', type: 'opamp', x: 448, y: 160, locked: true },
         { id: 'GND1', type: 'gnd', x: 64, y: 336, locked: true },
       ],
@@ -105,16 +105,16 @@ export const C5_LEVELS: LevelDef[] = [
     ],
     hints: [
       '两级结构：FG1 → R1 → C1（到地）完成低通；C1 上的电压送进运放 inp，运放 out 直接回接 inn 构成跟随器。',
-      '方波 0~5V、50% 占空比，经过 fc=1kHz 的低通后，高频沿被大幅衰减，输出贴着平均值。',
-      '平均 = 5 × 0.5 = 2.5V。注意 τ=1.6k×100n=0.16ms 与周期相当，输出是微弧的三角波，均值不变。',
+      '方波 0~5V、50% 占空比，经过 fc≈10Hz 的低通后（≪ 1kHz 信号），跳变沿被衰减约百倍，输出贴着平均值。',
+      '平均 = 5 × 0.5 = 2.5V。注意 τ=16k×1µ=16ms ≫ 半周期 0.5ms，电容只来得及微微起伏，输出是 2.5V 上 ±20mV 的细微波纹。',
     ],
     knowledge: {
       title: '有源滤波：给滤波器装上发动机',
-      body: '无源 RC 滤波器的输出阻抗高，负载一接，等效 R 改变、fc 漂移、幅度塌陷。运放缓冲器（电压跟随器）完美解决这个问题：输入阻抗无穷大，不拖累 RC；输出阻抗接近零，带载能力强。两者组合就是有源滤波的基本单元。fc = 1/(2π×1600×100nF) ≈ 995Hz：1kHz 方波的基波恰在 fc 附近被削到 70%，三次以上谐波衰减更重，输出趋向均值 2.5V 的圆滑波形。进阶知识：单级 RC 滚降 −20dB/十倍频，级联两级加运放（Sallen-Key 结构）达 −40dB，想要「砖墙」滤波就上高阶。音频、传感器、通信接收机，处处都是有源滤波的舞台。',
+      body: '无源 RC 滤波器的输出阻抗高，负载一接，等效 R 改变、fc 漂移、幅度塌陷。运放缓冲器（电压跟随器）完美解决这个问题：输入阻抗无穷大，不拖累 RC；输出阻抗接近零，带载能力强。两者组合就是有源滤波的基本单元。fc = 1/(2π×16k×1µF) ≈ 10Hz，远低于 1kHz 信号：方波基波被衰减约百倍（−40dB），谐波更重，输出是均值 2.5V 上 ±20mV 的细微波纹。进阶知识：单级 RC 滚降 −20dB/十倍频，级联两级加运放（Sallen-Key 结构）达 −40dB，想要「砖墙」滤波就上高阶。音频、传感器、通信接收机，处处都是有源滤波的舞台。',
     },
     sim: { duration: 20, probes: [{ comp: 'U1', port: 'out' }, { comp: 'FG1', port: 'out' }] },
-    // 验算: fc=1/(2π×1600×1e-7)=995Hz；1kHz 基波衰减至 ~0.7，谐波更重；
-    // 输出围绕均值 2.5V 波动，τ=0.16ms、半周期 0.5ms 时三角波起伏峰峰≈2.5×(0.5/4τ)…保守估计 ±0.2V 内 → ∈ [2.3,2.7]V ✓
+    // 验算: fc=1/(2π×16k×1µ)=9.95Hz ≪ 1kHz 信号；τ=16ms ≫ 半周期 0.5ms，
+    // 稳态收敛 2.50±0.02V ⊂ [2.3,2.7]V ✓（每半周纹波 ≈ 2.5×(0.5ms/16ms)/4 ≈ ±20mV），可持续 700ms 以上 ✓
   },
   {
     id: 'c5-3',

@@ -1,9 +1,9 @@
 // 回路工坊 — 时域步进仿真器：梯形法伴随模型 + 环形缓冲历史（供示波器）
 // 默认 dt=1e-5s；存在 funcgen 时自适应 dt = min(1e-5, 1/(200·fmax))。
 // 崩溃保护：求解失败自动降步长重试 2 次，仍失败则置 error 并暂停（绝不白屏）。
-import type { CircuitSpec, PortRef } from './types';
+import type { CircuitSpec, ComponentSpec, PortRef } from './types';
 import {
-  compileCircuit, maxFuncgenFreq, newDynState, portKey, solveCompiled,
+  compileCircuit, maxFuncgenFreq, newDynState, numParam, portKey, solveCompiled,
   updateFailures, type Compiled, type DynState, type FailureEvent, type SolveResult,
 } from './solver';
 
@@ -60,19 +60,52 @@ export class CircuitSimulator {
   pendingFailures: FailureEvent[] = [];
   /** 已模拟的采样总数 */
   samples = 0;
+  /**
+   * P1-2 传感器噪声建模：out(t) = output + noise × sin(2π·noiseFreq·t)。
+   * 仅作用于带 noise 参数的 sensor（克隆副本，绝不改写外部电路数据）；
+   * 无 noise 参数时该列表为空，行为与旧版完全一致。
+   */
+  private noisySensors: { comp: ComponentSpec; base: number; noise: number; freq: number }[] = [];
 
   constructor(circuit: CircuitSpec, dt?: number) {
-    this.circuit = circuit;
-    this.compiled = compileCircuit(circuit);
+    this.circuit = this.prepareCircuit(circuit);
+    this.compiled = compileCircuit(this.circuit);
     this.state = newDynState();
-    const fmax = maxFuncgenFreq(circuit);
+    const fmax = maxFuncgenFreq(this.circuit);
     this.dt = dt ?? (fmax > 0 ? Math.min(1e-5, 1 / (200 * fmax)) : 1e-5);
     if (this.compiled.error) this.error = this.compiled.error;
+  }
+
+  /** 找出带噪声的传感器并换成私有克隆（避免污染关卡定义/编辑器电路） */
+  private prepareCircuit(circuit: CircuitSpec): CircuitSpec {
+    this.noisySensors = [];
+    const noisy = circuit.components.filter(c => c.type === 'sensor' && numParam(c, 'noise', 0) > 0);
+    if (noisy.length === 0) return circuit;
+    const cloneById = new Map<string, ComponentSpec>();
+    for (const c of noisy) {
+      const clone: ComponentSpec = { ...c, params: { ...(c.params ?? {}) } };
+      this.noisySensors.push({
+        comp: clone,
+        base: numParam(c, ['output', 'value'], 1.65),
+        noise: numParam(c, 'noise', 0),
+        freq: numParam(c, 'noiseFreq', 1000),
+      });
+      cloneById.set(c.id, clone);
+    }
+    return { ...circuit, components: circuit.components.map(c => cloneById.get(c.id) ?? c) };
+  }
+
+  /** 按当前仿真时间刷新传感器输出（叠加正弦噪声） */
+  private applySensorNoise() {
+    for (const s of this.noisySensors) {
+      s.comp.params!.output = s.base + s.noise * Math.sin(2 * Math.PI * s.freq * this.time);
+    }
   }
 
   /** 推进一步；返回是否成功 */
   step(): boolean {
     if (this.error) return false;
+    this.applySensorNoise();
     let res = solveCompiled(this.compiled, { time: this.time, dt: this.dt, state: this.state });
     // 崩溃保护：降步长重试 2 次
     for (let retry = 0; !res.ok && retry < 2; retry++) {
@@ -141,10 +174,12 @@ export class CircuitSimulator {
   }
 
   reset(circuit?: CircuitSpec) {
-    if (circuit) {
-      this.circuit = circuit;
-      this.compiled = compileCircuit(circuit);
-      const fmax = maxFuncgenFreq(circuit);
+    // circuit === this.circuit 时已是 prepareCircuit 的产物（噪声克隆的 base 完好），直接复用；
+    // 只有外部传入新电路对象时才重新克隆，避免把「叠过噪声的 output」误当基准值。
+    if (circuit && circuit !== this.circuit) {
+      this.circuit = this.prepareCircuit(circuit);
+      this.compiled = compileCircuit(this.circuit);
+      const fmax = maxFuncgenFreq(this.circuit);
       this.dt = fmax > 0 ? Math.min(1e-5, 1 / (200 * fmax)) : 1e-5;
     }
     this.state = newDynState();

@@ -266,7 +266,7 @@ export default function HeroSection({ onWatchDemo }: { onWatchDemo: () => void }
           闯关式电路设计模拟器。拖拽连线、真实波形、信号处理、无线通信、元器件选型——零基础跟着剧情走，老硬件也能复习出新东西。通关毕业设计，照着教程就能去嘉立创打一块真板子。
         </p>
         <div className="hero-fade mb-10 flex items-center gap-4">
-          <PadButton to="/play/m1-1" variant="primary" size="L">
+          <PadButton to="/play/c1-1" variant="primary" size="L">
             ▶ 开始第 1 关：让灯亮起来
           </PadButton>
           <PadButton variant="ghost" size="L" onClick={onWatchDemo}>

@@ -1,8 +1,8 @@
 // 自由沙盒 /sandbox —— 全部件解锁自由搭建 + 函数发生器 + 5 槽存档 + 分享码 + 老手挑战 + CSV 导出
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  FlaskConical, FolderOpen, Import, Link2, Save, Trophy, X,
+  Box, FileBox, FileDown, FileUp, FlaskConical, FolderOpen, Import, Link2, Save, Trophy, X,
 } from 'lucide-react';
 import type { CircuitSpec, ComponentSpec } from '@/engine/types';
 import { formatSI, numParam, solveDC, COMP_META } from '@/engine/solver';
@@ -18,7 +18,11 @@ import WaveformPanel, { CH_NAMES, type ScopeChannel } from '@/components/Wavefor
 import PadButton from '@/components/PadButton';
 import { MultimeterCard, RightCollapseBar, RightPanelHeader, RunControls } from '@/components/editor/WorkbenchBits';
 import { useProgress } from '@/store/progress';
+import { downloadProject, parseProject } from '@/features/pcb3d/projectFile';
 import { cn } from '@/lib/utils';
+
+// 3D PCB 预览器：懒加载（首次打开面板才下载 three.js）
+const Pcb3DViewer = lazy(() => import('@/features/pcb3d/Pcb3DViewer'));
 
 /* ---------------- 存档槽（localStorage cc-sandbox-*） ---------------- */
 interface SaveSlot { name: string; savedAt: number; circuit: CircuitSpec }
@@ -91,6 +95,11 @@ export default function Sandbox() {
   const [challengeOpen, setChallengeOpen] = useState(false);
   const [doneChallenges, setDoneChallenges] = useState<string[]>(readChallenges);
   const [guideStep, setGuideStep] = useState(() => (localStorage.getItem('cc-sandbox-guide-seen') ? 0 : 1));
+  const [preview3d, setPreview3d] = useState(false);
+  const [previewH, setPreviewH] = useState(320);
+  const [projMenu, setProjMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragResizeRef = useRef<{ startY: number; startH: number } | null>(null);
 
   const soundOn = useProgress(s => s.settings.sound);
   useEffect(() => { setSoundEnabled(soundOn); }, [soundOn]);
@@ -166,6 +175,26 @@ export default function Sandbox() {
     setImportOpen(false);
     setImportText('');
     toast('分享码导入成功！', 'ok');
+  };
+
+  /* ---------------- 工程文件（.ccproj.json） ---------------- */
+  const exportProject = () => {
+    const filename = downloadProject(docName, circuitRef.current);
+    setProjMenu(false);
+    toast(`工程已导出为 ${filename}，已保存到下载目录。`, 'ok');
+  };
+  const importProjectFile = async (file: File) => {
+    const text = await file.text();
+    const result = parseProject(text);
+    if (!result.ok) {
+      toast(`导入失败：${result.error}`, 'error');
+      return;
+    }
+    setRunning(false);
+    setCircuit(result.circuit);
+    setDocName(result.name);
+    setProjMenu(false);
+    toast(`工程「${result.name}」导入成功！元件 ${result.circuit.components.length} · 导线 ${result.circuit.wires.length}`, 'ok');
   };
 
   /* ---------------- CSV 导出 ---------------- */
@@ -313,6 +342,57 @@ export default function Sandbox() {
         </div>
 
         <div className="flex-1" />
+        <PadButton
+          size="S"
+          variant={preview3d ? 'primary' : 'ghost'}
+          onClick={() => setPreview3d(v => !v)}
+          title="把当前电路转印成 3D PCB"
+        >
+          <Box className="h-3.5 w-3.5" /> 3D 预览
+        </PadButton>
+        {/* 工程文件菜单 */}
+        <div className="relative">
+          <PadButton size="S" variant="ghost" onClick={() => setProjMenu(v => !v)} title="本地工程文件导入/导出">
+            <FileBox className="h-3.5 w-3.5" /> 工程
+          </PadButton>
+          <AnimatePresence>
+            {projMenu && (
+              <>
+                <div className="fixed inset-0 z-[68]" onClick={() => setProjMenu(false)} />
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="panel-raised absolute right-0 top-full z-[69] mt-1 w-56 rounded-lg border border-ink-700 p-1.5"
+                >
+                  <button
+                    onClick={exportProject}
+                    className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-silk-300 hover:bg-ink-700 hover:text-silk-100"
+                  >
+                    <FileDown className="h-3.5 w-3.5 text-copper-400" />
+                    <span>导出工程 <span className="font-mono text-[10px] text-silk-700">.ccproj.json</span></span>
+                  </button>
+                  <button
+                    onClick={() => { fileInputRef.current?.click(); }}
+                    className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-silk-300 hover:bg-ink-700 hover:text-silk-100"
+                  >
+                    <FileUp className="h-3.5 w-3.5 text-sig-cyan" />
+                    <span>导入工程文件…</span>
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) void importProjectFile(f);
+              e.target.value = '';
+            }}
+          />
+        </div>
         <PadButton size="S" variant="ghost" onClick={() => setSlotDrawer(v => !v)}><FolderOpen className="h-3.5 w-3.5" /> 存档槽</PadButton>
         <PadButton size="S" variant="ghost" onClick={() => saveToSlot(SLOT_KEYS[0])}><Save className="h-3.5 w-3.5" /> 保存</PadButton>
         <PadButton size="S" variant="ghost" onClick={exportShare}><Link2 className="h-3.5 w-3.5" /> 分享码</PadButton>
@@ -429,6 +509,52 @@ export default function Sandbox() {
           </div>
         )}
       </div>
+
+      {/* ---------- 3D PCB 预览抽屉（可拖高度） ---------- */}
+      <AnimatePresence>
+        {preview3d && (
+          <motion.div
+            initial={{ height: 0 }} animate={{ height: previewH }} exit={{ height: 0 }}
+            transition={{ duration: 0.18 }}
+            className="relative shrink-0 overflow-hidden border-t border-ink-700 bg-ink-950"
+          >
+            {/* 拖拽调高把手 */}
+            <div
+              className="absolute left-0 right-0 top-0 z-20 flex h-3 cursor-row-resize items-center justify-center"
+              onPointerDown={e => {
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                dragResizeRef.current = { startY: e.clientY, startH: previewH };
+              }}
+              onPointerMove={e => {
+                const d = dragResizeRef.current;
+                if (!d) return;
+                setPreviewH(Math.min(Math.max(d.startH + (d.startY - e.clientY), 200), window.innerHeight - 320));
+              }}
+              onPointerUp={() => { dragResizeRef.current = null; }}
+              title="拖拽调整预览高度"
+            >
+              <span className="h-1 w-12 rounded-full bg-ink-600" />
+            </div>
+            <div className="absolute left-3 top-2 z-10 flex items-center gap-2 font-mono text-[10px] tracking-[0.25em] text-copper-400">
+              <Box className="h-3 w-3" /> 3D PCB PREVIEW · REV A
+            </div>
+            <button
+              onClick={() => setPreview3d(false)}
+              className="absolute right-3 top-2 z-10 text-silk-500 hover:text-silk-100"
+              title="关闭 3D 预览"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <Suspense fallback={
+              <div className="flex h-full items-center justify-center font-mono text-xs text-silk-500">
+                正在装载 3D 引擎（three.js）…
+              </div>
+            }>
+              <Pcb3DViewer circuit={circuit} currents={activeResult?.branchCurrents ?? null} />
+            </Suspense>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ---------- 底部状态条 ---------- */}
       <div className="flex h-8 shrink-0 items-center gap-5 border-t border-ink-700 bg-ink-900 px-4 font-mono text-[11px] text-silk-500">

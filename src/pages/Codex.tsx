@@ -16,7 +16,7 @@ import Lab, { LAB_DESCS, LAB_TITLES } from '@/features/codex/labs/index';
 import type { LabKind } from '@/features/codex/data/entries';
 import { cn } from '@/lib/utils';
 
-const LAB_ORDER: LabKind[] = ['bands', 'rc', 'led', 'opamp'];
+const LAB_ORDER: LabKind[] = ['bands', 'rc', 'led', 'opamp', 'pullup'];
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });

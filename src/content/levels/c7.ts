@@ -225,7 +225,7 @@ export const C7_LEVELS: LevelDef[] = [
     hints: [
       '按信号流分三段：电源段（BT1→LDO→MCU）、采集段（SEN1→p1）、指示段（p0→电阻→LED）。所有地汇到 GND1。',
       'LDO 输出 3.3V 给 MCU；MCU 的 p0 高电平也是 3.3V。LED 电流 = (3.3−2)÷R。',
-      'RP1 = 150Ω：I = 1.3/150 ≈ 8.7mA。连齐 10 条线，上电即全绿。',
+      'RP1 = 150Ω：I = 1.3/150 ≈ 8.7mA。连齐 10 条线，并双击 U2，勾选 P0 输出高，上电即全绿。',
     ],
     knowledge: {
       title: 'BOM：从电路到产品的最后一跃',

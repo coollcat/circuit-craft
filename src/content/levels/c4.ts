@@ -108,7 +108,7 @@ export const C4_LEVELS: LevelDef[] = [
     hints: [
       '布局顺序：先把电容拖到 U1 旁边（10mm 内），再连线。供电、去耦、输出三条链路分开想清楚。',
       '三条链：BT1 给 U1 供电；CP1 并在 U1 的 vcc 与地之间；U1.p0 → RP1 → LED → 地。',
-      'RP1 = 220Ω。U1 输出高电平 5V，LED 电流 (5−2)/220 ≈ 13.6mA。记得把 U1.gnd 也接地。',
+      'RP1 = 220Ω。U1 输出高电平 5V，LED 电流 (5−2)/220 ≈ 13.6mA。记得把 U1.gnd 也接地，并双击 U1，勾选 P0 输出高。',
     ],
     knowledge: {
       title: '去耦电容：芯片的贴身水库',
@@ -253,7 +253,8 @@ export const C4_LEVELS: LevelDef[] = [
     preset: {
       components: [
         { id: 'BT1', type: 'battery', x: 96, y: 176, params: { voltage: 12 }, locked: true },
-        { id: 'LED1', type: 'led', x: 384, y: 176, params: { vf: 3.2 }, locked: true },
+        // 功率 LED：额定 120mA（imax=0.12A），工作电流 ~83mA 远高于普通 LED 的 20mA 默认额定
+        { id: 'LED1', type: 'led', x: 384, y: 176, params: { vf: 3.2, imax: 0.12 }, locked: true },
       ],
       wires: [],
     },
@@ -283,5 +284,6 @@ export const C4_LEVELS: LevelDef[] = [
     },
     // 验算: R=100Ω 时 I=(12−3.2)/100=88mA ∈ [60,110]mA ✓；R∈[82,120] → I∈[73,107]mA ⊂ [60,110] ✓
     // 电阻功耗 P=I²R=0.088²×100≈0.77W → 需 ≥1W 功率电阻（文案已提示）✓
+    // LED imax=0.12A（功率 LED 额定 120mA）：led-lit 判据 83mA ≤ 1.5×imax=180mA ✓；3×imax=360mA，83mA 不烧毁 ✓
   },
 ];

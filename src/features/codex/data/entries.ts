@@ -1,5 +1,5 @@
 // 图鉴条目数据：16 个元件，六段式（一句话 / 工作原理 / 关键参数 / 选型要点 / 常见坑 / 实物与封装）
-export type LabKind = 'bands' | 'rc' | 'led' | 'opamp';
+export type LabKind = 'bands' | 'rc' | 'led' | 'opamp' | 'pullup';
 export type CategoryId = 'passive' | 'semi' | 'ic' | 'mech';
 
 export interface ParamRow {
@@ -500,7 +500,7 @@ ENTRIES.push(
     analogy: '像一台已经装好发动机的车架：你只需接油（电源）、方向盘（IO）和钥匙（EN），剩下的它自己搞定。',
     params: [
       { param: '工作电压', symbol: 'Vdd', unit: 'V', guide: '3.0~3.6V，标称 3.3V；IO 不耐 5V，需电平转换' },
-      { param: '峰值电流', symbol: 'Ipeak', unit: 'mA', guide: 'Wi-Fi 发射峰值 >500mA，电源按 1A 能力设计' },
+      { param: '峰值电流', symbol: 'Ipeak', unit: 'mA', guide: '平均百 mA 级、瞬时峰值 >500mA，电源按 ≥500mA 设计' },
       { param: '启动电流', symbol: 'Iboot', unit: 'mA', guide: '上电瞬时较大，EN 与 3V3 需足够去耦' },
       { param: 'IO 驱动能力', symbol: 'Iio', unit: 'mA', guide: '单脚约 20mA（建议 12mA 内），别直驱 LED 阵列' },
       { param: 'ADC 范围', symbol: 'Vadc', unit: 'V', guide: '衰减 12dB 档约 0~3.1V；ADC2 与 Wi-Fi 同时使用冲突' },
@@ -535,6 +535,7 @@ ENTRIES.push(
     tagline: '最老的元件，最烦的抖动。',
     essence: '开关：机械触点通断电路，简单却伴随抖动。',
     unlockChapter: 2,
+    lab: 'pullup',
     principle: [
       '靠金属弹片的机械接触导通电流。按下瞬间触点会弹跳数次，产生 5~20ms 的快速通断序列——这就是「按键抖动」，数字电路会把每一次弹跳都当成一次按下。',
       '去抖两招：硬件（RC 低通 + 施密特触发整形）或软件（采样延时 10~20ms 二次确认）。接 MCU 时配合上拉/下拉电阻，让松开态有确定电平。',

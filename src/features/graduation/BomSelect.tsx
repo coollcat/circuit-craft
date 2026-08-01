@@ -136,12 +136,25 @@ const REF_OF: Record<keyof BomSelection, string> = {
   passives: 'R1..C10',
 };
 
+/** 封装热阻 θJA（°C/W，典型值，铺铜一般条件下的估算） */
+const THETA_JA: Record<string, number> = {
+  'SOT-223': 90,
+  'SOT-89': 100,
+  'SOT-23-5': 150,
+  'SOT-23': 150,
+};
+const TA_AMBIENT = 25; // 环境温度估算
+const TJ_SCALE = 150; // 温度条满刻度 °C
+const TJ_WARN = 85;
+const TJ_MAX = 125;
+
 export default function BomSelect({ visitor, onComplete }: { visitor: boolean; onComplete: () => void }) {
   const grad = useGrad();
   const set = useGrad(s => s.set);
   const [sel, setSel] = useState<BomSelection>(grad.bom);
   const [frozen, setFrozen] = useState(grad.bomFrozen);
   const [confirm0402, setConfirm0402] = useState(false);
+  const [loadMa, setLoadMa] = useState(240); // LDO 负载电流滑杆（mA）：换 LDO 时保持，读数实时重算
   const { toasts, push } = useToasts();
 
   const partOf = (cat: keyof BomSelection) => PARTS.find(p => p.id === sel[cat]) ?? null;
@@ -169,6 +182,11 @@ export default function BomSelect({ visitor, onComplete }: { visitor: boolean; o
   // 热校核（按所选 LDO，React Compiler 自动 memo）
   const ldoPart = partOf('ldo');
   const thermal = ldoPart ? { part: ldoPart, full: 1.7 * 0.5, real: 1.7 * 0.24 } : null;
+  // 互动温升：P = (Vin−Vout)·I，Tj ≈ Ta + P·θJA（θJA 按所选 LDO 封装）
+  const thetaJA = ldoPart ? (THETA_JA[ldoPart.pkg] ?? 150) : null;
+  const ldoPower = 1.7 * (loadMa / 1000);
+  const tj = thetaJA !== null ? TA_AMBIENT + ldoPower * thetaJA : null;
+  const tjPct = tj !== null ? Math.min(100, (tj / TJ_SCALE) * 100) : 0;
 
   const choose = (p: Part) => {
     if (frozen) return;
@@ -379,17 +397,93 @@ export default function BomSelect({ visitor, onComplete }: { visitor: boolean; o
           <h4 className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-silk-500">
             <Flame className="h-4 w-4 text-warn" /> 热设计校核（LDO）
           </h4>
-          {thermal ? (
-            <div className="space-y-1.5 font-mono text-xs text-silk-300">
+          {thermal && tj !== null ? (
+            <div className="space-y-3 font-mono text-xs text-silk-300">
+              {/* 负载电流滑杆 */}
+              <label className="block space-y-1">
+                <span className="flex items-baseline justify-between">
+                  <span className="text-silk-300">负载电流 I</span>
+                  <span>
+                    <span className="text-sm font-bold text-copper-300">{loadMa}mA</span>
+                    <span className="ml-2 text-[10px] text-silk-500">ESP32 峰值 ≈240 · 工单满载 500</span>
+                  </span>
+                </span>
+                <input
+                  type="range"
+                  min={50}
+                  max={500}
+                  step={10}
+                  value={loadMa}
+                  onChange={e => setLoadMa(Number(e.target.value))}
+                  className="w-full accent-pcb-500"
+                />
+              </label>
+              <div className="flex gap-2">
+                {([240, 500] as const).map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setLoadMa(v)}
+                    className={cn(
+                      'rounded border px-2 py-0.5 text-[10px] transition-colors',
+                      loadMa === v
+                        ? 'border-pcb-400 bg-pcb-500/15 text-pcb-300'
+                        : 'border-ink-700 text-silk-500 hover:text-silk-300',
+                    )}
+                  >
+                    {v === 240 ? '峰值 240mA' : '满载 500mA'}
+                  </button>
+                ))}
+              </div>
+              {/* 实时功耗 / 结温读数 */}
               <p>
-                满载设计点：P = (5V − 3.3V) × 0.5A ={' '}
-                <span className={thermal.full > 0.6 ? 'text-warn' : 'text-pcb-300'}>{thermal.full.toFixed(2)}W</span>
-                {thermal.part.id === 'ams1117' && <span className="text-warn"> ⚠ SOT-223 满载 90°C+，勿按满载持续跑</span>}
+                P = (5V − 3.3V) × {(loadMa / 1000).toFixed(2)}A ={' '}
+                <span className={ldoPower > 0.6 ? 'text-warn' : 'text-pcb-300'}>{ldoPower.toFixed(2)}W</span>
+                <span className="ml-3 text-silk-500">
+                  θJA（{thermal.part.pkg}）≈ {thetaJA}°C/W
+                </span>
               </p>
               <p>
-                ESP32 实际峰值 240mA：P = 1.7V × 0.24A ={' '}
-                <span className="text-pcb-300">{thermal.real.toFixed(2)}W</span>（占空比低，可接受）
+                估算结温 Tj ≈ {TA_AMBIENT}°C + {ldoPower.toFixed(2)}W × {thetaJA}°C/W ={' '}
+                <span
+                  className={cn(
+                    'text-sm font-bold',
+                    tj > TJ_MAX ? 'text-danger' : tj > TJ_WARN ? 'text-warn' : 'text-pcb-300',
+                  )}
+                >
+                  {tj.toFixed(0)}°C
+                </span>
               </p>
+              {/* 温度进度条：pcb-300 → warn → danger 渐变，85°C / 125°C 刻度线 */}
+              <div>
+                <div className="relative h-3 overflow-hidden rounded-full bg-ink-700">
+                  <motion.div
+                    className="absolute inset-0"
+                    style={{
+                      background: `linear-gradient(90deg, #6FE3A1 0%, #FFB020 ${(TJ_WARN / TJ_SCALE) * 100}%, #FF5263 ${(TJ_MAX / TJ_SCALE) * 100}%)`,
+                      ...(tj > TJ_MAX ? { filter: 'drop-shadow(0 0 6px rgba(255,82,99,0.6))' } : {}),
+                    }}
+                    animate={{ clipPath: `inset(0 ${(100 - tjPct).toFixed(1)}% 0 0)` }}
+                    transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                  />
+                  <div className="absolute top-0 h-full w-px bg-silk-100/70" style={{ left: `${(TJ_WARN / TJ_SCALE) * 100}%` }} />
+                  <div className="absolute top-0 h-full w-px bg-silk-100/70" style={{ left: `${(TJ_MAX / TJ_SCALE) * 100}%` }} />
+                </div>
+                <div className="relative mt-0.5 h-3.5 text-[9px] text-silk-500">
+                  <span className="absolute -translate-x-1/2" style={{ left: `${(TJ_WARN / TJ_SCALE) * 100}%` }}>85°C</span>
+                  <span className="absolute -translate-x-1/2" style={{ left: `${(TJ_MAX / TJ_SCALE) * 100}%` }}>125°C</span>
+                  <span className="absolute right-0">{TJ_SCALE}°C</span>
+                </div>
+              </div>
+              {tj > TJ_MAX ? (
+                <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-danger">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                  结温超限！换封装（θJA 更小）或降压差——压差 1.7V 这么大，就别按这个电流持续跑。
+                </p>
+              ) : tj > TJ_WARN ? (
+                <p className="text-[11px] text-warn">△ 超过 85°C：留足散热铜皮，或换 θJA 更小的封装。</p>
+              ) : (
+                <p className="text-[11px] text-pcb-300">✓ 结温安全，热设计有裕量。</p>
+              )}
               <p className="text-silk-500">
                 {thermal.part.id === 'xc6206'
                   ? '✗ 最大输出 250mA < 峰值 240mA × 1.3 裕量 —— 不合格'

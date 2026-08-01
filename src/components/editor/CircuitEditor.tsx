@@ -544,6 +544,57 @@ export default function CircuitEditor({
                     {formatSI(v.opampOut.get(c.id)!, 'V')}
                   </text>
                 )}
+                {/* MCU 引脚电平指示器：点击切换 p0~p3 输出高 / 高阻输入（与参数弹窗勾选共享同一 params） */}
+                {c.type === 'mcu' && !burned && (
+                  <g transform={`rotate(${c.rotation ?? 0})`}>
+                    {PORT_GEOM.mcu.filter(g => /^p[0-3]$/.test(g.name)).map(g => {
+                      const on = c.params?.[g.name] === true;
+                      return (
+                        <g key={`pinlvl-${g.name}`}>
+                          <circle
+                            cx={g.x + 10}
+                            cy={g.y}
+                            r={5}
+                            fill={on ? '#6FE3A1' : '#8E8976'}
+                            opacity={on ? 1 : 0.55}
+                            stroke="#060A08"
+                            strokeWidth={1}
+                            style={{
+                              cursor: readOnly ? 'default' : 'pointer',
+                              ...(on ? { filter: 'drop-shadow(0 0 5px rgba(111,227,161,0.8))' } : {}),
+                            }}
+                            onPointerDown={e => {
+                              if (readOnly || probeMode) return;
+                              e.stopPropagation();
+                              const circ = circuitRef.current;
+                              emitChange({
+                                ...circ,
+                                components: circ.components.map(x =>
+                                  x.id === c.id ? { ...x, params: { ...x.params, [g.name]: !on } } : x,
+                                ),
+                              });
+                              sfxClick();
+                            }}
+                          >
+                            <title>{`${g.name.toUpperCase()} 输出：${on ? '高' : '高阻输入'} — 点击切换`}</title>
+                          </circle>
+                          <text
+                            x={g.x + 10}
+                            y={g.y + 2.5}
+                            textAnchor="middle"
+                            fontSize={6.5}
+                            fill={on ? '#060A08' : '#F2EFE3'}
+                            fontFamily="JetBrains Mono, monospace"
+                            pointerEvents="none"
+                            style={{ userSelect: 'none' }}
+                          >
+                            {on ? 'H' : 'Z'}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </g>
+                )}
                 {/* 端口 */}
                 {PORT_GEOM[c.type].map(g => {
                   const isFrom = wireFrom?.comp === c.id && wireFrom?.port === g.name;

@@ -98,3 +98,11 @@ export const useProgress = create<ProgressState>()(
     { name: 'cc-save-v1' },
   ),
 );
+
+/**
+ * 云同步挂钩（账号模块专用，见 src/features/account/sync.ts）：
+ * 订阅进度 store 的任意变化，用于防抖自动上传云端；游客态下不会被调用。
+ */
+export function subscribeProgressCloudSync(listener: () => void): () => void {
+  return useProgress.subscribe(listener);
+}

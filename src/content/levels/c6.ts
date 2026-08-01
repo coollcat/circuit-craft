@@ -49,7 +49,7 @@ export const C6_LEVELS: LevelDef[] = [
     hints: [
       '链路方向：信号源 → 发射模块 → 天线。先把三个环节连起来，再调频率。',
       'FG1 的 freq 参数默认 1kHz，远远不够——把它改到 433MHz（433000000）附近。',
-      '连线：FG1.out→MOD1.in，MOD1.out→ANT1.a，两边 gnd 都接 GND1。freq 设 4.33e8。',
+      '连线：FG1.out→MOD1.in，MOD1.out→ANT1.a，两边 gnd 都接 GND1。freq 滑杆拉不到那么快——直接在数字框输入 433000000。',
     ],
     knowledge: {
       title: '载波与调制：无线的底层逻辑',
@@ -173,7 +173,7 @@ export const C6_LEVELS: LevelDef[] = [
     title: '无线传感器节点：林工的正式订单',
     subtitle: '功耗预算是第一约束',
     briefing:
-      '正式订单来了：电池供电的无线温湿度节点——5V 电池，MCU（静态 30mA）采集传感器，状态 LED 指示。客户要求整机电流 38~52mA（电池才能撑过一个季度）。接好传感器 → MCU → LED 全链路，并把总电流压进预算。',
+      '正式订单来了：电池供电的无线温湿度节点——5V 电池，MCU（静态 30mA）采集传感器，状态 LED 指示。客户要求整机电流 38~52mA（电池才能撑过一个季度）。接好传感器 → MCU → LED 全链路；验收看两条账：LED 支路 8~22mA、MCU 静态 28~32mA（合计 30+13.6=43.6mA，在预算内）。',
     intro: [
       { speaker: 'lingong', text: '合同条款我念重点：一节电池，续航一个季度。换算下来整机电流预算 50mA 封顶。超了，退货。这单做好了，毕业设计的单子也是你的。' },
       { speaker: 'laozhou', text: '功耗设计的入手处永远是列账本：MCU 吃多少，外设吃多少，指示灯吃多少，加起来对一对。' },
@@ -207,7 +207,10 @@ export const C6_LEVELS: LevelDef[] = [
       { kind: 'connected', a: { comp: 'RP1', port: 'b' }, b: { comp: 'LED1', port: 'a' } },
       { kind: 'connected', a: { comp: 'LED1', port: 'k' }, b: { comp: 'GND1', port: 'gnd' } },
       { kind: 'led-lit', comp: 'LED1' },
-      { kind: 'branch-current', comp: 'BT1', min: 38, max: 52 },
+      // 功耗预算拆两条账验收（引擎中 GPIO 为独立电压源，LED 电流不经过 BT1 节点）：
+      // LED 支路 13.6mA ∈ [8,22] + MCU 静态 30mA ∈ [28,32]，合计 43.6mA 仍在 38~52mA 预算叙事内
+      { kind: 'branch-current', comp: 'LED1', min: 8, max: 22 },
+      { kind: 'branch-current', comp: 'U1', min: 28, max: 32 },
     ],
     stars: [
       { id: 'first-try', label: '一次满足预算', check: 'first-try' },
@@ -217,12 +220,13 @@ export const C6_LEVELS: LevelDef[] = [
     hints: [
       '总电流 = MCU 静态电流 + LED 支路电流。MCU 是固定的 30mA，你能调的只有 LED 支路。',
       '预算 38~52mA → LED 支路允许 8~22mA → 电阻范围 (5−2)÷I 算一下，220Ω 正好。',
-      'RP1 用 220Ω：LED 支路 13.6mA，总计 43.6mA。按 briefing 把 9 条线连齐。',
+      'RP1 用 220Ω：LED 支路 13.6mA（目标 8~22mA），MCU 静态 30mA（目标 28~32mA），合计 43.6mA 在预算内。按 briefing 把 9 条线连齐，并双击 U1，勾选 P0 输出高。',
     ],
     knowledge: {
       title: '功耗预算：电池产品的生死簿',
       body: '电池产品的设计从一张功耗账开始：各模块电流 × 工作占空比，加权平均后对照电池容量（mAh）推算续航。本关是持续供电的最简情形：30mA（MCU）+ 13.6mA（LED）= 43.6mA，2000mAh 电池理论续航约 46 小时——这就是为什么真实节点必须睡眠。以 ESP32 为例：工作 240mA、浅睡 0.8mA、深睡 10µA，若每小时醒来 3 秒采样发送，平均电流可压到 1mA 以下，续航从 8 小时变成 3 个月。功耗工程的三板斧：降频（功耗∝频率×电压²）、睡眠（掐断时钟与电源域）、外设断电（负载开关）。每省 1mA，电池小一圈，成本降一块——功耗就是钱。',
     },
-    // 验算: LED 支路 I=(5−2)/220=13.6mA；总电流=30+13.6=43.6mA ∈ [38,52]mA ✓（裕量 ±12%）
+    // 验算: LED 支路 I=(5−2)/220=13.6mA ∈ [8,22] ✓；MCU 静态 30mA ∈ [28,32] ✓；
+    // 合计 30+13.6=43.6mA ∈ [38,52]mA 预算叙事保留在 intro/outro/知识卡 ✓（裕量 ±12%）
   },
 ];

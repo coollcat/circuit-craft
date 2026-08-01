@@ -5,6 +5,7 @@ import { Link, NavLink } from 'react-router';
 import { Lock, Settings, Star, Zap } from 'lucide-react';
 import { useProgress } from '@/store/progress';
 import { LEVELS } from '@/content/levels';
+import AccountMenu from '@/features/account/AccountMenu';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -130,6 +131,9 @@ export default function Navbar() {
           >
             <Settings className="h-4 w-4" />
           </button>
+          {/* 账号区：游客态显示登录/注册，登录后显示用户名 + 云同步状态 */}
+          <span className="h-5 w-px bg-ink-700" aria-hidden="true" />
+          <AccountMenu />
 
           {showSettings && (
             <div className="panel-raised absolute right-0 top-12 z-50 w-64 rounded-lg p-4">

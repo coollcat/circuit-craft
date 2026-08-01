@@ -53,7 +53,7 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     hints: [
       '电路结构和主线一样，唯一的变化：电源/引脚电压从 5V 变成了 3.3V。重新算限流电阻。',
       '电阻压降 = 3.3 − 2 = 1.3V。要 6mA 左右：R ≈ 220Ω。',
-      'RP1 = 220Ω：I = 1.3/220 ≈ 5.9mA。供电、地、p0 输出三条链连好。',
+      'RP1 = 220Ω：I = 1.3/220 ≈ 5.9mA。供电、地、p0 输出三条链连好，并双击 U1，勾选 P0 输出高。',
     ],
     knowledge: {
       title: 'GPIO：芯片与世界的握手',
@@ -69,7 +69,7 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     title: '呼吸之间：PWM 的魔法',
     subtitle: '占空比 = 平均电压',
     briefing:
-      '让 LED「半亮」：不用改电阻，用 PWM——让 p1 以 1kHz 高速开关，占空比调到 40~60%。平均电压 = 3.3V × 占空比，LED 亮度和平均值成正比。概念代码：「PWM(p1, 频率 1kHz, 占空比 50%)」。',
+      '让 LED「半亮」：不用改电阻，用 PWM——函数发生器 FG1 扮演 MCU 的 p1，输出 1kHz 方波（0~3.3V），把占空比调到 40~60%。平均电压 = 3.3V × 占空比，LED 亮度和平均值成正比。概念代码：「PWM(p1, 频率 1kHz, 占空比 50%)」。',
     intro: [
       { speaker: 'xiaohan', text: 'PWM 就是「超高速开关」！开一半时间、关一半时间，眼睛看到的是一半亮度——骗过眼睛的艺术！' },
       { speaker: 'laozhou', text: '数字引脚只有高和低两种状态，但平均电压可以是任意值：V平均 = V高 × 占空比。3.3V 的 50% 就是 1.65V。这是数字世界冒充模拟世界的看家本领。' },
@@ -84,8 +84,9 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     ],
     preset: {
       components: [
-        { id: 'BT1', type: 'battery', x: 64, y: 176, params: { voltage: 3.3 }, locked: true },
-        { id: 'U1', type: 'mcu', x: 288, y: 176, params: { pinVoltage: 3.3, current: 20, duty: 0.1, pwmFreq: 1000 }, locked: true },
+        // P0-4 修复：PWM 源换成函数发生器（schema 支持 duty 编辑）——方波 0~3.3V / 1kHz，
+        // duty 默认 0.1（太暗，需玩家调高）；扮演 MCU p1 的 PWM 输出，教学点不变
+        { id: 'FG1', type: 'funcgen', x: 64, y: 176, params: { waveform: 'square', freq: 1000, vmin: 0, vmax: 3.3, duty: 0.1 }, locked: true },
         { id: 'LED1', type: 'led', x: 512, y: 176, params: { vf: 2 }, locked: true },
         { id: 'GND1', type: 'gnd', x: 64, y: 336, locked: true },
       ],
@@ -93,14 +94,11 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     },
     goals: [
       { kind: 'component-placed', type: 'resistor', count: 1 },
-      { kind: 'connected', a: { comp: 'BT1', port: 'pos' }, b: { comp: 'U1', port: 'vcc' } },
-      { kind: 'connected', a: { comp: 'U1', port: 'gnd' }, b: { comp: 'GND1', port: 'gnd' } },
-      { kind: 'connected', a: { comp: 'BT1', port: 'neg' }, b: { comp: 'GND1', port: 'gnd' } },
-      { kind: 'connected', a: { comp: 'U1', port: 'p1' }, b: { comp: 'RP1', port: 'a' } },
+      { kind: 'connected', a: { comp: 'FG1', port: 'out' }, b: { comp: 'RP1', port: 'a' } },
       { kind: 'connected', a: { comp: 'RP1', port: 'b' }, b: { comp: 'LED1', port: 'a' } },
       { kind: 'connected', a: { comp: 'LED1', port: 'k' }, b: { comp: 'GND1', port: 'gnd' } },
-      { kind: 'param', comp: 'U1', param: 'duty', min: 0.4, max: 0.6 },
-      { kind: 'led-lit', comp: 'LED1' },
+      { kind: 'connected', a: { comp: 'FG1', port: 'gnd' }, b: { comp: 'GND1', port: 'gnd' } },
+      { kind: 'param', comp: 'FG1', param: 'duty', min: 0.4, max: 0.6 },
     ],
     stars: [
       { id: 'first-try', label: '一次调到半亮', check: 'first-try' },
@@ -108,16 +106,18 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
     hints: [
-      '电路与 sa-1 相同（只是换成 p1），关键是 U1 的 duty（占空比）参数。',
+      '电路与 sa-1 相似，只是驱动源换成函数发生器 FG1（扮演 MCU 的 PWM 引脚）。关键是 FG1 的 duty（占空比）参数。',
       'duty 默认 0.1（太暗），改成 0.5：平均电压 3.3×0.5=1.65V，LED 半亮。',
-      'RP1 = 220Ω 接好 p1→LED 链路，把 U1.duty 设成 0.5。',
+      'FG1 已预置方波 0~3.3V、1kHz，把 duty 设成 0.5；RP1 = 220Ω 接好 FG1.out→RP1→LED→地。',
     ],
     knowledge: {
       title: 'PWM：数字引脚的模拟梦',
       body: 'PWM（脉宽调制）以固定频率输出方波，用占空比编码「等效电压」：Vavg = Vcc × D。1kHz、50% 占空比的 3.3V 方波，对 LED、电机这类「慢」负载而言，与 1.65V 直流几乎没有区别。它统治着调光、电机调速、舵机角度、开关电源——凡是要「数字控制功率」的地方就有它。两个设计参数：频率要远高于负载的响应带宽（灯丝用几百 Hz，电机几 kHz，音频 D 类功放几百 kHz），否则负载会跟着抖动；分辨率由定时器位数决定，ESP32 的 LEDC 可到 16 位，65536 级亮度。配合 RC 低通滤波（c3-4 那一课），PWM 甚至能变成粗糙的 DAC——占空比扫起来，就是任意波形。',
     },
-    sim: { duration: 10, probes: [{ comp: 'U1', port: 'p1' }] },
+    sim: { duration: 10, probes: [{ comp: 'FG1', port: 'out' }] },
     // 验算: 导通相 I=(3.3−2)/220=5.9mA；占空比 0.5 → 平均电流≈2.95mA，平均电压 1.65V；LED 以等效亮度点亮 ✓
+    // 目标为 duty 参数 + 连线（均为静态判定），可稳定保持 700ms 胜利条件 ✓
+    // （瞬时 led-lit 会随方波相位翻转、无法持续 700ms，故验收不含它——见审计 §二.4：led-lit 只判 >1mA，本就无法区分「半亮」）
   },
   {
     id: 'sa-3',
@@ -292,7 +292,7 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     hints: [
       '这是 sa-1 与 sa-3 的合体：p0 带 LED（220Ω），p1 带按键上拉（10kΩ）。',
       '上拉让 p1 默认 3.3V；程序层面（概念代码）用「当 p1 下降沿时」触发 p0 点亮。',
-      'RP1=10kΩ 上拉、RP2=220Ω 限流，连线 10 条见 briefing。',
+      'RP1=10kΩ 上拉、RP2=220Ω 限流，连线 10 条见 briefing，并双击 U1，勾选 P0 输出高。',
     ],
     knowledge: {
       title: '中断与事件驱动思维',
@@ -357,7 +357,7 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     hints: [
       '三条链：供电（3.3V 同时喂 U1 和 MOD1）、射频（p1→MOD1→天线）、指示（p0→电阻→LED）。',
       '天线阻抗用主线第 6 章的答案：50Ω。LED 限流：3.3V 体系 220Ω。',
-      'RP1=220Ω、ANT1=50Ω，按 briefing 连 11 条线。',
+      'RP1=220Ω、ANT1=50Ω，按 briefing 连 11 条线，并双击 U1，勾选 P0、P1 输出高。',
     ],
     knowledge: {
       title: '物联网节点的最小系统',

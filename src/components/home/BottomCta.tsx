@@ -62,7 +62,7 @@ export default function BottomCta() {
           ))}
         </motion.h2>
         <div onMouseEnter={() => setEnergized(true)} onMouseLeave={() => setEnergized(false)}>
-          <PadButton to="/play/m1-1" variant="primary" size="L">
+          <PadButton to="/play/c1-1" variant="primary" size="L">
             ▶ 开始第 1 关
           </PadButton>
         </div>

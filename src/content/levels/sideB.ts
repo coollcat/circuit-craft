@@ -255,7 +255,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
     ],
     preset: {
       components: [
-        { id: 'SEN1', type: 'sensor', x: 48, y: 176, params: { output: 0.1, noise: 0.01, noiseFreq: 10000 }, locked: true },
+        // 噪声幅度 4mV：经 20 倍放大为 ±80mV，仍在 U1.out 判定窗口 [1.9,2.1] 内（±100mV），
+        // 示波器上滤波前可见噪声、滤波后干净；P1-2 噪声建模落地后本关目标全程可持续成立
+        { id: 'SEN1', type: 'sensor', x: 48, y: 176, params: { output: 0.1, noise: 0.004, noiseFreq: 10000 }, locked: true },
         { id: 'U1', type: 'opamp', x: 240, y: 144, locked: true },
         { id: 'R1', type: 'resistor', x: 192, y: 304, params: { resistance: 1000 }, locked: true },
         { id: 'R2', type: 'resistor', x: 416, y: 96, params: { resistance: 1000 }, locked: true },
@@ -297,6 +299,7 @@ export const SIDE_B_LEVELS: LevelDef[] = [
     },
     sim: { duration: 20, probes: [{ comp: 'U1', port: 'out' }, { comp: 'R2', port: 'b' }] },
     // 验算: G=1+19k/1k=20 → 0.1V×20=2.0V ∈ [1.9,2.1] ✓；RP2∈[18.2k,19.8k] → [1.92,2.08] ⊂ ✓
-    // RC: fc=1/(2π×1k×1µ)=159Hz，直流 2.0V 无损通过；10kHz 噪声(0.01V×20=0.2V)衰减≈63倍→约 3mV ✓
+    // RC: fc=1/(2π×1k×1µ)=159Hz，直流 2.0V 无损通过；10kHz 噪声(0.004V×20=0.08V)衰减≈63倍→约 1.3mV ✓
+    // 噪声 4mV×20=±80mV < 判定窗口 ±100mV → 含噪声的瞬时输出仍全程 ∈ [1.9,2.1] ✓
   },
 ];

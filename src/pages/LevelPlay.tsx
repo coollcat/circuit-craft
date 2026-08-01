@@ -1,9 +1,9 @@
 // 关卡游玩页 /play/:levelId —— 三栏工作台 + 准物理仿真 + 渐进提示 + 防卡关 + QC PASS 结算
 // 数据暂为空时用 fixtures 兜底并显示「内容装载中」占位，不得报红。
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, Lightbulb, Stamp, Trophy } from 'lucide-react';
+import { ArrowLeft, Box, Check, Lightbulb, Stamp, Trophy } from 'lucide-react';
 import type { CircuitSpec, DialogueLine, GoalCheck, LevelDef, WireSpec } from '@/engine/types';
 import { evaluateGoals, formatSI, solveDC, type GoalStatus } from '@/engine/solver';
 import { FIXTURE_LEVELS } from '@/engine/fixtures';
@@ -22,6 +22,9 @@ import PadButton from '@/components/PadButton';
 import SilkTag from '@/components/SilkTag';
 import { MultimeterCard, NotesCard, RightCollapseBar, RightPanelHeader, RunControls } from '@/components/editor/WorkbenchBits';
 import { cn } from '@/lib/utils';
+
+// 3D PCB 预览器：懒加载（结算弹窗里展开才下载 three.js）
+const Pcb3DViewer = lazy(() => import('@/features/pcb3d/Pcb3DViewer'));
 
 function clonePreset(level: LevelDef): CircuitSpec {
   return {
@@ -472,6 +475,8 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
         elapsed={elapsed}
         hintsTier={hintsUsedTier}
         compCount={circuit.components.length}
+        circuit={circuit}
+        currents={activeResult?.branchCurrents ?? null}
         nextLevelId={nextLevel?.id}
         onReplay={resetAll}
       />
@@ -544,11 +549,13 @@ function HintDrawer({ open, onClose, hints, tier, onOpen, l3Confirm }: {
 }
 
 /* ================= 过关结算 VictoryModal ================= */
-function VictoryModal({ open, level, stars, elapsed, hintsTier, compCount, nextLevelId, onReplay }: {
+function VictoryModal({ open, level, stars, elapsed, hintsTier, compCount, circuit, currents, nextLevelId, onReplay }: {
   open: boolean; level: LevelDef; stars: boolean[]; elapsed: number; hintsTier: number; compCount: number;
+  circuit: CircuitSpec; currents: Map<string, number> | null;
   nextLevelId?: string; onReplay: () => void;
 }) {
   const mm = Math.floor(elapsed / 60), ss = elapsed % 60;
+  const [show3d, setShow3d] = useState(false);
   return (
     <AnimatePresence>
       {open && (
@@ -561,7 +568,7 @@ function VictoryModal({ open, level, stars, elapsed, hintsTier, compCount, nextL
             initial={{ scale: 0.96, y: 12 }}
             animate={{ scale: 1, y: 0 }}
             transition={{ duration: 0.28 }}
-            className="panel-raised relative w-[560px] rounded-xl p-8"
+            className="panel-raised relative max-h-[calc(100dvh-96px)] w-[560px] overflow-y-auto rounded-xl p-8"
           >
             {/* QC PASS 印章 */}
             <motion.div
@@ -615,10 +622,48 @@ function VictoryModal({ open, level, stars, elapsed, hintsTier, compCount, nextL
             </motion.div>
 
             {/* 数据行 */}
-            <div className="mb-6 flex justify-center gap-6 font-mono text-xs text-silk-500">
+            <div className="mb-5 flex justify-center gap-6 font-mono text-xs text-silk-500">
               <span>用时 {mm}:{String(ss).padStart(2, '0')}</span>
               <span>提示 L{hintsTier}</span>
               <span>元件 {compCount} 个</span>
+            </div>
+
+            {/* 3D PCB 折叠区：通关仪式感，展开才加载 three.js */}
+            <div className="mx-auto mb-6 w-full rounded-lg border border-ink-700 bg-ink-900/60">
+              <button
+                onClick={() => setShow3d(v => !v)}
+                className="flex w-full items-center justify-between px-4 py-2.5"
+              >
+                <span className="flex items-center gap-2 font-mono text-[11px] tracking-[0.2em] text-copper-300">
+                  <Box className="h-3.5 w-3.5" /> 看看它的 3D 样子
+                </span>
+                <span className="font-mono text-[10px] text-silk-700">{show3d ? '▲ 收起' : '▼ 打板成品'}</span>
+              </button>
+              <AnimatePresence>
+                {show3d && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 260, opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden border-t border-ink-700"
+                  >
+                    <div className="h-[260px]">
+                      <Suspense fallback={
+                        <div className="flex h-full items-center justify-center font-mono text-xs text-silk-500">
+                          正在装载 3D 引擎（three.js）…
+                        </div>
+                      }>
+                        <Pcb3DViewer
+                          circuit={circuit}
+                          currents={currents}
+                          emptyHint="这关还没搭出电路——重玩一次，搭好了再来看成品板。"
+                        />
+                      </Suspense>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="flex items-center justify-center gap-3">

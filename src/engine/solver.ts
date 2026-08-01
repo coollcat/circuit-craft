@@ -59,7 +59,7 @@ export const DEFAULT_PARAMS: Record<ComponentType, Record<string, number | strin
   crystal: { capacitance: 12e-12 },
   antenna: { impedance: 50 },
   sensor: { output: 1.65 },
-  mcu: { pinVoltage: 3.3, current: 20, p0: false, p1: false, p2: false, p3: false },
+  mcu: { pinVoltage: 3.3, current: 20, fs: 500, p0: false, p1: false, p2: false, p3: false },
   ic: { vout: 3.3 },
   fuse: { rating: 0.5 },
   funcgen: { waveform: 'sine', freq: 1000, vmin: 0, vmax: 5, duty: 0.5 },
@@ -97,7 +97,7 @@ export const COMP_META: Record<ComponentType, CompMeta> = {
   crystal: { name: '晶振', group: '机电', note: '教学近似：12pF 电容（不起振）' },
   antenna: { name: '天线', group: '无线', note: '教学近似：对地 50Ω 纯阻负载（impedance 可调）' },
   sensor: { name: '传感器', group: '集成', note: '教学近似：out 输出理想电压源（output 参数）' },
-  mcu: { name: '单片机', group: '集成', note: '教学近似：静态电流 current(mA) + GPIO 电平源 pinVoltage' },
+  mcu: { name: '单片机', group: '集成', note: '教学近似：静态电流 current(mA)；GPIO 置高=pinVoltage 电压源，未置高=高阻输入' },
   ic: { name: 'LDO 稳压器', group: '集成', note: '教学近似：vin>vout+0.8V 时 out=vout，否则跟随 vin-0.8V' },
   fuse: { name: '保险丝', group: '机电', note: 'I>rating 熔断开路' },
   funcgen: { name: '函数发生器', group: '电源', note: '正弦/方波/三角波：freq + vmin/vmax + duty' },
@@ -259,7 +259,12 @@ export function compileCircuit(circuit: CircuitSpec): Compiled {
       vsrcBranches.push({ comp: c, kind: 'sensor', netP: netOfPort(c, 'out'), netN: 0 });
     } else if (c.type === 'mcu') {
       for (const pin of ['p0', 'p1', 'p2', 'p3']) {
-        vsrcBranches.push({ comp: c, kind: 'mcu-io', netP: netOfPort(c, pin), netN: 0, port: pin });
+        // P0-1 修复：引脚未置高 = 高阻输入（不建对地电压源支路，节点仅保留 GMIN），
+        // 置高 = pinVoltage 理想电压源。旧模型把未置高引脚钳在 0V，会拉垮 ADC 采样
+        // （c5-3/sa-4）、与传感器/信号源并联造成矩阵奇异（c6-4/c7-4/sb-3）。
+        if (boolParam(c, pin)) {
+          vsrcBranches.push({ comp: c, kind: 'mcu-io', netP: netOfPort(c, pin), netN: 0, port: pin });
+        }
       }
     } else if (c.type === 'ic') {
       vsrcBranches.push({ comp: c, kind: 'ldo', netP: netOfPort(c, 'out'), netN: 0 });

@@ -301,7 +301,7 @@ export const PARAM_SCHEMA: Partial<Record<ComponentType, ParamField[]>> = {
   opamp: [{ key: 'gain', label: '开环增益', min: 1e3, max: 1e7, log: true }],
   funcgen: [
     { key: 'waveform', label: '波形', options: [{ value: 'sine', label: '正弦' }, { value: 'square', label: '方波' }, { value: 'triangle', label: '三角' }] },
-    { key: 'freq', label: '频率', unit: 'Hz', min: 0.1, max: 1e6, log: true },
+    { key: 'freq', label: '频率', unit: 'Hz', min: 0.1, max: 1e9, log: true },
     { key: 'vmin', label: '低电平', unit: 'V', min: -15, max: 15, step: 0.1 },
     { key: 'vmax', label: '高电平', unit: 'V', min: -15, max: 15, step: 0.1 },
     { key: 'duty', label: '占空比', min: 0.05, max: 0.95, step: 0.05 },
@@ -310,6 +310,7 @@ export const PARAM_SCHEMA: Partial<Record<ComponentType, ParamField[]>> = {
   mcu: [
     { key: 'pinVoltage', label: 'IO 高电平', unit: 'V', min: 1.8, max: 5, step: 0.1 },
     { key: 'current', label: '静态电流', unit: 'mA', min: 1, max: 200, step: 1 },
+    { key: 'fs', label: '采样率', unit: 'Hz', min: 10, max: 100000, log: true, help: 'ADC 每秒采样次数；奈奎斯特：fs > 2 × 信号最高频率' },
     { key: 'p0', label: 'P0 输出高', toggle: true }, { key: 'p1', label: 'P1 输出高', toggle: true },
     { key: 'p2', label: 'P2 输出高', toggle: true }, { key: 'p3', label: 'P3 输出高', toggle: true },
   ],
