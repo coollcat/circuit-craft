@@ -18,6 +18,8 @@ export interface ProgressState {
   settings: ProgressSettings;
   completeLevel: (id: string, stars: number) => void;
   useHint: (levelId: string, tier: number) => void;
+  /** 重玩/重置本关时清零该关提示记录：无提示星按「本次尝试」判定，可重新挑战 */
+  clearHints: (levelId: string) => void;
   isLevelUnlocked: (id: string) => boolean;
   totalStars: () => number;
   setSettings: (patch: Partial<ProgressSettings>) => void;
@@ -66,6 +68,15 @@ export const useProgress = create<ProgressState>()(
             [levelId]: Math.max(state.hintsUsed[levelId] ?? 0, tier),
           },
         })),
+
+      clearHints: levelId => {
+        if (!(levelId in get().hintsUsed)) return; // 无记录则不触发订阅（避免无意义云同步）
+        set(state => {
+          const hintsUsed = { ...state.hintsUsed };
+          delete hintsUsed[levelId];
+          return { hintsUsed };
+        });
+      },
 
       isLevelUnlocked: id => {
         const level = ALL().find(l => l.id === id);

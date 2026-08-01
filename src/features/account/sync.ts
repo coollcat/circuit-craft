@@ -8,6 +8,7 @@ import superjson from 'superjson';
 import type { AppRouter } from '../../../api/router';
 import { useProgress, subscribeProgressCloudSync } from '@/store/progress';
 import { useGrad } from '@/features/graduation/store';
+import { safeGetItem, safeRemoveItem, safeSetItem } from '@/lib/safeStorage';
 import { useAccount } from './store';
 
 const TOKEN_KEY = 'cc-account-token';
@@ -39,30 +40,20 @@ const client = createTRPCClient<AppRouter>({
 /* ---------------- 凭据读写 ---------------- */
 
 export function getToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
+  // safeGetItem：存储被禁用时回落内存副本，会话内登录态仍可用
+  return safeGetItem(TOKEN_KEY);
 }
 
 export function saveCredentials(token: string, username: string) {
-  try {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(NAME_KEY, username);
-  } catch {
-    /* localStorage 不可用时仅内存态 */
-  }
+  // 写失败自动降级内存（仅本次会话持有登录态），safeStorage 单次警告
+  safeSetItem(TOKEN_KEY, token);
+  safeSetItem(NAME_KEY, username);
   useAccount.getState().setAuth(token, username);
 }
 
 function clearCredentials() {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(NAME_KEY);
-  } catch {
-    /* ignore */
-  }
+  safeRemoveItem(TOKEN_KEY);
+  safeRemoveItem(NAME_KEY);
   useAccount.getState().setAuth(null, null);
 }
 
@@ -72,12 +63,9 @@ export function packLocalSave(): string {
   const bag: Record<string, string> = {};
   const keys = [...FIXED_KEYS, ...SANDBOX_KEYS];
   for (const key of keys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw != null) bag[key] = raw;
-    } catch {
-      /* 单个键读取失败不影响其它键 */
-    }
+    // safeGetItem 自带容错（读取失败回落内存副本），单键异常不影响其它键
+    const raw = safeGetItem(key);
+    if (raw != null) bag[key] = raw;
   }
   try {
     return JSON.stringify(bag);
@@ -119,11 +107,8 @@ export function applySavePayload(payload: string): boolean {
     for (const key of keys) {
       const v = bag[key];
       if (typeof v === 'string') {
-        try {
-          localStorage.setItem(key, v);
-        } catch {
-          /* ignore */
-        }
+        // 写失败降级内存，云端存档本会话内仍生效，只是不持久化
+        safeSetItem(key, v);
       }
     }
     // 让 zustand persist store 重新读取 localStorage
@@ -338,8 +323,8 @@ export function initCloudSync(): void {
   inited = true;
 
   try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const username = localStorage.getItem(NAME_KEY);
+    const token = safeGetItem(TOKEN_KEY);
+    const username = safeGetItem(NAME_KEY);
     if (token) {
       useAccount.getState().setAuth(token, username ?? '焊友');
       // 启动时静默对齐一次：云端为空则推本地；有冲突先标记，不打断游玩
@@ -371,7 +356,8 @@ export function initCloudSync(): void {
   // 毕业设计 store（cc-graduation-v1）变化
   useGrad.subscribe(() => schedulePush());
 
-  // 沙盒槽 / 挑战记录是直接 localStorage.setItem 写入的，包装一层捕获
+  // 沙盒槽 / 挑战记录经 safeSetItem → localStorage.setItem 写入（safeStorage 动态
+  // 调用，会经过这里包装后的版本），包装一层捕获
   try {
     const rawSetItem = localStorage.setItem.bind(localStorage);
     localStorage.setItem = (key: string, value: string) => {

@@ -16,21 +16,24 @@ import { useSimulation, defaultTimebase } from '@/components/editor/useSimulatio
 import { setSoundEnabled } from '@/components/editor/sound';
 import WaveformPanel, { CH_NAMES, type ScopeChannel } from '@/components/WaveformPanel';
 import PadButton from '@/components/PadButton';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { MultimeterCard, RightCollapseBar, RightPanelHeader, RunControls } from '@/components/editor/WorkbenchBits';
+import { safeGetItem, safeSetItem, setStorageWarnHandler } from '@/lib/safeStorage';
 import { useProgress } from '@/store/progress';
-import { downloadProject, parseProject } from '@/features/pcb3d/projectFile';
+import { parseProject, serializeProject } from '@/features/pcb3d/projectFile';
 import { cn } from '@/lib/utils';
 
 // 3D PCB 预览器：懒加载（首次打开面板才下载 three.js）
 const Pcb3DViewer = lazy(() => import('@/features/pcb3d/Pcb3DViewer'));
 
 /* ---------------- 存档槽（localStorage cc-sandbox-*） ---------------- */
-interface SaveSlot { name: string; savedAt: number; circuit: CircuitSpec }
+// pcb? 仅作历史字段容忍：旧槽位 JSON 里可能带 pcb 布局，读取时忽略、新存档不再写入
+interface SaveSlot { name: string; savedAt: number; circuit: CircuitSpec; pcb?: unknown }
 const SLOT_KEYS = [1, 2, 3, 4, 5].map(i => `cc-sandbox-${i}`);
 
 function readSlot(key: string): SaveSlot | null {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = safeGetItem(key);
     if (!raw) return null;
     const s = JSON.parse(raw) as SaveSlot;
     return s && s.circuit ? s : null;
@@ -69,7 +72,7 @@ const CHALLENGES: Challenge[] = [
 ];
 const CH_KEY = 'cc-sandbox-challenges';
 function readChallenges(): string[] {
-  try { return JSON.parse(localStorage.getItem(CH_KEY) ?? '[]'); } catch { return []; }
+  try { return JSON.parse(safeGetItem(CH_KEY) ?? '[]'); } catch { return []; }
 }
 
 const EMPTY_CIRCUIT: CircuitSpec = { components: [], wires: [] };
@@ -94,7 +97,7 @@ export default function Sandbox() {
   const [importText, setImportText] = useState('');
   const [challengeOpen, setChallengeOpen] = useState(false);
   const [doneChallenges, setDoneChallenges] = useState<string[]>(readChallenges);
-  const [guideStep, setGuideStep] = useState(() => (localStorage.getItem('cc-sandbox-guide-seen') ? 0 : 1));
+  const [guideStep, setGuideStep] = useState(() => (safeGetItem('cc-sandbox-guide-seen') ? 0 : 1));
   const [preview3d, setPreview3d] = useState(false);
   const [previewH, setPreviewH] = useState(320);
   const [projMenu, setProjMenu] = useState(false);
@@ -103,6 +106,12 @@ export default function Sandbox() {
 
   const soundOn = useProgress(s => s.settings.sound);
   useEffect(() => { setSoundEnabled(soundOn); }, [soundOn]);
+
+  // 存储写失败（隐私模式/配额满）时的一次性警告（safeStorage 只触发一次）
+  useEffect(() => {
+    setStorageWarnHandler(msg => toast(msg, 'error'));
+    return () => setStorageWarnHandler(null);
+  }, []);
 
   const palette = useMemo(fullSandboxPalette, []);
   const emptyUsed = useMemo(() => new Set<string>(), []);
@@ -140,14 +149,15 @@ export default function Sandbox() {
     const existing = readSlot(key);
     if (existing && !window.confirm(`覆盖槽位「${existing.name}」？`)) return;
     const slot: SaveSlot = { name: docName, savedAt: Date.now(), circuit: circuitRef.current };
-    localStorage.setItem(key, JSON.stringify(slot));
-    toast(`已保存到 ${key.replace('cc-sandbox-', '槽位 ')}。`, 'ok');
+    // 写失败降级内存并弹一次性警告（safeStorage），这里只在真正持久化时报成功
+    const persisted = safeSetItem(key, JSON.stringify(slot));
+    if (persisted) toast(`已保存到 ${key.replace('cc-sandbox-', '槽位 ')}。`, 'ok');
   };
   const loadSlot = (key: string) => {
     const s = readSlot(key);
     if (!s) return;
     setRunning(false);
-    setCircuit(s.circuit);
+    setCircuit(s.circuit); // s.pcb（旧存档的 PCB 布局字段）有意忽略
     setDocName(s.name);
     setSlotDrawer(false);
     toast(`已载入「${s.name}」。`, 'ok');
@@ -177,11 +187,19 @@ export default function Sandbox() {
     toast('分享码导入成功！', 'ok');
   };
 
-  /* ---------------- 工程文件（.ccproj.json） ---------------- */
+  /* ---------------- 工程文件（.ccproj.json；旧文件里可能带 pcb 字段，parseProject 会自然忽略） ---------------- */
   const exportProject = () => {
-    const filename = downloadProject(docName, circuitRef.current);
+    const text = serializeProject(docName, circuitRef.current);
+    const safe = (docName.trim() || '未命名电路').replace(/[\\/:*?"<>|]/g, '_');
+    const filename = `${safe}.ccproj.json`;
+    const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
     setProjMenu(false);
-    toast(`工程已导出为 ${filename}，已保存到下载目录。`, 'ok');
+    toast(`工程已导出为 ${filename}。`, 'ok');
   };
   const importProjectFile = async (file: File) => {
     const text = await file.text();
@@ -227,7 +245,7 @@ export default function Sandbox() {
   const toggleChallenge = (id: string) => {
     setDoneChallenges(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-      localStorage.setItem(CH_KEY, JSON.stringify(next));
+      safeSetItem(CH_KEY, JSON.stringify(next));
       return next;
     });
   };
@@ -299,6 +317,11 @@ export default function Sandbox() {
             <Trophy className="h-3 w-3" /> · 沙盒玩家
           </span>
         )}
+
+        {/* 原理图双层走线提示：顶/底层切换 + 过孔（画布工具区内操作） */}
+        <span className="mx-1 hidden rounded border border-ink-700 bg-ink-850 px-2.5 py-1 font-mono text-[11px] text-silk-500 lg:inline" title="原理图支持双层走线：顶层/底层切换 + V 键过孔换层">
+          原理图 · 双层走线
+        </span>
 
         {/* 信号源控制 */}
         <div className="mx-1 flex items-center gap-2 rounded border border-ink-700 bg-ink-850 px-3 py-1">
@@ -454,10 +477,10 @@ export default function Sandbox() {
                     : '做完记得点 💾 保存到存档槽；分享码可以发给朋友，他们粘贴导入就能看到你的电路。'}
                 </p>
                 <div className="flex justify-end gap-2">
-                  <PadButton size="S" variant="ghost" onClick={() => { setGuideStep(0); localStorage.setItem('cc-sandbox-guide-seen', '1'); }}>跳过</PadButton>
+                  <PadButton size="S" variant="ghost" onClick={() => { setGuideStep(0); safeSetItem('cc-sandbox-guide-seen', '1'); }}>跳过</PadButton>
                   <PadButton size="S" onClick={() => {
                     if (guideStep === 1) setGuideStep(2);
-                    else { setGuideStep(0); localStorage.setItem('cc-sandbox-guide-seen', '1'); }
+                    else { setGuideStep(0); safeSetItem('cc-sandbox-guide-seen', '1'); }
                   }}>
                     {guideStep === 1 ? '下一步' : '开工！'}
                   </PadButton>
@@ -545,13 +568,16 @@ export default function Sandbox() {
             >
               <X className="h-4 w-4" />
             </button>
-            <Suspense fallback={
-              <div className="flex h-full items-center justify-center font-mono text-xs text-silk-500">
-                正在装载 3D 引擎（three.js）…
-              </div>
-            }>
-              <Pcb3DViewer circuit={circuit} currents={activeResult?.branchCurrents ?? null} />
-            </Suspense>
+            {/* 3D 局部兜底：chunk 加载失败 / WebGL 不可用时只降级本区域，不带走整站 */}
+            <ErrorBoundary variant="viewer">
+              <Suspense fallback={
+                <div className="flex h-full items-center justify-center font-mono text-xs text-silk-500">
+                  正在装载 3D 引擎（three.js）…
+                </div>
+              }>
+                <Pcb3DViewer circuit={circuit} currents={activeResult?.branchCurrents ?? null} />
+              </Suspense>
+            </ErrorBoundary>
           </motion.div>
         )}
       </AnimatePresence>

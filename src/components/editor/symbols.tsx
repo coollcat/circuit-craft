@@ -73,68 +73,74 @@ export function compRadius(comp: ComponentSpec): number {
 }
 
 const S = { stroke: '#F2EFE3', strokeWidth: 2, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-const LEAD = (x1: number, y1: number, x2: number, y2: number, key: string) => (
-  <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} {...S} />
-);
 
-/** 元件符号主体（不含端口圆点/位号），中心原点，未旋转 */
-export function SymbolGlyph({ type, closed, burned }: { type: ComponentType; closed?: boolean; burned?: boolean }) {
-  const stroke = burned ? '#55524A' : '#F2EFE3';
+/** 元件符号主体（不含端口圆点/位号），中心原点，未旋转。
+ *  stroke/burnedStroke/accent 为画布主题注入（默认维持深色画布原配色，调色板等旧调用方不受影响） */
+export function SymbolGlyph({ type, closed, burned, stroke: strokeProp, burnedStroke, accent }: {
+  type: ComponentType; closed?: boolean; burned?: boolean;
+  stroke?: string; burnedStroke?: string; accent?: string;
+}) {
+  const stroke = burned ? (burnedStroke ?? '#55524A') : (strokeProp ?? '#F2EFE3');
+  const acc = accent ?? '#45DCE8';
   const P = { ...S, stroke };
+  // 引脚线：跟随主题描边（原来走模块级 S，主题切换时会漏色）
+  const L = (x1: number, y1: number, x2: number, y2: number, key: string) => (
+    <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} {...P} />
+  );
   switch (type) {
     case 'battery':
       return (<g {...P}>
-        {LEAD(-32, 0, -14, 0, 'l1')}{LEAD(14, 0, 32, 0, 'l2')}
+        {L(-32, 0, -14, 0, 'l1')}{L(14, 0, 32, 0, 'l2')}
         <line x1={-14} y1={-12} x2={-14} y2={12} {...P} />
         <line x1={14} y1={-5} x2={14} y2={5} {...P} strokeWidth={3} />
         <text x={-14} y={-16} fontSize={10} fill="#C9803C" textAnchor="middle" stroke="none">+</text>
       </g>);
     case 'vsrc':
       return (<g {...P}>
-        {LEAD(-32, 0, -16, 0, 'l1')}{LEAD(16, 0, 32, 0, 'l2')}
+        {L(-32, 0, -16, 0, 'l1')}{L(16, 0, 32, 0, 'l2')}
         <circle r={16} {...P} />
         <text x={-6} y={-4} fontSize={9} fill="#C9803C" stroke="none">+</text>
         <text x={4} y={12} fontSize={9} fill="#8E8976" stroke="none">−</text>
       </g>);
     case 'gnd':
       return (<g {...P}>
-        {LEAD(0, -20, 0, -6, 'l')}
+        {L(0, -20, 0, -6, 'l')}
         <line x1={-12} y1={-6} x2={12} y2={-6} {...P} />
         <line x1={-7} y1={0} x2={7} y2={0} {...P} />
         <line x1={-3} y1={6} x2={3} y2={6} {...P} />
       </g>);
     case 'resistor':
       return (<g {...P}>
-        {LEAD(-32, 0, -20, 0, 'l1')}{LEAD(20, 0, 32, 0, 'l2')}
+        {L(-32, 0, -20, 0, 'l1')}{L(20, 0, 32, 0, 'l2')}
         <path d="M-20 0 L-15 -8 L-5 8 L5 -8 L15 8 L20 0" {...P} />
       </g>);
     case 'capacitor':
       return (<g {...P}>
-        {LEAD(-32, 0, -4, 0, 'l1')}{LEAD(4, 0, 32, 0, 'l2')}
+        {L(-32, 0, -4, 0, 'l1')}{L(4, 0, 32, 0, 'l2')}
         <line x1={-4} y1={-12} x2={-4} y2={12} {...P} />
         <line x1={4} y1={-12} x2={4} y2={12} {...P} />
       </g>);
     case 'inductor':
       return (<g {...P}>
-        {LEAD(-32, 0, -24, 0, 'l1')}{LEAD(24, 0, 32, 0, 'l2')}
+        {L(-32, 0, -24, 0, 'l1')}{L(24, 0, 32, 0, 'l2')}
         <path d="M-24 0 A6 6 0 0 1 -12 0 A6 6 0 0 1 0 0 A6 6 0 0 1 12 0 A6 6 0 0 1 24 0" {...P} />
       </g>);
     case 'pot':
       return (<g {...P}>
-        {LEAD(-32, 0, -20, 0, 'l1')}{LEAD(20, 0, 32, 0, 'l2')}
+        {L(-32, 0, -20, 0, 'l1')}{L(20, 0, 32, 0, 'l2')}
         <path d="M-20 0 L-15 -8 L-5 8 L5 -8 L15 8 L20 0" {...P} />
-        {LEAD(0, -28, 0, -10, 'w')}
+        {L(0, -28, 0, -10, 'w')}
         <path d="M-4 -12 L0 -8 L4 -12" {...P} />
       </g>);
     case 'diode':
       return (<g {...P}>
-        {LEAD(-32, 0, -10, 0, 'l1')}{LEAD(10, 0, 32, 0, 'l2')}
+        {L(-32, 0, -10, 0, 'l1')}{L(10, 0, 32, 0, 'l2')}
         <path d="M-10 -9 L-10 9 L10 0 Z" {...P} fill={stroke} />
         <line x1={10} y1={-9} x2={10} y2={9} {...P} />
       </g>);
     case 'led':
       return (<g {...P}>
-        {LEAD(-32, 0, -10, 0, 'l1')}{LEAD(10, 0, 32, 0, 'l2')}
+        {L(-32, 0, -10, 0, 'l1')}{L(10, 0, 32, 0, 'l2')}
         <path d="M-10 -9 L-10 9 L10 0 Z" {...P} fill={stroke} />
         <line x1={10} y1={-9} x2={10} y2={9} {...P} />
         <path d="M2 -12 L10 -20 M10 -20 l-5 0 M10 -20 l0 5" {...P} stroke={burned ? stroke : '#FFB84D'} />
@@ -142,75 +148,75 @@ export function SymbolGlyph({ type, closed, burned }: { type: ComponentType; clo
       </g>);
     case 'zener':
       return (<g {...P}>
-        {LEAD(-32, 0, -10, 0, 'l1')}{LEAD(10, 0, 32, 0, 'l2')}
+        {L(-32, 0, -10, 0, 'l1')}{L(10, 0, 32, 0, 'l2')}
         <path d="M-10 -9 L-10 9 L10 0 Z" {...P} fill={stroke} />
         <path d="M6 -9 L10 -9 L10 9 L14 9" {...P} />
       </g>);
     case 'switch':
       return (<g {...P}>
-        {LEAD(-32, 0, -14, 0, 'l1')}{LEAD(14, 0, 32, 0, 'l2')}
+        {L(-32, 0, -14, 0, 'l1')}{L(14, 0, 32, 0, 'l2')}
         <circle cx={-14} cy={0} r={2.5} fill={stroke} stroke="none" />
         <circle cx={14} cy={0} r={2.5} fill={stroke} stroke="none" />
         <line x1={-13} y1={0} x2={closed ? 13 : 10} y2={closed ? 0 : -14} {...P} />
       </g>);
     case 'button':
       return (<g {...P}>
-        {LEAD(-32, 0, -14, 0, 'l1')}{LEAD(14, 0, 32, 0, 'l2')}
+        {L(-32, 0, -14, 0, 'l1')}{L(14, 0, 32, 0, 'l2')}
         <circle cx={-14} cy={0} r={2.5} fill={stroke} stroke="none" />
         <circle cx={14} cy={0} r={2.5} fill={stroke} stroke="none" />
-        {closed ? LEAD(-14, 0, 14, 0, 'c') : <path d="M-14 -8 H14 M0 -8 V-2" {...P} />}
+        {closed ? L(-14, 0, 14, 0, 'c') : <path d="M-14 -8 H14 M0 -8 V-2" {...P} />}
       </g>);
     case 'npn':
       return (<g {...P}>
-        {LEAD(-32, 0, -8, 0, 'lb')}
+        {L(-32, 0, -8, 0, 'lb')}
         <line x1={-8} y1={-14} x2={-8} y2={14} {...P} />
-        {LEAD(-8, -5, 16, -24, 'lc')}{LEAD(-8, 5, 16, 24, 'le')}
+        {L(-8, -5, 16, -24, 'lc')}{L(-8, 5, 16, 24, 'le')}
         <path d="M10 16 L16 24 L6 20" {...P} fill={stroke} />
       </g>);
     case 'nmos': case 'pmos':
       return (<g {...P}>
-        {LEAD(-32, 0, -12, 0, 'lg')}
+        {L(-32, 0, -12, 0, 'lg')}
         <line x1={-12} y1={-12} x2={-12} y2={12} {...P} />
         <line x1={-6} y1={-16} x2={-6} y2={16} {...P} />
-        {LEAD(-6, -10, 16, -10, 'd1')}{LEAD(16, -10, 16, -24, 'd2')}
-        {LEAD(-6, 10, 16, 10, 's1')}{LEAD(16, 10, 16, 24, 's2')}
+        {L(-6, -10, 16, -10, 'd1')}{L(16, -10, 16, -24, 'd2')}
+        {L(-6, 10, 16, 10, 's1')}{L(16, 10, 16, 24, 's2')}
         {type === 'pmos' && <circle cx={-16} cy={0} r={3.5} {...P} />}
       </g>);
     case 'opamp':
       return (<g {...P}>
         <path d="M-32 -26 L-32 26 L40 0 Z" {...P} />
-        {LEAD(-32, -14, -44, -14, 'in+')}{LEAD(-32, 14, -44, 14, 'in-')}
-        {LEAD(40, 0, 52, 0, 'out')}
-        {LEAD(0, -34, -8, -34, 'v1')}{LEAD(-8, -34, -8, -20, 'v2')}
-        {LEAD(0, 34, -8, 34, 'e1')}{LEAD(-8, 34, -8, 20, 'e2')}
+        {L(-32, -14, -44, -14, 'in+')}{L(-32, 14, -44, 14, 'in-')}
+        {L(40, 0, 52, 0, 'out')}
+        {L(0, -34, -8, -34, 'v1')}{L(-8, -34, -8, -20, 'v2')}
+        {L(0, 34, -8, 34, 'e1')}{L(-8, 34, -8, 20, 'e2')}
         <text x={-27} y={-9} fontSize={11} fill="#C9803C" stroke="none">+</text>
         <text x={-27} y={22} fontSize={11} fill="#8E8976" stroke="none">−</text>
       </g>);
     case 'crystal':
       return (<g {...P}>
-        {LEAD(-32, 0, -10, 0, 'l1')}{LEAD(10, 0, 32, 0, 'l2')}
+        {L(-32, 0, -10, 0, 'l1')}{L(10, 0, 32, 0, 'l2')}
         <rect x={-10} y={-10} width={20} height={20} rx={3} {...P} />
         <line x1={-4} y1={-12} x2={-4} y2={12} {...P} />
         <line x1={4} y1={-12} x2={4} y2={12} {...P} />
       </g>);
     case 'antenna':
       return (<g {...P}>
-        {LEAD(0, 24, 0, 4, 'l')}
+        {L(0, 24, 0, 4, 'l')}
         <path d="M0 4 L-10 -12 M0 4 L10 -12 M0 4 L0 -14" {...P} />
       </g>);
     case 'sensor':
       return (<g {...P}>
         <rect x={-22} y={-22} width={44} height={44} rx={6} {...P} />
-        <circle r={7} {...P} stroke="#45DCE8" />
-        {LEAD(0, -30, 0, -22, 'v')}{LEAD(0, 30, 0, 22, 'g')}{LEAD(32, 0, 22, 0, 'o')}
+        <circle r={7} {...P} stroke={acc} />
+        {L(0, -30, 0, -22, 'v')}{L(0, 30, 0, 22, 'g')}{L(32, 0, 22, 0, 'o')}
         <text x={0} y={30} fontSize={8} fill="#8E8976" textAnchor="middle" stroke="none">SEN</text>
       </g>);
     case 'mcu':
       return (<g {...P}>
         <rect x={-28} y={-34} width={56} height={68} rx={4} {...P} />
-        {LEAD(0, -40, 0, -34, 'v')}{LEAD(0, 40, 0, 34, 'g')}
-        {LEAD(32, -24, 28, -24, 'p0')}{LEAD(32, -8, 28, -8, 'p1')}
-        {LEAD(32, 8, 28, 8, 'p2')}{LEAD(32, 24, 28, 24, 'p3')}
+        {L(0, -40, 0, -34, 'v')}{L(0, 40, 0, 34, 'g')}
+        {L(32, -24, 28, -24, 'p0')}{L(32, -8, 28, -8, 'p1')}
+        {L(32, 8, 28, 8, 'p2')}{L(32, 24, 28, 24, 'p3')}
         <text x={0} y={-12} fontSize={10} fill="#5B8DEF" textAnchor="middle" stroke="none" fontFamily="JetBrains Mono">MCU</text>
         <text x={20} y={-20} fontSize={7} fill="#8E8976" textAnchor="end" stroke="none">P0</text>
         <text x={20} y={-4} fontSize={7} fill="#8E8976" textAnchor="end" stroke="none">P1</text>
@@ -220,38 +226,38 @@ export function SymbolGlyph({ type, closed, burned }: { type: ComponentType; clo
     case 'ic':
       return (<g {...P}>
         <rect x={-24} y={-18} width={48} height={36} rx={4} {...P} />
-        {LEAD(-32, 0, -24, 0, 'i')}{LEAD(32, 0, 24, 0, 'o')}{LEAD(0, 30, 0, 18, 'g')}
-        <text x={0} y={4} fontSize={9} fill="#45DCE8" textAnchor="middle" stroke="none" fontFamily="JetBrains Mono">LDO</text>
+        {L(-32, 0, -24, 0, 'i')}{L(32, 0, 24, 0, 'o')}{L(0, 30, 0, 18, 'g')}
+        <text x={0} y={4} fontSize={9} fill={acc} textAnchor="middle" stroke="none" fontFamily="JetBrains Mono">LDO</text>
       </g>);
     case 'fuse':
       return (<g {...P}>
-        {LEAD(-32, 0, -18, 0, 'l1')}{LEAD(18, 0, 32, 0, 'l2')}
+        {L(-32, 0, -18, 0, 'l1')}{L(18, 0, 32, 0, 'l2')}
         <rect x={-18} y={-7} width={36} height={14} rx={7} {...P} />
         <path d={burned ? 'M-8 2 L8 -2 M-6 -3 L6 3' : 'M-14 0 H14'} {...P} />
       </g>);
     case 'funcgen':
       return (<g {...P}>
         <circle r={18} {...P} />
-        {LEAD(32, 0, 18, 0, 'o')}{LEAD(-32, 0, -18, 0, 'g')}
-        <path d="M-10 0 Q-5 -10 0 0 Q5 10 10 0" {...P} stroke="#45DCE8" />
+        {L(32, 0, 18, 0, 'o')}{L(-32, 0, -18, 0, 'g')}
+        <path d="M-10 0 Q-5 -10 0 0 Q5 10 10 0" {...P} stroke={acc} />
       </g>);
     case 'voltmeter':
       return (<g {...P}>
         <circle r={16} {...P} />
-        {LEAD(-32, 0, -16, 0, 'p')}{LEAD(16, 0, 32, 0, 'n')}
-        <text x={0} y={5} fontSize={13} fill="#45DCE8" textAnchor="middle" stroke="none" fontFamily="JetBrains Mono">V</text>
+        {L(-32, 0, -16, 0, 'p')}{L(16, 0, 32, 0, 'n')}
+        <text x={0} y={5} fontSize={13} fill={acc} textAnchor="middle" stroke="none" fontFamily="JetBrains Mono">V</text>
       </g>);
     case 'ammeter':
       return (<g {...P}>
         <circle r={16} {...P} />
-        {LEAD(-32, 0, -16, 0, 'p')}{LEAD(16, 0, 32, 0, 'n')}
+        {L(-32, 0, -16, 0, 'p')}{L(16, 0, 32, 0, 'n')}
         <text x={0} y={5} fontSize={13} fill="#E56BD6" textAnchor="middle" stroke="none" fontFamily="JetBrains Mono">A</text>
       </g>);
     case 'module':
       return (<g {...P}>
         <rect x={-26} y={-22} width={52} height={44} rx={4} {...P} />
-        {LEAD(-32, -12, -26, -12, 'i')}{LEAD(32, -12, 26, -12, 'o')}
-        {LEAD(-32, 12, -26, 12, 'v')}{LEAD(32, 12, 26, 12, 'g')}
+        {L(-32, -12, -26, -12, 'i')}{L(32, -12, 26, -12, 'o')}
+        {L(-32, 12, -26, 12, 'v')}{L(32, 12, 26, 12, 'g')}
         <text x={0} y={4} fontSize={9} fill="#5B8DEF" textAnchor="middle" stroke="none" fontFamily="JetBrains Mono">RF</text>
       </g>);
   }

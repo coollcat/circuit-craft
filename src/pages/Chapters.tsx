@@ -1,7 +1,7 @@
 // 章节地图 Chapter Map（/chapters）—— 整块 PCB 式选关大地图
 // S 形主走线串联 30 关卡焊盘 + 支线岔口 + 玩家面板 + 章节详情抽屉 + 底部状态条 + 首访引导
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, Component, FileText, Route, AudioWaveform, Radio, Award,
@@ -12,6 +12,8 @@ import type { LevelDef } from '@/engine/types';
 import { useProgress } from '@/store/progress';
 import PadButton from '@/components/PadButton';
 import SilkTag from '@/components/SilkTag';
+import { titleForStars } from '@/lib/titles';
+import { safeGetItem, safeSetItem, setStorageWarnHandler } from '@/lib/safeStorage';
 import { cn } from '@/lib/utils';
 
 /* ---------- 章节元数据（丝印梗 / 知识清单 / 老周说） ---------- */
@@ -33,15 +35,7 @@ const CHAPTER_META: {
   { chapter: 7, name: '选型实战', icon: Award, gag: '买得到的元件才是好元件', intro: '数据手册、LDO、成本与 BOM——量产思维养成。', knowledge: ['数据手册读法', '降额设计', 'LDO 选型', 'E 系列与供货', 'BOM 制作'], laozhou: '毕业设计没有提示。但从今天起，你查手册的速度会越来越快——那就是工程师的经验。' },
 ];
 
-/** 称号体系（chapters.md：0/15/40/70/100/120 星阈值） */
-function titleFor(total: number): string {
-  if (total >= 120) return '首席打板人';
-  if (total >= 100) return '资深硬件工程师';
-  if (total >= 70) return '硬件工程师';
-  if (total >= 40) return '助理工程师';
-  if (total >= 15) return '学徒';
-  return '见习焊工';
-}
+/* 称号体系统一收敛到 src/lib/titles.ts（0/15/40/70/100/120 星阈值），此处不再另立阶梯 */
 
 /* ---------- 地图几何：S 形布局 ---------- */
 const BOARD_W = 1560;
@@ -100,6 +94,7 @@ const GUIDE_KEY = 'cc-guide-chapters-v1';
 
 export default function Chapters() {
   const navigate = useNavigate();
+  const location = useLocation();
   const completed = useProgress(s => s.completed);
   const stars = useProgress(s => s.stars);
   const isLevelUnlocked = useProgress(s => s.isLevelUnlocked);
@@ -153,14 +148,29 @@ export default function Chapters() {
   const [knowledgeOf, setKnowledgeOf] = useState<LevelDef | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [guideStep, setGuideStep] = useState<number>(() =>
-    typeof window !== 'undefined' && !localStorage.getItem(GUIDE_KEY) ? 0 : -1,
+    typeof window !== 'undefined' && !safeGetItem(GUIDE_KEY) ? 0 : -1,
   );
+
+  // 存储写失败（隐私模式/配额满）时的一次性警告（safeStorage 只触发一次）
+  useEffect(() => {
+    setStorageWarnHandler(setToast);
+    return () => setStorageWarnHandler(null);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // URL 直达未解锁关卡被重定向回来时，接住 LevelPlay 带来的提示
+  useEffect(() => {
+    const msg = (location.state as { toast?: string } | null)?.toast;
+    if (msg) {
+      setToast(msg);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     if (!shake) return;
@@ -238,7 +248,7 @@ export default function Chapters() {
             <div className="flex items-center gap-3">
               <img src="/logo.svg" alt="" className="h-12 w-12" />
               <div>
-                <div className="text-sm font-bold text-silk-100">{titleFor(totalStars)}</div>
+                <div className="text-sm font-bold text-silk-100">{titleForStars(totalStars)}</div>
                 <div className="mt-0.5 font-mono text-[11px] text-silk-500">⭐ {totalStars}/123 · ⚡ 通关 {totalCompleted}/41</div>
               </div>
             </div>
@@ -731,7 +741,7 @@ export default function Chapters() {
               onClick={() => {
                 if (guideStep < guideSteps.length - 1) setGuideStep(guideStep + 1);
                 else {
-                  localStorage.setItem(GUIDE_KEY, '1');
+                  safeSetItem(GUIDE_KEY, '1');
                   setGuideStep(-1);
                 }
               }}
@@ -763,7 +773,7 @@ export default function Chapters() {
           <span className="truncate text-[11px] text-silk-300">{typed}</span>
         </div>
         <div className="shrink-0 font-mono text-[11px] text-silk-500">
-          进度 {totalCompleted}/41 · ⭐{totalStars} · 称号：{titleFor(totalStars)}
+          进度 {totalCompleted}/41 · ⭐{totalStars} · 称号：{titleForStars(totalStars)}
         </div>
       </div>
     </div>

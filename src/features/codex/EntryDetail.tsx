@@ -1,8 +1,9 @@
 // 条目详情（六段式 + 嵌实验 + 剧透锁定）
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Camera, Eye, FlaskConical, Lock, Quote, Wrench } from 'lucide-react';
+import { ArrowLeft, Eye, FlaskConical, Lock, Quote, Wrench } from 'lucide-react';
 import type { CodexEntry } from './data/entries';
+import Codex3DCard from '@/features/codex3d';
 import { ComponentSymbol } from './symbols';
 import Lab, { LAB_TITLES } from './labs/index';
 import SilkTag from '@/components/SilkTag';
@@ -189,27 +190,21 @@ export default function EntryDetail({
             </Section>
           </div>
 
-          {/* 7. 实物照片位与封装 */}
+          {/* 7. 3D 实物预览与封装（亮背影棚灯箱 + 原封装文字） */}
           <Section title="长什么样" eyebrow="PACKAGE">
-            <div className="panel grid grid-cols-[280px_1fr] gap-6 rounded-lg p-5">
-              {/* 实物照片位（占位，资产就绪后替换） */}
-              <div className="gerber-grid-fine flex h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-silk-700 bg-ink-900">
-                <Camera className="h-6 w-6 text-silk-700" />
-                <span className="font-mono text-[11px] text-silk-700">实物照片位 PHOTO TBD</span>
-              </div>
-              <div className="space-y-3">
-                <ul className="space-y-1.5">
-                  {entry.pkg.packages.map((p, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-silk-300">
-                      <span className="font-mono text-sig-cyan">{String(i + 1).padStart(2, '0')}</span>
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-                <p className="border-t border-ink-700 pt-3 text-xs leading-5 text-silk-500">
-                  {entry.pkg.note}
-                </p>
-              </div>
+            <Codex3DCard entryId={entry.id} name={entry.name} />
+            <div className="panel rounded-lg p-5">
+              <ul className="space-y-1.5">
+                {entry.pkg.packages.map((p, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-silk-300">
+                    <span className="font-mono text-sig-cyan">{String(i + 1).padStart(2, '0')}</span>
+                    {p}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 border-t border-ink-700 pt-3 text-xs leading-5 text-silk-500">
+                {entry.pkg.note}
+              </p>
             </div>
           </Section>
 

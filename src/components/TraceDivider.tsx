@@ -1,5 +1,6 @@
 // TraceDivider 走线分隔线（design.md 6.5）：2px 铜色走线，中段 45° 折角，两端过孔
 import { useEffect, useRef, useState } from 'react';
+import { useProgress } from '@/store/progress';
 import { cn } from '@/lib/utils';
 
 export default function TraceDivider({
@@ -11,10 +12,16 @@ export default function TraceDivider({
   active?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // 设置·动效关闭时：直接常亮，不播点亮动画
+  const motionOn = useProgress(s => s.settings.motion);
   const [lit, setLit] = useState(false);
 
   useEffect(() => {
     if (!active) return;
+    if (!motionOn) {
+      setLit(true);
+      return;
+    }
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -28,7 +35,7 @@ export default function TraceDivider({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [active]);
+  }, [active, motionOn]);
 
   return (
     <div ref={ref} className={cn('relative h-6 w-full', className)} aria-hidden>
@@ -40,7 +47,7 @@ export default function TraceDivider({
           stroke={lit ? '#3FC47F' : '#C9803C'}
           strokeWidth="2"
           strokeLinejoin="round"
-          className="transition-colors duration-700"
+          className={motionOn ? 'transition-colors duration-700' : undefined}
           style={lit ? { filter: 'drop-shadow(0 0 4px rgba(63,196,127,0.55))' } : undefined}
         />
         {/* 两端过孔 */}
@@ -48,8 +55,8 @@ export default function TraceDivider({
         <circle cx="8" cy="12" r="2" fill="#060A08" />
         <circle cx="992" cy="12" r="5" fill="#C9803C" />
         <circle cx="992" cy="12" r="2" fill="#060A08" />
-        {/* 电流粒子：点亮时流过一次 */}
-        {lit && (
+        {/* 电流粒子：点亮时流过一次（动效关闭时不播） */}
+        {lit && motionOn && (
           <circle r="3" fill="#6FE3A1">
             <animateMotion
               dur="1.2s"

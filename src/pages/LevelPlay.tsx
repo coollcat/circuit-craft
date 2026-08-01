@@ -1,10 +1,10 @@
 // 关卡游玩页 /play/:levelId —— 三栏工作台 + 准物理仿真 + 渐进提示 + 防卡关 + QC PASS 结算
 // 数据暂为空时用 fixtures 兜底并显示「内容装载中」占位，不得报红。
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Box, Check, Lightbulb, Stamp, Trophy } from 'lucide-react';
-import type { CircuitSpec, DialogueLine, GoalCheck, LevelDef, WireSpec } from '@/engine/types';
+import type { CircuitSpec, DialogueLine, GoalCheck, LevelDef, StarCondition, WireSpec } from '@/engine/types';
 import { evaluateGoals, formatSI, solveDC, type GoalStatus } from '@/engine/solver';
 import { FIXTURE_LEVELS } from '@/engine/fixtures';
 import { getLevel, LEVELS, SIDE_QUESTS } from '@/content/levels';
@@ -12,15 +12,18 @@ import { useProgress } from '@/store/progress';
 import CircuitEditor, { type EditorVisuals } from '@/components/editor/CircuitEditor';
 import PalettePanel from '@/components/editor/PalettePanel';
 import ParamDialog from '@/components/editor/ParamDialog';
+import { PARAM_SCHEMA } from '@/components/editor/symbols';
 import { ToastHost, toast } from '@/components/editor/toast';
 import { useSimulation, defaultTimebase } from '@/components/editor/useSimulation';
 import { setSoundEnabled, sfxChord } from '@/components/editor/sound';
 import WaveformPanel, { CH_NAMES, type ScopeChannel } from '@/components/WaveformPanel';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import DialogueBar from '@/components/DialogueBar';
 import StarMeter from '@/components/StarMeter';
 import PadButton from '@/components/PadButton';
 import SilkTag from '@/components/SilkTag';
 import { MultimeterCard, NotesCard, RightCollapseBar, RightPanelHeader, RunControls } from '@/components/editor/WorkbenchBits';
+import { SOLDER_CURSOR_CLASS, ensureSolderCursorStyle } from '@/lib/cursor';
 import { cn } from '@/lib/utils';
 
 // 3D PCB 预览器：懒加载（结算弹窗里展开才下载 three.js）
@@ -29,20 +32,58 @@ const Pcb3DViewer = lazy(() => import('@/features/pcb3d/Pcb3DViewer'));
 function clonePreset(level: LevelDef): CircuitSpec {
   return {
     components: level.preset.components.map(c => ({ ...c, params: { ...(c.params ?? {}) } })),
-    wires: level.preset.wires.map(w => ({ id: w.id, from: { ...w.from }, to: { ...w.to } })),
+    wires: level.preset.wires.map(w => ({
+      id: w.id,
+      from: { ...w.from },
+      to: { ...w.to },
+      ...(w.layer ? { layer: w.layer } : {}),
+      ...(w.via ? { via: w.via.map(p => ({ ...p })) } : {}), // {...p} 同时带走 hole 过孔标记
+    })),
   };
+}
+
+/** param key → 中文名/单位 反查表（PARAM_SCHEMA 按元件类型组织，目标里只有 key，故反查；同 key 取先见者） */
+const PARAM_LABELS: Record<string, { label: string; unit?: string }> = (() => {
+  const map: Record<string, { label: string; unit?: string }> = {};
+  for (const fields of Object.values(PARAM_SCHEMA)) {
+    for (const f of fields ?? []) if (!map[f.key]) map[f.key] = { label: f.label, unit: f.unit };
+  }
+  return map;
+})();
+
+/** 目标数值格式化：极大/极小且带单位时用 SI 词头（400000000 Hz → 400 MHz），否则原样 */
+function fmtGoalValue(v: number, unit?: string): string {
+  if (unit && (Math.abs(v) >= 1000 || (Math.abs(v) > 0 && Math.abs(v) < 0.01))) return formatSI(v, unit).replace(' ', '');
+  return `${v}${unit ?? ''}`;
 }
 
 export function goalLabel(g: GoalCheck): string {
   switch (g.kind) {
     case 'connected': return `连通 ${g.a.comp}:${g.a.port} ↔ ${g.b.comp}:${g.b.port}`;
     case 'component-placed': return `放置 ${g.count ?? 1} 个 ${g.type}`;
-    case 'param': return `${g.comp} 的 ${g.param} ∈ [${g.min ?? '-∞'}, ${g.max ?? '+∞'}]`;
+    case 'param': {
+      const meta = PARAM_LABELS[g.param];
+      const zh = meta ? ` ${meta.label}` : '';
+      const unit = meta?.unit;
+      const range = g.min !== undefined && g.max !== undefined
+        ? `${fmtGoalValue(g.min, unit)}~${fmtGoalValue(g.max, unit)}`
+        : g.min !== undefined
+          ? `≥ ${fmtGoalValue(g.min, unit)}`
+          : `≤ ${fmtGoalValue(g.max!, unit)}`;
+      return `${g.comp} 的 ${g.param}${zh} ${range}`;
+    }
     case 'node-voltage': return `V(${g.node.comp}:${g.node.port}) ∈ [${g.min}, ${g.max}]V`;
     case 'branch-current': return `I(${g.comp}) ∈ [${g.min}, ${g.max}]mA`;
     case 'led-lit': return `点亮 ${g.comp}（1mA < I ≤ 额定）`;
     case 'custom': return g.description || g.id;
   }
+}
+
+/** 星标展示文案：与真实判定对齐（内容里的 label 保留风味，此处统一为判据口径） */
+export function starLabel(s: StarCondition): string {
+  if (s.check === 'no-hint') return '不看 L3 剧透提示（L1/L2 随意）';
+  if (s.check === 'first-try') return '首次运行即全绿（无失败运行）';
+  return s.label;
 }
 
 function goalKey(g: GoalCheck): string {
@@ -54,6 +95,15 @@ export default function LevelPlay() {
   const content = levelId ? getLevel(levelId) : undefined;
   const fixture = (levelId && FIXTURE_LEVELS.find(l => l.id === levelId)) || FIXTURE_LEVELS[0];
   const level = content ?? fixture;
+  const navigate = useNavigate();
+  // URL 直达未解锁关卡 → 重定向回章节地图并提示（fixture 兜底关不参与解锁判定）
+  const locked = useProgress(s => (content ? !s.isLevelUnlocked(content.id) : false));
+  useEffect(() => {
+    if (content && locked) {
+      navigate('/chapters', { replace: true, state: { toast: `「${content.title}」还没解锁——先通关前面的关卡。` } });
+    }
+  }, [content, locked, navigate]);
+  if (content && locked) return null;
   return <LevelPlayInner key={level.id} level={level} isFixtureFallback={!content} />;
 }
 
@@ -86,9 +136,12 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
 
   const completeLevel = useProgress(s => s.completeLevel);
   const useHint = useProgress(s => s.useHint);
+  const clearHints = useProgress(s => s.clearHints);
   const hintsUsedTier = useProgress(s => s.hintsUsed[level.id] ?? 0);
   const soundOn = useProgress(s => s.settings.sound);
+  const solderCursor = useProgress(s => s.settings.solderCursor);
   useEffect(() => { setSoundEnabled(soundOn); }, [soundOn]);
+  useEffect(() => { if (solderCursor) ensureSolderCursorStyle(); }, [solderCursor]);
 
   const pendingLines = useRef<DialogueLine[]>([]);
   const enqueueDialogue = useCallback((line: DialogueLine) => {
@@ -149,6 +202,7 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
   /* ---------------- 运行 / 失败计数 / 示教重影 ---------------- */
   const startRun = () => {
     setRunning(true);
+    lastInteract.current = Date.now();
     if (runJudgeTimer.current) window.clearTimeout(runJudgeTimer.current);
     runJudgeTimer.current = window.setTimeout(() => {
       const res = simRef.current.latest;
@@ -168,13 +222,24 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
   };
   const pauseRun = () => {
     setRunning(false);
+    lastInteract.current = Date.now();
     if (runJudgeTimer.current) window.clearTimeout(runJudgeTimer.current);
   };
+  // 重玩/重置 = 全新一次尝试：电路、计时、失败计数、关怀标记、该关提示记录全部归零，
+  // 让 time 星 / first-try 星 / 无提示星都能在重玩时真正重新挑战。
   const resetAll = () => {
     pauseRun();
     setCircuit(clonePreset(level));
     prevOk.current = new Set();
     setVictory(false);
+    startTime.current = Date.now();
+    lastInteract.current = Date.now();
+    setElapsed(0);
+    totalFails.current = 0;
+    failCounts.current = {};
+    nudged5min.current = false;
+    setGhostTick(0);
+    clearHints(level.id);
   };
 
   // 重影倒计时
@@ -184,17 +249,18 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
     return () => window.clearInterval(id);
   }, [ghostTick > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 5 分钟无进展关怀
+  // 5 分钟无进展关怀（守卫：关卡已完成 / 暂停中 / 提示抽屉已打开时不打扰）
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (!victory && !nudged5min.current && Date.now() - lastInteract.current > 5 * 60 * 1000) {
+      if (victory || !running || hintOpen || nudged5min.current) return;
+      if (Date.now() - lastInteract.current > 5 * 60 * 1000) {
         nudged5min.current = true;
         enqueueDialogue({ speaker: 'xiaohan', text: '卡住了吗？要不要看看提示？或者去图鉴复习一下再回来。' });
         setHintOpen(true);
       }
     }, 30000);
     return () => window.clearInterval(id);
-  }, [victory, enqueueDialogue]);
+  }, [victory, running, hintOpen, enqueueDialogue]);
 
   // 计时
   useEffect(() => {
@@ -342,14 +408,14 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
           ))}
         </div>
         {/* 星条件 */}
-        <div className="flex items-center gap-0.5" title={level.stars.map(s => s.label).join(' / ')}>
+        <div className="flex items-center gap-0.5" title={level.stars.map(starLabel).join(' / ')}>
           <StarMeter value={victory ? starResults.filter(Boolean).length : 0} size={14} />
         </div>
         <RunControls running={running} onRun={startRun} onPause={pauseRun} onReset={resetAll} />
         <button
           onClick={() => setHintOpen(true)}
           className="relative rounded-md border border-ink-600 bg-ink-800 p-2 text-sig-amber transition-colors hover:border-sig-amber"
-          title="渐进提示（L3 会失去无提示星）"
+          title="渐进提示（L3 会让本次尝试失去无提示星，重玩可重新挑战）"
         >
           <Lightbulb className="h-4 w-4" />
           {hintTier < 3 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger" />}
@@ -374,7 +440,7 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
           footer={<span className="font-mono text-[10px] text-silk-700">双击或拖拽放入画布 · 图鉴见 /codex</span>}
         />
 
-        <div className="relative min-w-0 flex-1">
+        <div className={cn('relative min-w-0 flex-1', solderCursor && SOLDER_CURSOR_CLASS)}>
           <CircuitEditor
             circuit={circuit}
             onChange={setCircuit}
@@ -461,7 +527,10 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
           <ParamDialog
             comp={comp}
             anchor={paramEdit.anchor}
-            onChange={params => setCircuit(c => ({ ...c, components: c.components.map(x => (x.id === comp.id ? { ...x, params } : x)) }))}
+            onChange={params => {
+              lastInteract.current = Date.now(); // 调参也是进展，别误触 5 分钟关怀
+              setCircuit(c => ({ ...c, components: c.components.map(x => (x.id === comp.id ? { ...x, params } : x)) }));
+            }}
             onClose={() => setParamEdit(null)}
           />
         );
@@ -488,7 +557,7 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
 const TIER_META = [
   { label: 'L1 · 方向', desc: '只指路，不剧透', cost: '无代价' },
   { label: 'L2 · 方法', desc: '给出拓扑 / 公式', cost: '无代价' },
-  { label: 'L3 · 近乎答案', desc: '元件清单 + 连线指引', cost: '失去 ⭐ 无提示星' },
+  { label: 'L3 · 近乎答案', desc: '元件清单 + 连线指引', cost: '本次尝试失去 ⭐ 无提示星' },
 ];
 
 function HintDrawer({ open, onClose, hints, tier, onOpen, l3Confirm }: {
@@ -527,7 +596,7 @@ function HintDrawer({ open, onClose, hints, tier, onOpen, l3Confirm }: {
                     <p className="text-sm leading-relaxed text-silk-100">{h}</p>
                   ) : t === 3 && l3Confirm ? (
                     <div className="rounded border border-danger/50 bg-danger/10 p-2">
-                      <p className="mb-2 text-xs text-danger">确定要撕开焊盘封印吗？使用后将失去本关的「⭐ 无提示星」。</p>
+                      <p className="mb-2 text-xs text-danger">确定要撕开焊盘封印吗？本次尝试将失去「⭐ 无提示星」——重玩本关可以重新挑战。</p>
                       <div className="flex gap-2">
                         <PadButton size="S" variant="danger" onClick={() => onOpen(3)}>确定要看</PadButton>
                         <PadButton size="S" variant="ghost" onClick={onClose}>再想想</PadButton>
@@ -602,7 +671,7 @@ function VictoryModal({ open, level, stars, elapsed, hintsTier, compCount, circu
                 >
                   <StarMeter value={stars[i] ? 1 : 0} max={1} size={36} />
                   <span className={cn('max-w-[120px] text-center font-mono text-[10px] leading-tight', stars[i] ? 'text-copper-300' : 'text-silk-700')}>
-                    {s.label}
+                    {starLabel(s)}
                   </span>
                 </motion.div>
               ))}
@@ -649,17 +718,19 @@ function VictoryModal({ open, level, stars, elapsed, hintsTier, compCount, circu
                     className="overflow-hidden border-t border-ink-700"
                   >
                     <div className="h-[260px]">
-                      <Suspense fallback={
-                        <div className="flex h-full items-center justify-center font-mono text-xs text-silk-500">
-                          正在装载 3D 引擎（three.js）…
-                        </div>
-                      }>
-                        <Pcb3DViewer
-                          circuit={circuit}
-                          currents={currents}
-                          emptyHint="这关还没搭出电路——重玩一次，搭好了再来看成品板。"
-                        />
-                      </Suspense>
+                      <ErrorBoundary variant="viewer">
+                        <Suspense fallback={
+                          <div className="flex h-full items-center justify-center font-mono text-xs text-silk-500">
+                            正在装载 3D 引擎（three.js）…
+                          </div>
+                        }>
+                          <Pcb3DViewer
+                            circuit={circuit}
+                            currents={currents}
+                            emptyHint="这关还没搭出电路——重玩一次，搭好了再来看成品板。"
+                          />
+                        </Suspense>
+                      </ErrorBoundary>
                     </div>
                   </motion.div>
                 )}

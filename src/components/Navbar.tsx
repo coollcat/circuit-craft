@@ -1,11 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
 // Navbar 全站导航（design.md 6.1，TopNav，64px，sticky top-0 z-50）
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router';
 import { Lock, Settings, Star, Zap } from 'lucide-react';
 import { useProgress } from '@/store/progress';
 import { LEVELS } from '@/content/levels';
 import AccountMenu from '@/features/account/AccountMenu';
+import { titleForStars } from '@/lib/titles';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -14,16 +15,6 @@ const NAV_ITEMS = [
   { to: '/sandbox', label: '沙盒' },
   { to: '/codex', label: '图鉴' },
 ] as const;
-
-/** 称号阶梯 */
-export function titleForStars(stars: number): string {
-  if (stars >= 90) return '首席硬件工程师';
-  if (stars >= 60) return 'Layout 大师';
-  if (stars >= 30) return '布线师';
-  if (stars >= 12) return '焊点熟手';
-  if (stars >= 3) return '初级焊工';
-  return '见习焊工';
-}
 
 function graduationUnlocked(completed: string[]): boolean {
   const ch6 = LEVELS.filter(l => l.track === 'main' && l.chapter === 6);
@@ -39,6 +30,11 @@ export default function Navbar() {
   const reset = useProgress(s => s.reset);
   const [showSettings, setShowSettings] = useState(false);
   const gradLocked = !graduationUnlocked(completed);
+
+  // 动效开关的全局兜底：<html data-motion="off">，供非 React 消费者（粒子系统等）读取
+  useEffect(() => {
+    document.documentElement.dataset.motion = settings.motion ? 'on' : 'off';
+  }, [settings.motion]);
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-ink-700 bg-ink-900/85 backdrop-blur-md">

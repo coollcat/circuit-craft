@@ -21,6 +21,12 @@ const COLORS: Record<Exclude<WireFlowState, 'idle'>, string> = {
   warn: '#FFB020',
   danger: '#FF5263',
 };
+// 亮色画布：lighter 合成在浅底上会糊白，换深色粒子 + 普通合成
+const COLORS_LIGHT: Record<Exclude<WireFlowState, 'idle'>, string> = {
+  normal: '#1F7A4C',
+  warn: '#C77F14',
+  danger: '#D43D4C',
+};
 const MAX_PARTICLES = 120;
 /** 电流→速度映射：0→0.5，≥50mA→4 px/frame */
 function speedFor(i: number): number {
@@ -34,6 +40,8 @@ export class ParticleSystem {
   private states: WireFlowState[] = [];
   private particles: Particle[] = [];
   enabled = true;
+  /** 亮色画布模式：深色粒子 + source-over 合成（由编辑器按主题设置） */
+  lightMode = false;
 
   /** 每帧（或电路变化时）更新导线几何与电流 */
   setWires(paths: WirePath[], currents: Map<string, number>, states: Map<string, WireFlowState>) {
@@ -50,6 +58,8 @@ export class ParticleSystem {
   /** 推进一帧（帧率无关：frames=经过的 60fps 帧数） */
   update(frames = 1) {
     if (!this.enabled) return;
+    // 设置·动效关闭（<html data-motion="off">）：粒子停流动，只留静态高亮
+    const still = typeof document !== 'undefined' && document.documentElement.dataset.motion === 'off';
     // 目标粒子数：每根有电流的导线按电流大小分配
     for (let w = 0; w < this.wires.length; w++) {
       const i = Math.abs(this.currents[w]);
@@ -65,7 +75,7 @@ export class ParticleSystem {
       const path = this.wires[p.wire];
       if (!path || Math.abs(this.currents[p.wire]) < 1e-6 || this.states[p.wire] === 'idle') return false;
       p.speed = speedFor(this.currents[p.wire]);
-      p.dist += p.speed * frames;
+      if (!still) p.dist += p.speed * frames;
       if (p.dist > path.length) p.dist -= path.length;
       if (p.dist < 0) p.dist += path.length;
       return true;
@@ -78,17 +88,18 @@ export class ParticleSystem {
 
   draw(ctx: CanvasRenderingContext2D) {
     if (!this.enabled) return;
+    const palette = this.lightMode ? COLORS_LIGHT : COLORS;
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalCompositeOperation = this.lightMode ? 'source-over' : 'lighter';
     for (const p of this.particles) {
       const path = this.wires[p.wire];
       if (!path || path.points.length < 2) continue;
       const { x, y } = pointAt(path, p.dist);
       const st = this.states[p.wire];
-      const color = COLORS[st === 'idle' ? 'normal' : st];
+      const color = palette[st === 'idle' ? 'normal' : st];
       ctx.fillStyle = color;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = this.lightMode ? 2 : 6;
       ctx.beginPath();
       ctx.arc(x, y, 1.6, 0, Math.PI * 2);
       ctx.fill();

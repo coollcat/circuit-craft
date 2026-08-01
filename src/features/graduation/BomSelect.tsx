@@ -37,13 +37,13 @@ const PARTS: Part[] = [
     id: 'ams1117', cat: 'ldo', name: 'AMS1117-3.3', pkg: 'SOT-223', price: 0.12, qty: 1, stock: 53200, lead: '现货',
     params: [['压差 Vdrop', '≈1.1V'], ['最大电流', '800mA'], ['静态电流 Iq', '5mA'], ['输入范围', '4.4–15V']],
     verdict: 'warn',
-    note: '经典老料。压差 1.1V 意味着满载 500mA 发热 0.85W，SOT-223 会烫到 90°C+；但 ESP32 实际峰值仅 240mA（0.41W）可承受，注意留散热铜皮。',
+    note: '经典老料。压差 1.1V 意味着满载 500mA 发热 0.85W，SOT-223 会烫到 90°C+；ESP32 平均百 mA 级、瞬时峰值 >500mA，按典型持续负载 240mA 校核（0.41W）可承受，注意留散热铜皮。',
   },
   {
     id: 'xc6206', cat: 'ldo', name: 'XC6206P332MR', pkg: 'SOT-23', price: 0.08, qty: 1, stock: 89100, lead: '现货',
     params: [['压差 Vdrop', '0.68V@200mA'], ['最大电流', '250mA'], ['静态电流 Iq', '1µA'], ['输入范围', '≤6V']],
     verdict: 'bad',
-    note: '便宜是便宜，可最大输出 250mA——ESP32 射频发射瞬时就要 240mA，一点裕量都没有，WiFi 一喊话就掉电复位。',
+    note: '便宜是便宜，可最大输出 250mA——ESP32 平均百 mA 级、瞬时峰值 >500mA，一点裕量都没有，WiFi 一喊话就掉电复位。',
   },
   {
     id: 'me6211', cat: 'ldo', name: 'ME6211C33M5G', pkg: 'SOT-23-5', price: 0.35, qty: 1, stock: 41500, lead: '现货',
@@ -154,7 +154,7 @@ export default function BomSelect({ visitor, onComplete }: { visitor: boolean; o
   const [sel, setSel] = useState<BomSelection>(grad.bom);
   const [frozen, setFrozen] = useState(grad.bomFrozen);
   const [confirm0402, setConfirm0402] = useState(false);
-  const [loadMa, setLoadMa] = useState(240); // LDO 负载电流滑杆（mA）：换 LDO 时保持，读数实时重算
+  const [loadMa, setLoadMa] = useState(240); // LDO 负载电流滑杆（mA）：默认取 ESP32 典型持续负载 240mA（瞬时峰值 >500mA，电源按 ≥500mA 设计）
   const { toasts, push } = useToasts();
 
   const partOf = (cat: keyof BomSelection) => PARTS.find(p => p.id === sel[cat]) ?? null;
@@ -207,7 +207,7 @@ export default function BomSelect({ visitor, onComplete }: { visitor: boolean; o
     set({ bom: next, bomCost: 0 });
     if (p.verdict === 'bad') push('danger', `选型不合理：${p.note}`);
     else if (p.id === 'ams1117')
-      push('warn', '热警告：压差 1.7V × 0.5A = 0.85W，SOT-223 满载会烫到 90°C+。ESP32 实际峰值 240mA 可用，但别按满载跑。');
+      push('warn', '热警告：压差 1.7V × 0.5A = 0.85W，SOT-223 满载会烫到 90°C+。ESP32 典型持续负载 ~240mA 可用，但瞬时峰值 >500mA，电源按 ≥500mA 设计，别按满载跑。');
     else if (p.verdict === 'warn') push('warn', p.note);
     else push('ok', `${p.name} 已选入 BOM`);
   };
@@ -405,7 +405,7 @@ export default function BomSelect({ visitor, onComplete }: { visitor: boolean; o
                   <span className="text-silk-300">负载电流 I</span>
                   <span>
                     <span className="text-sm font-bold text-copper-300">{loadMa}mA</span>
-                    <span className="ml-2 text-[10px] text-silk-500">ESP32 峰值 ≈240 · 工单满载 500</span>
+                    <span className="ml-2 text-[10px] text-silk-500">ESP32 持续 ≈240 · 瞬时 &gt;500 · 按 ≥500 设计</span>
                   </span>
                 </span>
                 <input
@@ -430,7 +430,7 @@ export default function BomSelect({ visitor, onComplete }: { visitor: boolean; o
                         : 'border-ink-700 text-silk-500 hover:text-silk-300',
                     )}
                   >
-                    {v === 240 ? '峰值 240mA' : '满载 500mA'}
+                    {v === 240 ? '持续 240mA（典型）' : '满载 500mA（峰值口径）'}
                   </button>
                 ))}
               </div>
@@ -486,7 +486,7 @@ export default function BomSelect({ visitor, onComplete }: { visitor: boolean; o
               )}
               <p className="text-silk-500">
                 {thermal.part.id === 'xc6206'
-                  ? '✗ 最大输出 250mA < 峰值 240mA × 1.3 裕量 —— 不合格'
+                  ? '✗ 最大输出 250mA < 瞬时峰值 >500mA，连平均百 mA 级都没裕量 —— 不合格'
                   : thermal.part.id === 'me6211'
                     ? '✓ 500mA 额定 + 40µA 静态电流，无线传感器节点的省电之选'
                     : thermal.part.id === 'ams1117'

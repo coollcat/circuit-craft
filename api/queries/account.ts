@@ -41,7 +41,37 @@ function checkLoginRateLimit(username: string): void {
   }
 }
 
+/* ---------------- 注册限流（内存计数，尽力而为） ---------------- */
+// register 同样执行 ~36ms 的同步 scrypt，无限流会被脚本直打耗满 CPU。
+// queries 层拿不到请求 IP，退用 username 维度：同一 username 1 分钟最多 3 次注册尝试。
+// 与 login 同款语义：serverless / 多实例部署下各实例计数互相独立，仅作单实例内
+// 的轻量限流，不构成全局限流防线。
+const REGISTER_WINDOW_MS = 60_000; // 1 分钟窗口
+const REGISTER_MAX_ATTEMPTS = 3; // 同一 username 窗口内最多 3 次注册尝试
+const registerAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function checkRegisterRateLimit(username: string): void {
+  const now = Date.now();
+  const rec = registerAttempts.get(username);
+  if (!rec || now >= rec.resetAt) {
+    registerAttempts.set(username, { count: 1, resetAt: now + REGISTER_WINDOW_MS });
+    // 防止 Map 被大量随机用户名撑爆：超上限时顺带清理过期项
+    if (registerAttempts.size > 5000) {
+      for (const [k, v] of registerAttempts) {
+        if (now >= v.resetAt) registerAttempts.delete(k);
+      }
+    }
+    return;
+  }
+  rec.count += 1;
+  if (rec.count > REGISTER_MAX_ATTEMPTS) {
+    throw new Error("尝试太频繁，请稍后再试");
+  }
+}
+
 export async function registerUser(username: string, password: string) {
+  // 限流放在最前：挡住一切后续开销（含 scrypt 与 DB 往返），与 login 一致
+  checkRegisterRateLimit(username);
   if (!USERNAME_RE.test(username)) {
     throw new Error("用户名需为 3-24 位字母/数字/中文/下划线/短横线");
   }

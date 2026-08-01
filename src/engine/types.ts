@@ -13,7 +13,13 @@ export type ComponentType =
   | 'funcgen' | 'voltmeter' | 'ammeter' | 'module';
 
 export interface PortRef { comp: string; port: string; }
-export interface WireSpec { id: string; from: PortRef; to: PortRef; }
+// 导线层（wave6 新增，可选，向后兼容）：缺省 'top'，旧导线不变；仅视觉/组织分层，不影响仿真连通性。
+export type WireLayer = 'top' | 'bottom';
+// 拐点（wirefix 新增，可选，向后兼容）：用户手动放置的中间拐点（世界坐标）；
+// hole:true（wave6）表示该拐点同时是过孔/换层点，经过后导线切到另一层。
+export interface ViaPoint { x: number; y: number; hole?: boolean }
+// via 存在且非空时渲染/命中/粒子走「端口A → via… → 端口B」折线（相邻点 route45 桥接），否则用 route45 自动走线。
+export interface WireSpec { id: string; from: PortRef; to: PortRef; via?: ViaPoint[]; layer?: WireLayer; }
 
 export interface ComponentSpec {
   id: string;

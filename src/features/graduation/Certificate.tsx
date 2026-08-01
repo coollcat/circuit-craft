@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ImageDown, Home, FlaskConical, Lock } from 'lucide-react';
 import PadButton from '@/components/PadButton';
 import SilkTag from '@/components/SilkTag';
-import { titleForStars } from '@/components/Navbar';
+import { GRADUATION_HONOR, titleForStars } from '@/lib/titles';
 import { useProgress } from '@/store/progress';
 import { SealStamp } from './ui';
 import { useGrad } from './store';
@@ -67,7 +67,8 @@ export default function Certificate({ visitor }: { visitor: boolean }) {
   const [saving, setSaving] = useState(false);
   const certRef = useRef<HTMLDivElement>(null);
 
-  const title = grad.orderPlaced ? '首席打板人' : titleForStars(totalStars);
+  // 「首席打板人」是毕业下单后的专属荣誉，仅此一处授予；星数阶梯称号走统一 titles.ts
+  const title = grad.orderPlaced ? GRADUATION_HONOR : titleForStars(totalStars);
   const certNo = useMemo(() => `CC-GRAD-2024-${String(Math.floor(1000 + Math.random() * 8999))}`, []);
   const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
   const minutes = Math.max(1, Math.round(((grad.finishedAt ?? Date.now()) - grad.startedAt) / 60000));

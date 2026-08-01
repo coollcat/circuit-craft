@@ -2,6 +2,7 @@
 // DialogueBar 剧情对话条（design.md 6.8）：NPC 头像 + 打字机文本 + 继续
 import { useEffect, useRef, useState } from 'react';
 import type { DialogueLine, NPCId } from '@/engine/types';
+import { useProgress } from '@/store/progress';
 import { cn } from '@/lib/utils';
 
 export const NPC_META: Record<
@@ -45,11 +46,17 @@ export default function DialogueBar({ lines, onDone, className }: DialogueBarPro
   const timer = useRef<number | null>(null);
   const line = lines[lineIdx];
   const done = lineIdx >= lines.length - 1 && chars >= (line?.text.length ?? 0);
+  // 设置·动效关闭时：打字机停用，整句瞬时显示
+  const motionOn = useProgress(s => s.settings.motion);
 
-  // 打字机：18 字/秒
+  // 打字机：18 字/秒（动效关闭 → 瞬时全文）
   useEffect(() => {
-    setChars(0);
     if (!line) return;
+    if (!motionOn) {
+      setChars(line.text.length);
+      return;
+    }
+    setChars(0);
     timer.current = window.setInterval(() => {
       setChars(c => {
         if (c >= line.text.length) {
@@ -62,12 +69,12 @@ export default function DialogueBar({ lines, onDone, className }: DialogueBarPro
     return () => {
       if (timer.current) window.clearInterval(timer.current);
     };
-  }, [lineIdx, line]);
+  }, [lineIdx, line, motionOn]);
 
   useEffect(() => {
     setLineIdx(0);
-    setChars(0);
-  }, [lines]);
+    if (motionOn) setChars(0); // 动效关闭时由上面的效果直接铺满全文，避免先清空
+  }, [lines, motionOn]);
 
   useEffect(() => {
     if (done && lines.length > 0) onDone?.();

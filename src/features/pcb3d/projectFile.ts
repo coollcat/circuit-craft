@@ -1,6 +1,6 @@
 // 3D PCB / 沙盒 —— 工程文件（.ccproj.json）导入导出
 // 与存档槽 / 分享码并存：面向「保存到本地磁盘 / 从磁盘打开」的场景。
-import type { CircuitSpec, ComponentSpec, ComponentType, WireSpec } from '@/engine/types';
+import type { CircuitSpec, ComponentSpec, ComponentType, ViaPoint, WireSpec } from '@/engine/types';
 
 export const PROJECT_KIND = 'ccproj';
 export const PROJECT_VERSION = 1;
@@ -87,11 +87,29 @@ function sanitizeComponent(v: unknown): ComponentSpec | null {
   return comp;
 }
 
+/** 手动拐点（可选字段，非法一律丢弃而不是整线判废——via 丢了只是走线变回自动 45°）；hole:true 保留（过孔换层点） */
+function sanitizeVia(v: unknown): ViaPoint[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const pts: ViaPoint[] = [];
+  for (const p of v) {
+    if (typeof p !== 'object' || p === null) continue;
+    const o = p as Record<string, unknown>;
+    if (typeof o.x === 'number' && Number.isFinite(o.x) && typeof o.y === 'number' && Number.isFinite(o.y)) {
+      pts.push(o.hole === true ? { x: o.x, y: o.y, hole: true } : { x: o.x, y: o.y });
+    }
+  }
+  return pts.length > 0 ? pts : undefined;
+}
+
 function sanitizeWire(v: unknown): WireSpec | null {
   if (typeof v !== 'object' || v === null) return null;
   const o = v as Record<string, unknown>;
   if (typeof o.id !== 'string' || !isPortRef(o.from) || !isPortRef(o.to)) return null;
-  return { id: o.id, from: { comp: o.from.comp, port: o.from.port }, to: { comp: o.to.comp, port: o.to.port } };
+  const wire: WireSpec = { id: o.id, from: { comp: o.from.comp, port: o.from.port }, to: { comp: o.to.comp, port: o.to.port } };
+  const via = sanitizeVia(o.via);
+  if (via) wire.via = via;
+  if (o.layer === 'top' || o.layer === 'bottom') wire.layer = o.layer; // 非法层值丢弃 = 缺省顶层
+  return wire;
 }
 
 /**

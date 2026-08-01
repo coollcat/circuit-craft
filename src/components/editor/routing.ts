@@ -1,4 +1,6 @@
 // 编辑器 — 45°/90° 折线自动布线
+import type { ViaPoint, WireLayer } from '@/engine/types';
+
 export interface Pt { x: number; y: number }
 
 /**
@@ -18,6 +20,35 @@ export function route45(a: Pt, b: Pt): Pt[] {
   // 垂直 — 斜 — 垂直
   const midY = a.y + Math.sign(dy) * (ady - adx);
   return [a, { x: a.x, y: midY }, b];
+}
+
+export const flipLayer = (l: WireLayer): WireLayer => (l === 'top' ? 'bottom' : 'top');
+
+export interface WireSegment { pts: Pt[]; layer: WireLayer }
+
+/**
+ * 按链段拆分导线路径并标注每段所在层：
+ * 链 = 端口A → via… → 端口B，相邻链点用 route45 桥接；
+ * 段 i 的层 = 起始层被前面 hole 过孔数奇偶翻转。
+ * 画线预览与落线渲染必须共用本函数（或其展开形式 buildWirePolyline），保证逐段一致。
+ */
+export function buildWireSegments(a: Pt, via: ViaPoint[], b: Pt, startLayer: WireLayer = 'top'): WireSegment[] {
+  const chain: Pt[] = [a, ...via, b];
+  const segs: WireSegment[] = [];
+  let layer = startLayer;
+  for (let i = 0; i < chain.length - 1; i++) {
+    segs.push({ pts: route45(chain[i], chain[i + 1]), layer });
+    if (via[i]?.hole) layer = flipLayer(layer); // chain[i+1] 是过孔：后续段换层
+  }
+  return segs;
+}
+
+/** 预览与落线共用的完整折线（buildWireSegments 的扁平化，层信息丢弃） */
+export function buildWirePolyline(a: Pt, via: ViaPoint[], b: Pt): Pt[] {
+  const pts: Pt[] = [];
+  const segs = buildWireSegments(a, via, b);
+  for (let i = 0; i < segs.length; i++) pts.push(...(i === 0 ? segs[i].pts : segs[i].pts.slice(1)));
+  return pts;
 }
 
 export function ptsToPath(points: Pt[]): string {

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { CircuitSpec } from '@/engine/types';
 import { numParam } from '@/engine/solver';
 import { PORT_GEOM, compRadius, portWorldPos } from '@/components/editor/symbols';
-import { route45, type Pt } from '@/components/editor/routing';
+import { buildWireSegments, type Pt } from '@/components/editor/routing';
 import { PX2MM, buildComponent, disposeComponent } from './models';
 
 const BOARD_THICKNESS = 1.6;
@@ -156,7 +156,7 @@ export class PcbScene {
   private traceDirty = false;
   private circuit: CircuitSpec = { components: [], wires: [] };
   private comps = new Map<string, CompEntry>();
-  private wireMats = new Map<string, THREE.MeshStandardMaterial>();
+  private wireMats = new Map<string, THREE.MeshStandardMaterial[]>(); // 每条导线 [顶层材质, 底层材质]
   private traceRes: { geos: THREE.BufferGeometry[]; mats: THREE.Material[] } = { geos: [], mats: [] };
   private currents: Map<string, number> | null = null;
   private gridTex: THREE.CanvasTexture;
@@ -301,14 +301,14 @@ export class PcbScene {
       ledMat.emissiveIntensity = Math.min(i / imax, 1.35) * 2.2;
     }
     // 走线微光（有电流的铜箔泛绿光）
-    for (const [wireId, mat] of this.wireMats) {
+    for (const [wireId, mats] of this.wireMats) {
       const wire = this.circuit.wires.find(w => w.id === wireId);
       if (!wire) continue;
       const i = Math.max(
         Math.abs(this.currents?.get(wire.from.comp) ?? 0),
         Math.abs(this.currents?.get(wire.to.comp) ?? 0),
       );
-      mat.emissiveIntensity = Math.min(i / 0.02, 1) * 0.45;
+      for (const mat of mats) mat.emissiveIntensity = Math.min(i / 0.02, 1) * 0.45;
     }
   }
 
@@ -393,7 +393,7 @@ export class PcbScene {
     this.traceGroup.clear();
     for (const geo of this.traceRes.geos) geo.dispose();
     for (const mat of this.traceRes.mats) mat.dispose();
-    for (const mat of this.wireMats.values()) mat.dispose();
+    for (const mats of this.wireMats.values()) for (const mat of mats) mat.dispose();
     this.wireMats.clear();
     const traceRes: typeof this.traceRes = { geos: [], mats: [] };
     this.traceRes = traceRes;
@@ -430,31 +430,49 @@ export class PcbScene {
       }
     }
 
-    // 铜走线（45° 折线 → 贴板条带）
+    // 铜走线（与原理图编辑器同一套 buildWireSegments：顶层铜色 / 底层蓝色贴板条带，hole 拐点画过孔柱）
     for (const wire of circuit.wires) {
       const a = compById.get(wire.from.comp);
       const b = compById.get(wire.to.comp);
       if (!a || !b) continue;
-      const pts = route45(portWorldPos(a, wire.from.port), portWorldPos(b, wire.to.port)).map(p => this.toBoard(p));
-      if (pts.length < 2) continue;
-      const mat = new THREE.MeshStandardMaterial({
+      const pa = portWorldPos(a, wire.from.port);
+      const pb = portWorldPos(b, wire.to.port);
+      const segs = buildWireSegments(pa, wire.via ?? [], pb, wire.layer ?? 'top');
+      if (segs.length === 0) continue;
+      const topMat = new THREE.MeshStandardMaterial({
         color: '#C9803C', roughness: 0.32, metalness: 0.9,
         emissive: new THREE.Color('#3FC47F'), emissiveIntensity: 0,
       });
-      this.wireMats.set(wire.id, mat);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const p0 = pts[i], p1 = pts[i + 1];
-        const dx = p1.x - p0.x, dz = p1.z - p0.z;
-        const len = Math.hypot(dx, dz);
-        if (len < 0.05) continue;
-        const strip = new THREE.Mesh(stripGeo, mat);
-        strip.scale.x = len + TRACE_W; // 段间重叠盖住接缝
-        strip.position.set((p0.x + p1.x) / 2, 0.1, (p0.z + p1.z) / 2);
-        strip.rotation.y = -Math.atan2(dz, dx);
-        this.traceGroup.add(strip);
+      const bottomMat = new THREE.MeshStandardMaterial({
+        color: '#3D6FD8', roughness: 0.4, metalness: 0.85,
+        emissive: new THREE.Color('#3FC47F'), emissiveIntensity: 0,
+      });
+      this.wireMats.set(wire.id, [topMat, bottomMat]);
+      for (const seg of segs) {
+        const mat = seg.layer === 'bottom' ? bottomMat : topMat;
+        const y = seg.layer === 'bottom' ? 0.05 : 0.1; // 底层条带贴板略低，避免与顶层 z-fighting
+        const bpts = seg.pts.map(p => this.toBoard(p));
+        for (let i = 0; i < bpts.length - 1; i++) {
+          const p0 = bpts[i], p1 = bpts[i + 1];
+          const dx = p1.x - p0.x, dz = p1.z - p0.z;
+          const len = Math.hypot(dx, dz);
+          if (len < 0.05) continue;
+          const strip = new THREE.Mesh(stripGeo, mat);
+          strip.scale.x = len + TRACE_W; // 段间重叠盖住接缝
+          strip.position.set((p0.x + p1.x) / 2, y, (p0.z + p1.z) / 2);
+          strip.rotation.y = -Math.atan2(dz, dx);
+          this.traceGroup.add(strip);
+        }
       }
-      addVia(pts[0].x, pts[0].z);
-      addVia(pts[pts.length - 1].x, pts[pts.length - 1].z);
+      // 端点焊盘过孔 + hole 拐点过孔柱（addVia 自带去重）
+      const ba = this.toBoard(pa), bb = this.toBoard(pb);
+      addVia(ba.x, ba.z);
+      addVia(bb.x, bb.z);
+      for (const v of wire.via ?? []) {
+        if (!v.hole) continue;
+        const bv = this.toBoard(v);
+        addVia(bv.x, bv.z);
+      }
     }
     this.applyCurrents();
   }
@@ -488,7 +506,7 @@ export class PcbScene {
     this.rig.dispose();
     for (const entry of this.comps.values()) disposeComponent(entry.group);
     this.comps.clear();
-    for (const mat of this.wireMats.values()) mat.dispose();
+    for (const mats of this.wireMats.values()) for (const mat of mats) mat.dispose();
     this.wireMats.clear();
     this.traceGroup.traverse(o => {
       if (o instanceof THREE.Mesh) o.geometry.dispose();
