@@ -9,6 +9,7 @@ import {
   CloudUpload,
   Copy,
   KeyRound,
+  PenLine,
   RefreshCw,
   UserRound,
   X,
@@ -36,6 +37,27 @@ function fmtTime(v: unknown): string {
   } catch {
     return '未知时间';
   }
+}
+
+/* ---------------- 注册成功视图（生成/手动注册共用） ---------------- */
+
+function DoneView({ username, onClose }: { username: string; onClose: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-4 py-4 text-center">
+      <span className="glow-pcb flex h-14 w-14 items-center justify-center rounded-full border-2 border-pcb-400 bg-ink-800">
+        <Check className="h-7 w-7 text-pcb-300" />
+      </span>
+      <div>
+        <h3 className="text-lg font-bold text-silk-100">云存档已开通</h3>
+        <p className="mt-1 font-mono text-sm text-pcb-300">{username}</p>
+      </div>
+      <p className="max-w-sm text-sm leading-relaxed text-silk-300">
+        小焊提示：进度会每 5 秒自动焊上云端，换台电脑登录就能接着玩。
+        账号密码一定收好——丢了可真找不回来！
+      </p>
+      <PadButton onClick={onClose}>开工！</PadButton>
+    </div>
+  );
 }
 
 /* ---------------- 一键生成账号 ---------------- */
@@ -93,22 +115,7 @@ function GenerateView() {
   };
 
   if (doneName) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-4 text-center">
-        <span className="glow-pcb flex h-14 w-14 items-center justify-center rounded-full border-2 border-pcb-400 bg-ink-800">
-          <Check className="h-7 w-7 text-pcb-300" />
-        </span>
-        <div>
-          <h3 className="text-lg font-bold text-silk-100">云存档已开通</h3>
-          <p className="mt-1 font-mono text-sm text-pcb-300">{doneName}</p>
-        </div>
-        <p className="max-w-sm text-sm leading-relaxed text-silk-300">
-          小焊提示：进度会每 5 秒自动焊上云端，换台电脑登录就能接着玩。
-          账号密码一定收好——丢了可真找不回来！
-        </p>
-        <PadButton onClick={closeDialog}>开工！</PadButton>
-      </div>
-    );
+    return <DoneView username={doneName} onClose={closeDialog} />;
   }
 
   return (
@@ -177,6 +184,118 @@ function GenerateView() {
   );
 }
 
+/* ---------------- 手动输入注册 ---------------- */
+
+// 与服务端 account.ts 的 USERNAME_RE 保持一致
+const USERNAME_RE = /^[a-zA-Z0-9_\u4e00-\u9fa5-]{3,24}$/;
+
+const inputCls =
+  'w-full rounded-md border border-ink-700 bg-ink-850 px-3 py-2 font-mono text-sm text-silk-100 placeholder:text-silk-700 focus:border-pcb-400';
+
+function RegisterView() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [doneName, setDoneName] = useState<string | null>(null);
+  const registerMut = trpc.account.register.useMutation();
+  const closeDialog = useAccount(s => s.closeDialog);
+
+  const doRegister = async () => {
+    const name = username.trim();
+    if (!USERNAME_RE.test(name)) {
+      setError('用户名需为 3-24 位字母/数字/中文/下划线/短横线');
+      return;
+    }
+    if (password.length < 8 || password.length > 64) {
+      setError('密码需为 8-64 位');
+      return;
+    }
+    if (password !== confirm) {
+      setError('两次输入的密码不一致');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await registerMut.mutateAsync({ username: name, password });
+      saveCredentials(res.token, res.username);
+      await syncAfterAuth();
+      // 若云端有冲突，syncAfterAuth 已切到冲突视图；否则展示开通成功
+      if (!useAccount.getState().conflict) setDoneName(res.username);
+    } catch (e) {
+      // 撞名等失败直接展示服务端文案，让用户自己换名字，不自动重试
+      setError(errMsg(e, '注册失败，请检查网络后再试'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (doneName) {
+    return <DoneView username={doneName} onClose={closeDialog} />;
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={e => {
+        e.preventDefault();
+        if (!busy) void doRegister();
+      }}
+    >
+      <p className="text-sm leading-relaxed text-silk-300">
+        想要好记的账号？自己起一个用户名和密码，马上把本地存档焊上云端。不用邮箱，不用手机号。
+      </p>
+      <label className="flex flex-col gap-1.5 text-xs text-silk-500">
+        用户名
+        <div className="relative">
+          <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-silk-700" />
+          <input
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="3-24 位字母/数字/中文/下划线/短横线"
+            autoComplete="username"
+            className={cn(inputCls, 'pl-9')}
+          />
+        </div>
+      </label>
+      <label className="flex flex-col gap-1.5 text-xs text-silk-500">
+        密码
+        <div className="relative">
+          <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-silk-700" />
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="8-64 位，建议字母+数字混合"
+            autoComplete="new-password"
+            className={cn(inputCls, 'pl-9')}
+          />
+        </div>
+      </label>
+      <label className="flex flex-col gap-1.5 text-xs text-silk-500">
+        确认密码
+        <div className="relative">
+          <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-silk-700" />
+          <input
+            type="password"
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            placeholder="再输一遍密码"
+            autoComplete="new-password"
+            className={cn(inputCls, 'pl-9')}
+          />
+        </div>
+      </label>
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <PadButton size="L" type="submit" disabled={busy}>
+        {busy ? '正在上锡注册…' : '注册并开通云存档'}
+      </PadButton>
+    </form>
+  );
+}
+
 /* ---------------- 老用户登录 ---------------- */
 
 function LoginView() {
@@ -201,9 +320,6 @@ function LoginView() {
       setBusy(false);
     }
   };
-
-  const inputCls =
-    'w-full rounded-md border border-ink-700 bg-ink-850 px-3 py-2 font-mono text-sm text-silk-100 placeholder:text-silk-700 focus:border-pcb-400';
 
   return (
     <form
@@ -297,7 +413,7 @@ function ConflictView() {
 /* ---------------- 登录/注册主体（弹窗关闭时卸载，重开自动回到「一键生成」） ---------------- */
 
 function AuthView() {
-  const [tab, setTab] = useState<'gen' | 'login'>('gen');
+  const [tab, setTab] = useState<'gen' | 'manual' | 'login'>('gen');
   return (
     <>
       {/* 选项卡（走线指示条风格） */}
@@ -305,6 +421,7 @@ function AuthView() {
         {(
           [
             ['gen', '一键生成账号', Zap],
+            ['manual', '手动注册', PenLine],
             ['login', '老用户登录', UserRound],
           ] as const
         ).map(([key, label, Icon]) => (
@@ -335,7 +452,7 @@ function AuthView() {
           </button>
         ))}
       </div>
-      {tab === 'gen' ? <GenerateView /> : <LoginView />}
+      {tab === 'gen' ? <GenerateView /> : tab === 'manual' ? <RegisterView /> : <LoginView />}
     </>
   );
 }
