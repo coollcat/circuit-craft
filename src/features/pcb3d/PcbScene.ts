@@ -52,6 +52,7 @@ class OrbitRig {
     this.radius = Math.min(600, Math.max(24, this.radius * Math.exp(e.deltaY * 0.0012)));
   };
   private onDbl = () => { this.reset(); };
+  private onCtx = (e: Event) => { e.preventDefault(); };
 
   constructor(el: HTMLElement) {
     this.el = el;
@@ -60,7 +61,7 @@ class OrbitRig {
     el.addEventListener('pointerup', this.onUp);
     el.addEventListener('wheel', this.onWheel, { passive: false });
     el.addEventListener('dblclick', this.onDbl);
-    el.addEventListener('contextmenu', e => e.preventDefault());
+    el.addEventListener('contextmenu', this.onCtx);
   }
   reset(): void {
     this.theta = this.home.theta;
@@ -91,6 +92,7 @@ class OrbitRig {
     this.el.removeEventListener('pointerup', this.onUp);
     this.el.removeEventListener('wheel', this.onWheel);
     this.el.removeEventListener('dblclick', this.onDbl);
+    this.el.removeEventListener('contextmenu', this.onCtx);
   }
 }
 
@@ -491,6 +493,9 @@ export class PcbScene {
     this.traceGroup.traverse(o => {
       if (o instanceof THREE.Mesh) o.geometry.dispose();
     });
+    // 走线层共享材质（焊盘金 / 钻孔黑）一并释放，避免泄漏材质程序
+    for (const mat of this.traceRes.mats) mat.dispose();
+    this.traceRes = { geos: [], mats: [] };
     if (this.boardGroup) {
       this.boardGroup.traverse(o => {
         if (o instanceof THREE.Mesh) {
@@ -504,6 +509,9 @@ export class PcbScene {
     this.gridTex.dispose();
     for (const m of this.boardMats) m.dispose();
     this.renderer.dispose();
+    // 主动释放 GL 上下文：反复开关 3D 面板时避免累积上下文触发
+    // 浏览器 "Too many active WebGL contexts" 警告
+    this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
   }
 }

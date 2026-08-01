@@ -6,10 +6,6 @@ import LedLab from './LedLab';
 import OpAmpLab from './OpAmpLab';
 import PullUpLab from './PullUpLab';
 
-/** 新增实验 kind（未写入 entries.ts 的 LabKind 联合，主代理合并阶段补挂载后可扩展） */
-export type ExtraLabKind = 'pullup';
-export type AnyLabKind = LabKind | ExtraLabKind;
-
 export const LAB_TITLES: Record<LabKind, string> = {
   bands: '色环电阻练习器',
   rc: 'RC 充放电曲线',
@@ -26,25 +22,18 @@ export const LAB_DESCS: Record<LabKind, string> = {
   pullup: '上拉 / 下拉 / 悬空三种接法对比，按住按键看节点电压。',
 };
 
-export const EXTRA_LAB_TITLES: Record<ExtraLabKind, string> = {
-  pullup: '上拉 / 下拉电阻',
-};
-
-export const EXTRA_LAB_DESCS: Record<ExtraLabKind, string> = {
-  pullup: '上拉 / 下拉 / 悬空三种接法对比，按住按键看节点电压——为什么输入脚需要确定的电平。',
-};
-
-export default function Lab({ kind }: { kind: AnyLabKind }) {
+export default function Lab({ kind }: { kind: LabKind }) {
   switch (kind) {
     case 'bands':
       return (
         <>
           <BandsLab />
+          {/* 进阶实验：标题/描述统一引自 LAB_TITLES / LAB_DESCS（单一来源） */}
           <div className="mt-6 border-t border-ink-700 pt-6">
             <h4 className="mb-1 font-mono text-xs uppercase tracking-widest text-sig-cyan">
-              进阶实验 · {EXTRA_LAB_TITLES.pullup}
+              进阶实验 · {LAB_TITLES.pullup}
             </h4>
-            <p className="mb-4 text-xs text-silk-500">{EXTRA_LAB_DESCS.pullup}</p>
+            <p className="mb-4 text-xs text-silk-500">{LAB_DESCS.pullup}</p>
             <PullUpLab />
           </div>
         </>

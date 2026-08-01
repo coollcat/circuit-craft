@@ -1,6 +1,7 @@
 // 云存档同步引擎（非 React 模块）
 // - token 存 localStorage「cc-account-token」，用户名存「cc-account-username」（仅显示用）
-// - payload = 打包 cc-save-v1 / cc-graduation-v1 / cc-sandbox-1..5 / cc-settings 为单个 JSON
+// - payload = 打包 cc-save-v1 / cc-graduation-v1 / cc-sandbox-1..5 / cc-sandbox-challenges 为单个 JSON
+//   （设置存于 cc-save-v1 的 settings 字段内，无独立 cc-settings 键）
 // - 所有网络调用 try/catch 静默降级：任何失败都不影响本地游玩，仅反映到同步状态
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
@@ -12,8 +13,12 @@ import { useAccount } from './store';
 const TOKEN_KEY = 'cc-account-token';
 const NAME_KEY = 'cc-account-username';
 
-/** 参与云同步打包的 localStorage 键（沙盒槽存在才打包） */
-const FIXED_KEYS = ['cc-save-v1', 'cc-graduation-v1', 'cc-settings'] as const;
+/** 参与云同步打包的 localStorage 键（键存在才打包）
+ *  - cc-save-v1：zustand persist，含星数/完成关卡/提示/设置（settings 字段）
+ *  - cc-graduation-v1：毕业设计向导状态
+ *  - cc-sandbox-challenges：沙盒老手挑战完成记录（用户进度，需跨设备同步）
+ */
+const FIXED_KEYS = ['cc-save-v1', 'cc-graduation-v1', 'cc-sandbox-challenges'] as const;
 const SANDBOX_KEYS = [1, 2, 3, 4, 5].map(i => `cc-sandbox-${i}`);
 
 const DEBOUNCE_MS = 5000;
@@ -191,6 +196,24 @@ export function schedulePush(): void {
   }, DEBOUNCE_MS);
 }
 
+/** 是否还有未上传云端的本地更改（防抖窗口内或有待补推） */
+export function hasUnsyncedChanges(): boolean {
+  return getToken() != null && (debounceTimer != null || pendingPush);
+}
+
+/**
+ * 页面隐藏 / 卸载兜底：防抖窗口内若有关窗动作，立即发起推送（尽力而为）。
+ * 直接同步发起 mutation（fetch 立即派出），不阻塞卸载流程；
+ * 浏览器对卸载期请求不保证送达，属尽力而为的兜底，正常路径仍是 5s 防抖推送。
+ */
+export function flushPendingPush(): void {
+  if (debounceTimer == null) return;
+  window.clearTimeout(debounceTimer);
+  debounceTimer = null;
+  if (!getToken() || applyingRemote) return;
+  void pushLocalNow();
+}
+
 interface CloudSave {
   payload: string;
   updatedAt: unknown;
@@ -348,16 +371,29 @@ export function initCloudSync(): void {
   // 毕业设计 store（cc-graduation-v1）变化
   useGrad.subscribe(() => schedulePush());
 
-  // 沙盒槽 / 设置是直接 localStorage.setItem 写入的，包装一层捕获
+  // 沙盒槽 / 挑战记录是直接 localStorage.setItem 写入的，包装一层捕获
   try {
     const rawSetItem = localStorage.setItem.bind(localStorage);
     localStorage.setItem = (key: string, value: string) => {
       rawSetItem(key, value);
-      if (key.startsWith('cc-sandbox-') || key === 'cc-settings') {
+      // 覆盖 cc-sandbox-1..5 与 cc-sandbox-challenges（均以 cc-sandbox- 开头）
+      if (key.startsWith('cc-sandbox-')) {
         schedulePush();
       }
     };
   } catch {
     /* 包装失败仅影响沙盒自动同步，不影响游玩 */
   }
+
+  // 页面隐藏 / 卸载兜底：防抖窗口内的更改立即冲刷，避免关页丢更新
+  window.addEventListener('pagehide', flushPendingPush);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingPush();
+  });
+  // 有未同步更改时提示「离开页面前有未同步更改」（仅脏数据时触发）
+  window.addEventListener('beforeunload', e => {
+    if (!hasUnsyncedChanges()) return;
+    e.preventDefault();
+    e.returnValue = ''; // 旧版浏览器兼容
+  });
 }

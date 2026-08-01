@@ -46,7 +46,7 @@ export const C2_LEVELS: LevelDef[] = [
     hints: [
       '电容充电需要一条完整回路：电源 → 电阻 → 电容 → 地。电阻决定充电快慢。',
       '把 R1 串在 BT1 正极和 C1 之间，C1 另一端接地，电池负极也接地。',
-      '连线：BT1.pos→R1.a，R1.b→C1.a，C1.b→GND1，BT1.neg→GND1。运行后等约 2 秒电压即超过 3.9V。',
+      '连线：BT1.pos→R1.a，R1.b→C1.a，C1.b→GND1，BT1.neg→GND1。充电需要时间，耐心等它爬到 3.9V——真实电路里这就是一个数量级的等待。',
     ],
     knowledge: {
       title: 'RC 充电与时间常数 τ',

@@ -42,12 +42,12 @@ function SectionHead({
   );
 }
 
-/** 小实验区：4 个实验 Tab 切换 */
+/** 小实验区：5 个实验 Tab 切换 */
 function LabsSection() {
   const [active, setActive] = useState<LabKind>('bands');
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-5 gap-3">
         {LAB_ORDER.map(k => (
           <button
             key={k}

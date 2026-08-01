@@ -49,7 +49,7 @@ export const C6_LEVELS: LevelDef[] = [
     hints: [
       '链路方向：信号源 → 发射模块 → 天线。先把三个环节连起来，再调频率。',
       'FG1 的 freq 参数默认 1kHz，远远不够——把它改到 433MHz（433000000）附近。',
-      '连线：FG1.out→MOD1.in，MOD1.out→ANT1.a，两边 gnd 都接 GND1。freq 滑杆拉不到那么快——直接在数字框输入 433000000。',
+      '连线：FG1.out→MOD1.in，MOD1.out→ANT1.a，两边 gnd 都接 GND1。freq 用滑杆（对数刻度）拉到 433MHz 附近，或直接在数字框输入 433000000。',
     ],
     knowledge: {
       title: '载波与调制：无线的底层逻辑',

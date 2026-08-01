@@ -274,7 +274,10 @@ export interface ParamField {
 export const PARAM_SCHEMA: Partial<Record<ComponentType, ParamField[]>> = {
   battery: [{ key: 'voltage', label: '电压', unit: 'V', min: 0.5, max: 24, step: 0.5, help: '电池电动势' }],
   vsrc: [{ key: 'voltage', label: '电压', unit: 'V', min: -24, max: 24, step: 0.1 }],
-  resistor: [{ key: 'resistance', label: '阻值', unit: 'Ω', min: 1, max: 10e6, log: true, help: '阻值越大，电流越小' }],
+  resistor: [
+    { key: 'resistance', label: '阻值', unit: 'Ω', min: 1, max: 10e6, log: true, help: '阻值越大，电流越小' },
+    { key: 'power', label: '额定功率', unit: 'W', min: 0.25, max: 5, step: 0.25 },
+  ],
   capacitor: [{ key: 'capacitance', label: '容值', unit: 'F', min: 1e-12, max: 1e-3, log: true, help: '容值越大，充放电越慢' }],
   inductor: [{ key: 'inductance', label: '感值', unit: 'H', min: 1e-6, max: 1, log: true }],
   pot: [

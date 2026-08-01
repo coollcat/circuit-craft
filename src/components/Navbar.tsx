@@ -54,8 +54,8 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* 中：导航项 */}
-        <nav className="flex items-center gap-1">
+        {/* 中：导航项（1280px 下限收紧横向间距防挤压） */}
+        <nav className="flex min-w-0 items-center gap-0.5">
           {NAV_ITEMS.map(item => (
             <NavLink
               key={item.to}
@@ -63,7 +63,7 @@ export default function Navbar() {
               end={'end' in item && item.end}
               className={({ isActive }) =>
                 cn(
-                  'relative px-4 py-2 text-sm transition-colors duration-200',
+                  'relative px-3 py-2 text-sm transition-colors duration-200',
                   isActive ? 'text-pcb-300' : 'text-silk-300 hover:text-silk-100',
                 )
               }
@@ -93,7 +93,7 @@ export default function Navbar() {
           {/* 毕业设计（未解锁带锁） */}
           {gradLocked ? (
             <span
-              className="flex cursor-not-allowed items-center gap-1.5 px-4 py-2 text-sm text-silk-700"
+              className="flex cursor-not-allowed items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm text-silk-700"
               title="通关第 6 章解锁"
             >
               <Lock className="h-3.5 w-3.5" />
@@ -104,7 +104,7 @@ export default function Navbar() {
               to="/graduation"
               className={({ isActive }) =>
                 cn(
-                  'px-4 py-2 text-sm transition-colors',
+                  'whitespace-nowrap px-3 py-2 text-sm transition-colors',
                   isActive ? 'text-pcb-300' : 'text-silk-300 hover:text-silk-100',
                 )
               }
@@ -114,13 +114,14 @@ export default function Navbar() {
           )}
         </nav>
 
-        {/* 右：总星数 / 称号 / 设置 */}
-        <div className="relative flex items-center gap-4">
+        {/* 右：总星数 / 称号 / 设置（shrink-0 防挤压，1280px 下限收紧间距） */}
+        <div className="relative flex shrink-0 items-center gap-3">
           <span className="flex items-center gap-1.5 font-mono text-[13px] text-copper-300">
             <Star className="h-4 w-4 fill-copper-300" />
             {totalStars}
           </span>
-          <span className="flex items-center gap-1.5 border border-dashed border-silk-500 px-2 py-0.5 font-mono text-xs text-silk-300">
+          {/* 称号徽章：<1400px 隐藏称号文本只留星数，保证 1280px 下限不溢出 */}
+          <span className="hidden min-[1400px]:flex items-center gap-1.5 whitespace-nowrap border border-dashed border-silk-500 px-2 py-0.5 font-mono text-xs text-silk-300">
             <Zap className="h-3.5 w-3.5 text-pcb-300" />
             {titleForStars(totalStars)}
           </span>

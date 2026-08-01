@@ -43,7 +43,7 @@ export const DEFAULT_PARAMS: Record<ComponentType, Record<string, number | strin
   vsrc: { voltage: 5 },
   battery: { voltage: 9 },
   gnd: {},
-  resistor: { resistance: 220 },
+  resistor: { resistance: 220, power: 0.25 },
   capacitor: { capacitance: 1e-6 },
   inductor: { inductance: 1e-3 },
   pot: { resistance: 10000, wiper: 0.5 },
