@@ -20,9 +20,14 @@ export function useSimulation(circuit: CircuitSpec, running: boolean): Simulatio
   const simRef = useRef<CircuitSimulator>(new CircuitSimulator(circuit));
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(simRef.current.error);
+  // 拖拽/微调时 circuit 引用每帧都变但内容不变 —— 用内容签名挡住无谓的仿真器重建
+  const sigRef = useRef<string>(JSON.stringify(circuit));
 
   // 电路变化 → 重建仿真器
   useEffect(() => {
+    const sig = JSON.stringify(circuit);
+    if (sig === sigRef.current) return;
+    sigRef.current = sig;
     const sim = new CircuitSimulator(circuit);
     simRef.current = sim;
     setError(sim.error);

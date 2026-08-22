@@ -8,6 +8,7 @@ import type { CircuitSpec, DialogueLine, GoalCheck, LevelDef, StarCondition, Wir
 import { evaluateGoals, formatSI, solveDC, type GoalStatus } from '@/engine/solver';
 import { FIXTURE_LEVELS } from '@/engine/fixtures';
 import { getLevel, LEVELS, SIDE_QUESTS } from '@/content/levels';
+import { buildSolutionCircuit, deriveSolutionSteps, type SolutionStep } from '@/content/solution';
 import { useProgress } from '@/store/progress';
 import CircuitEditor, { type EditorVisuals } from '@/components/editor/CircuitEditor';
 import PalettePanel from '@/components/editor/PalettePanel';
@@ -81,7 +82,7 @@ export function goalLabel(g: GoalCheck): string {
 
 /** 星标展示文案：与真实判定对齐（内容里的 label 保留风味，此处统一为判据口径） */
 export function starLabel(s: StarCondition): string {
-  if (s.check === 'no-hint') return '不看 L3 剧透提示（L1/L2 随意）';
+  if (s.check === 'no-hint') return '不看剧透级提示 L3/L4（L1/L2 随意）';
   if (s.check === 'first-try') return '首次运行即全绿（无失败运行）';
   return s.label;
 }
@@ -358,7 +359,8 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
 
   /* ---------------- 提示 ---------------- */
   const openHintTier = (tier: number) => {
-    if (tier === 3 && hintTier < 3 && !l3Confirm) {
+    // L3/L4 都是剧透级：首次展开需确认（会失去无提示星）
+    if (tier >= 3 && hintTier < tier && !l3Confirm) {
       setL3Confirm(true);
       return;
     }
@@ -366,6 +368,14 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
     setHintTier(t => Math.max(t, tier));
     useHint(level.id, tier);
   };
+
+  /* ---------------- L4 直接通关：解法清单 + 一键照抄 ---------------- */
+  const solutionSteps = useMemo<SolutionStep[]>(() => deriveSolutionSteps(level), [level]);
+  const applySolution = useCallback(() => {
+    setCircuit(c => buildSolutionCircuit(level, c));
+    toast('已按参考解法补齐元件与连线——按 ▶ 运行验收。', 'ok');
+    lastInteract.current = Date.now();
+  }, [level]);
 
   /* ---------------- 下一关 ---------------- */
   const nextLevel = (() => {
@@ -514,8 +524,10 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
         open={hintOpen}
         onClose={() => { setHintOpen(false); setL3Confirm(false); }}
         hints={level.hints}
+        steps={solutionSteps}
         tier={hintTier}
         onOpen={openHintTier}
+        onApplySolution={applySolution}
         l3Confirm={l3Confirm}
       />
 
@@ -559,12 +571,22 @@ const TIER_META = [
   { label: 'L1 · 方向', desc: '只指路，不剧透', cost: '无代价' },
   { label: 'L2 · 方法', desc: '给出拓扑 / 公式', cost: '无代价' },
   { label: 'L3 · 近乎答案', desc: '元件清单 + 连线指引', cost: '本次尝试失去 ⭐ 无提示星' },
+  { label: 'L4 · 直接通关', desc: '完整解法清单，可一键照抄', cost: '同 L3：失去 ⭐ 无提示星' },
 ];
 
-function HintDrawer({ open, onClose, hints, tier, onOpen, l3Confirm }: {
-  open: boolean; onClose: () => void; hints: [string, string, string];
-  tier: number; onOpen: (t: number) => void; l3Confirm: boolean;
+const STEP_ICON: Record<SolutionStep['kind'], string> = {
+  place: '[元件]',
+  param: '[参数]',
+  pin: '[芯片]',
+  wire: '[连线]',
+};
+
+function HintDrawer({ open, onClose, hints, steps, tier, onOpen, onApplySolution, l3Confirm }: {
+  open: boolean; onClose: () => void; hints: [string, string, string]; steps: SolutionStep[];
+  tier: number; onOpen: (t: number) => void; onApplySolution: () => void; l3Confirm: boolean;
 }) {
+  const cardCls = (unlocked: boolean) =>
+    cn('rounded-lg border p-3', unlocked ? 'border-sig-amber/50 bg-ink-900' : 'border-ink-700 bg-ink-900/50');
   return (
     <AnimatePresence>
       {open && (
@@ -587,7 +609,7 @@ function HintDrawer({ open, onClose, hints, tier, onOpen, l3Confirm }: {
               const unlocked = tier >= t;
               const canOpen = tier >= t - 1;
               return (
-                <div key={t} className={cn('rounded-lg border p-3', unlocked ? 'border-sig-amber/50 bg-ink-900' : 'border-ink-700 bg-ink-900/50')}>
+                <div key={t} className={cardCls(unlocked)}>
                   <div className="mb-1 flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-sig-amber">{TIER_META[i].label}</span>
                     <span className="font-mono text-[10px] text-silk-700">{TIER_META[i].cost}</span>
@@ -596,13 +618,7 @@ function HintDrawer({ open, onClose, hints, tier, onOpen, l3Confirm }: {
                   {unlocked ? (
                     <p className="text-sm leading-relaxed text-silk-100">{h}</p>
                   ) : t === 3 && l3Confirm ? (
-                    <div className="rounded border border-danger/50 bg-danger/10 p-2">
-                      <p className="mb-2 text-xs text-danger">确定要撕开焊盘封印吗？本次尝试将失去「⭐ 无提示星」——重玩本关可以重新挑战。</p>
-                      <div className="flex gap-2">
-                        <PadButton size="S" variant="danger" onClick={() => onOpen(3)}>确定要看</PadButton>
-                        <PadButton size="S" variant="ghost" onClick={onClose}>再想想</PadButton>
-                      </div>
-                    </div>
+                    <SpoilerConfirm onConfirm={() => onOpen(3)} onClose={onClose} />
                   ) : (
                     <PadButton size="S" variant="ghost" disabled={!canOpen} onClick={() => onOpen(t)}>
                       {canOpen ? `查看 ${TIER_META[i].label}` : '先阅读上一级'}
@@ -611,10 +627,56 @@ function HintDrawer({ open, onClose, hints, tier, onOpen, l3Confirm }: {
                 </div>
               );
             })}
+
+            {/* L4 · 直接通关（解法由目标数据推导，无需内容组维护文案） */}
+            {(() => {
+              const t = 4;
+              const unlocked = tier >= t;
+              return (
+                <div className={cardCls(unlocked)}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-sig-amber">{TIER_META[3].label}</span>
+                    <span className="font-mono text-[10px] text-silk-700">{TIER_META[3].cost}</span>
+                  </div>
+                  <p className="mb-2 text-[11px] text-silk-500">{TIER_META[3].desc}</p>
+                  {unlocked ? (
+                    <>
+                      <ol className="mb-3 space-y-2">
+                        {steps.map((s, i) => (
+                          <li key={i} className="flex gap-1.5 text-[12px] leading-relaxed text-silk-200">
+                            <span className="shrink-0 font-mono text-[10px] text-copper-400">{STEP_ICON[s.kind]}</span>
+                            <span>{s.text}</span>
+                          </li>
+                        ))}
+                      </ol>
+                      <PadButton size="S" variant="primary" onClick={onApplySolution}>一键照抄（补齐电路）</PadButton>
+                    </>
+                  ) : tier === 3 && l3Confirm ? (
+                    <SpoilerConfirm onConfirm={() => onOpen(4)} onClose={onClose} />
+                  ) : (
+                    <PadButton size="S" variant="ghost" disabled={tier < 3} onClick={() => onOpen(4)}>
+                      {tier >= 3 ? `查看 ${TIER_META[3].label}` : '先阅读 L3'}
+                    </PadButton>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </motion.aside>
       )}
     </AnimatePresence>
+  );
+}
+
+function SpoilerConfirm({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div className="rounded border border-danger/50 bg-danger/10 p-2">
+      <p className="mb-2 text-xs text-danger">确定要撕开焊盘封印吗？本次尝试将失去「⭐ 无提示星」——重玩本关可以重新挑战。</p>
+      <div className="flex gap-2">
+        <PadButton size="S" variant="danger" onClick={onConfirm}>确定要看</PadButton>
+        <PadButton size="S" variant="ghost" onClick={onClose}>再想想</PadButton>
+      </div>
+    </div>
   );
 }
 
