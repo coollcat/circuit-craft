@@ -443,6 +443,8 @@ export default function CircuitEditor({
       if (readOnly) return;
       const circ = circuitRef.current;
       if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
+        // 若正从被删元件的端口拉线，先取消布线，避免渲染期对已删端口取坐标而崩溃
+        if (wireFrom && wireFrom.comp === sel.id) cancelWire();
         if (sel.kind === 'wire') {
           emitChange({ ...circ, wires: circ.wires.filter(x => x.id !== sel.id) });
         } else {

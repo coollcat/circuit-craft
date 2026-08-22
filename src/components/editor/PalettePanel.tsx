@@ -117,7 +117,7 @@ function PaletteChip({ item, used, locked, onAdd }: { item: ComponentSpec; used?
   const meta = COMP_META[item.type];
   const disabled = used || locked;
   const mainParam = Object.entries(DEFAULT_PARAMS[item.type])
-    .filter(([k]) => ['resistance', 'capacitance', 'inductance', 'voltage', 'vout', 'impedance'].includes(k))
+    .filter(([k]) => ['resistance', 'capacitance', 'inductance', 'voltage', 'vout', 'impedance', 'ratio', 'light', 'temp', 'r25'].includes(k))
     .map(([, v]) => v)[0];
   return (
     <button

@@ -2,9 +2,10 @@ import {
   mysqlTable,
   serial,
   varchar,
-  text,
+  mediumtext,
   timestamp,
   bigint,
+  index,
 } from "drizzle-orm/mysql-core";
 
 // 回路工坊账号体系：随机生成的用户名+密码，scrypt 加盐哈希存储
@@ -17,19 +18,27 @@ export const users = mysqlTable("users", {
 });
 
 // 会话令牌：登录/注册时签发，前端 localStorage 持有
-export const sessions = mysqlTable("sessions", {
-  id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-  token: varchar("token", { length: 128 }).notNull().unique(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const sessions = mysqlTable(
+  "sessions",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+    token: varchar("token", { length: 128 }).notNull().unique(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("idx_sessions_user_id").on(t.userId)],
+);
 
 // 云端存档：每用户一份 JSON 快照（进度/设置/沙盒槽/毕业设计），整存整取
-export const saves = mysqlTable("saves", {
-  id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true })
-    .notNull()
-    .unique(),
-  payload: text("payload").notNull(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+// MEDIUMTEXT：应用层允许 512KB，TEXT 的 64KB 上限会在大存档时静默截断/报错
+export const saves = mysqlTable(
+  "saves",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("user_id", { mode: "number", unsigned: true })
+      .notNull()
+      .unique(),
+    payload: mediumtext("payload").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+);

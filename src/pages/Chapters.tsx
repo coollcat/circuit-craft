@@ -7,7 +7,7 @@ import {
   Zap, Component, FileText, Route, AudioWaveform, Radio, Award,
   Lock, FlaskConical, BookOpen, Play, X, GraduationCap, ChevronRight,
 } from 'lucide-react';
-import { LEVELS } from '@/content/levels';
+import { LEVELS, SIDE_QUESTS } from '@/content/levels';
 import type { LevelDef } from '@/engine/types';
 import { useProgress } from '@/store/progress';
 import PadButton from '@/components/PadButton';
@@ -105,6 +105,8 @@ export default function Chapters() {
   const pads = useMemo(buildPads, []);
   const totalStars = useMemo(() => Object.values(stars).reduce((a, b) => a + b, 0), [stars]);
   const totalCompleted = completed.length;
+  const TOTAL_LEVELS = LEVELS.length + SIDE_QUESTS.length;
+  const TOTAL_STARS = TOTAL_LEVELS * 3;
 
   const stateOf = useCallback(
     (l: LevelDef): PadState => {
@@ -312,7 +314,7 @@ export default function Chapters() {
               <img src="/logo.svg" alt="" className="h-12 w-12" />
               <div>
                 <div className="text-sm font-bold text-silk-100">{titleForStars(totalStars)}</div>
-                <div className="mt-0.5 font-mono text-[11px] text-silk-500">⭐ {totalStars}/123 · ⚡ 通关 {totalCompleted}/41</div>
+                <div className="mt-0.5 font-mono text-[11px] text-silk-500">⭐ {totalStars}/{TOTAL_STARS} · ⚡ 通关 {totalCompleted}/{TOTAL_LEVELS}</div>
               </div>
             </div>
             {/* 主线进度条（铜箔开窗） */}
@@ -832,7 +834,7 @@ export default function Chapters() {
           <span className="truncate text-[11px] text-silk-300">{typed}</span>
         </div>
         <div className="shrink-0 font-mono text-[11px] text-silk-500">
-          进度 {totalCompleted}/41 · ⭐{totalStars} · 称号：{titleForStars(totalStars)}
+          进度 {totalCompleted}/{TOTAL_LEVELS} · ⭐{totalStars} · 称号：{titleForStars(totalStars)}
         </div>
       </div>
     </div>

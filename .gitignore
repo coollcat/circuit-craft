@@ -9,7 +9,6 @@ dist
 *.db
 *.sqlite
 *.sqlite3
-db/migrations/*.sql
 # TypeScript cache
 *.tsbuildinfo
 # Build outputs

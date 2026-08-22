@@ -100,7 +100,7 @@ export default function SideQuests() {
   const b5Done = sbLast ? completed.includes(sbLast.id) : false;
 
   /* 轨道间联动提示（打字机，进入后延迟 1s 播一次） */
-  const hintText = '丝印提示：支线 A 的 ADC 知识会让主线 5-4 变简单 · 支线 B-5 需要主线第 4 章的布局技能';
+  const hintText = '丝印提示：支线 A 的 ADC 知识会让主线 5-4 变简单 · 支线 B 尾声的射频篇需要主线第 6 章的语感';
   const [typed, setTyped] = useState('');
   useEffect(() => {
     let i = 0;
@@ -220,7 +220,7 @@ export default function SideQuests() {
                   {levels.map((l, i) => {
                     const st = stateOf(l);
                     const starCount = stars[l.id] ?? 0;
-                    const isGrad = l.id === 'sb-5';
+                    const isGrad = track.track === 'side-b' && l.id === sbLast?.id;
                     return (
                       <motion.div
                         key={l.id}
@@ -341,7 +341,7 @@ export default function SideQuests() {
           <h3 className="mt-2 text-lg font-bold text-silk-100">支线毕业设计：传感器信号处理小板</h3>
           <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-silk-300">
             支线 B 的终点是一块真能用的传感器小板：mV 级传感器信号进板，经运放放大 20 倍、RC 低通滤掉高频噪声，
-            最后以 2.0V 的干净直流送进 ADC。它与工业变送器同构——通过 B-5，你将完成人生第一块「信号链工程化」作品。
+            最后以 2.0V 的干净直流送进 ADC。它与工业变送器同构——通过它，你将完成人生第一块「信号链工程化」作品，并解锁尾声的射频三连关。
             板上留有排针与传感器焊盘，照着主线第 4 章的布局手艺，它真的可以打板。
           </p>
           <div className="mt-3 font-mono text-[10px] text-silk-500">
