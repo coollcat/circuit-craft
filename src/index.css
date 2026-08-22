@@ -4,6 +4,43 @@
 
 @layer base {
   :root {
+    /* ── 品牌语义色（RGB 三元组，供 tailwind <alpha-value> 消费）—— 暗色默认 ── */
+    --cc-ink-950: 6 10 8;
+    --cc-ink-900: 10 16 13;
+    --cc-ink-850: 14 22 17;
+    --cc-ink-800: 19 33 26;
+    --cc-ink-700: 27 46 36;
+    --cc-ink-600: 38 64 47;
+    --cc-ink-500: 49 82 62;
+    --cc-pcb-600: 31 122 76;
+    --cc-pcb-500: 46 158 99;
+    --cc-pcb-400: 63 196 127;
+    --cc-pcb-300: 111 227 161;
+    --cc-copper-600: 154 94 40;
+    --cc-copper-500: 201 128 60;
+    --cc-copper-400: 224 164 88;
+    --cc-copper-300: 240 192 120;
+    --cc-silk-100: 242 239 227;
+    --cc-silk-300: 207 201 180;
+    --cc-silk-500: 142 137 118;
+    --cc-silk-700: 85 82 74;
+    --cc-sig-cyan: 69 220 232;
+    --cc-sig-magenta: 229 107 214;
+    --cc-sig-amber: 255 184 77;
+    --cc-sig-blue: 91 141 239;
+    --cc-ok: 67 224 138;
+    --cc-warn: 255 176 32;
+    --cc-danger: 255 82 99;
+    /* ── 全色值变量：SVG 符号/内联样式直接消费 ── */
+    --col-silk-100: #F2EFE3;
+    --col-silk-500: #8E8976;
+    --col-sig-cyan: #45DCE8;
+    --col-sig-amber: #FFB84D;
+    --col-sig-blue: #5B8DEF;
+    --col-sig-magenta: #E56BD6;
+    --col-copper-500: #C9803C;
+
+    /* shadcn 基座令牌（暗色默认） */
     --background: 150 29% 3%;
     --foreground: 46 31% 92%;
     --card: 150 26% 7%;
@@ -34,6 +71,73 @@
     --sidebar-ring: 184 79% 59%;
   }
 
+  /* ══════════ 白色主题：图纸/丝印质感（html[data-theme='light'] 时全站生效） ══════════ */
+  html[data-theme='light'] {
+    --cc-ink-950: 247 246 240;
+    --cc-ink-900: 242 241 234;
+    --cc-ink-850: 236 235 227;
+    --cc-ink-800: 228 227 218;
+    --cc-ink-700: 205 203 189;
+    --cc-ink-600: 178 175 158;
+    --cc-ink-500: 156 152 134;
+    --cc-pcb-600: 20 96 59;
+    --cc-pcb-500: 27 116 71;
+    --cc-pcb-400: 38 140 87;
+    --cc-pcb-300: 62 168 110;
+    --cc-copper-600: 122 72 30;
+    --cc-copper-500: 156 98 42;
+    --cc-copper-400: 186 128 58;
+    --cc-copper-300: 160 106 32;
+    --cc-silk-100: 34 39 30;
+    --cc-silk-300: 69 75 63;
+    --cc-silk-500: 107 112 98;
+    --cc-silk-700: 155 160 147;
+    --cc-sig-cyan: 14 124 140;
+    --cc-sig-magenta: 178 58 164;
+    --cc-sig-amber: 169 106 0;
+    --cc-sig-blue: 59 102 196;
+    --cc-ok: 23 138 80;
+    --cc-warn: 169 106 0;
+    --cc-danger: 210 51 68;
+
+    --col-silk-100: #22271E;
+    --col-silk-500: #6B7062;
+    --col-sig-cyan: #0E7C8C;
+    --col-sig-amber: #A96A00;
+    --col-sig-blue: #3B66C4;
+    --col-sig-magenta: #B23AA4;
+    --col-copper-500: #9C622A;
+
+    /* shadcn 基座令牌（亮色） */
+    --background: 45 33% 96%;
+    --foreground: 105 12% 13%;
+    --card: 45 30% 97%;
+    --card-foreground: 105 12% 13%;
+    --popover: 45 32% 98%;
+    --popover-foreground: 105 12% 13%;
+    --primary: 152 54% 30%;
+    --primary-foreground: 45 33% 97%;
+    --secondary: 45 18% 89%;
+    --secondary-foreground: 105 12% 13%;
+    --muted: 45 18% 90%;
+    --muted-foreground: 90 8% 40%;
+    --accent: 150 25% 88%;
+    --accent-foreground: 105 12% 13%;
+    --destructive: 355 75% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 45 15% 78%;
+    --input: 45 15% 78%;
+    --ring: 188 65% 38%;
+    --sidebar-background: 45 25% 94%;
+    --sidebar-foreground: 105 12% 13%;
+    --sidebar-primary: 152 54% 30%;
+    --sidebar-primary-foreground: 45 33% 97%;
+    --sidebar-accent: 45 18% 89%;
+    --sidebar-accent-foreground: 105 12% 13%;
+    --sidebar-border: 45 15% 78%;
+    --sidebar-ring: 188 65% 38%;
+  }
+
   html {
     @apply scroll-smooth;
   }
@@ -53,6 +157,13 @@
   .gerber-grid-fine {
     background-image: radial-gradient(rgba(63, 196, 127, 0.05) 1px, transparent 1px);
     background-size: 12.7px 12.7px;
+  }
+  /* 白色主题：坐标纸风格的深绿点阵 */
+  html[data-theme='light'] .gerber-grid {
+    background-image: radial-gradient(rgba(27, 116, 71, 0.14) 1px, transparent 1px);
+  }
+  html[data-theme='light'] .gerber-grid-fine {
+    background-image: radial-gradient(rgba(27, 116, 71, 0.10) 1px, transparent 1px);
   }
 
   /* 全局噪点纹理（3% 透明度，防色带，模拟阻焊磨砂） */
@@ -76,6 +187,15 @@
     box-shadow:
       inset 0 1px 0 rgba(242, 239, 227, 0.04),
       0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  /* 白色主题：内高光换成上缘细阴影，投影减淡 */
+  html[data-theme='light'] .panel {
+    box-shadow: inset 0 1px 0 rgba(34, 39, 30, 0.05);
+  }
+  html[data-theme='light'] .panel-raised {
+    box-shadow:
+      inset 0 1px 0 rgba(34, 39, 30, 0.05),
+      0 8px 24px rgba(34, 39, 30, 0.12);
   }
 
   /* 发光：激活走线 / 危险 */
@@ -109,7 +229,7 @@
 
   /* focus 环：2px sig-cyan 外描边 */
   *:focus-visible {
-    outline: 2px solid #45dce8;
+    outline: 2px solid rgb(var(--cc-sig-cyan));
     outline-offset: 2px;
   }
 
@@ -119,20 +239,20 @@
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: #0a100d;
+    background: rgb(var(--cc-ink-950));
   }
   ::-webkit-scrollbar-thumb {
-    background: #26402f;
+    background: rgb(var(--cc-ink-600));
     border-radius: 5px;
-    border: 2px solid #0a100d;
+    border: 2px solid rgb(var(--cc-ink-950));
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #1f7a4c;
+    background: rgb(var(--cc-pcb-600));
   }
 
   ::selection {
-    background: rgba(46, 158, 99, 0.4);
-    color: #f2efe3;
+    background: rgb(var(--cc-pcb-500) / 0.35);
+    color: rgb(var(--cc-silk-100));
   }
 
   /* 降级：减少动效时停用流动发光 */

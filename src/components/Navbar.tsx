@@ -2,7 +2,7 @@
 // Navbar 全站导航（design.md 6.1，TopNav，64px，sticky top-0 z-50）
 import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router';
-import { Lock, Settings, Star, Zap } from 'lucide-react';
+import { Lock, Moon, Settings, Star, Sun, Zap } from 'lucide-react';
 import { useProgress } from '@/store/progress';
 import { LEVELS } from '@/content/levels';
 import AccountMenu from '@/features/account/AccountMenu';
@@ -36,6 +36,12 @@ export default function Navbar() {
   useEffect(() => {
     document.documentElement.dataset.motion = settings.motion ? 'on' : 'off';
   }, [settings.motion]);
+
+  // 明暗主题：<html data-theme> 驱动 index.css 的 CSS 变量层
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+  }, [settings.theme]);
+  const toggleTheme = () => setSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' });
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-ink-700 bg-ink-900/85 backdrop-blur-md">
@@ -122,6 +128,14 @@ export default function Navbar() {
             <Zap className="h-3.5 w-3.5 text-pcb-300" />
             {titleForStars(totalStars)}
           </span>
+          <button
+            onClick={toggleTheme}
+            aria-label={settings.theme === 'dark' ? '切换到白色主题' : '切换到暗色主题'}
+            title={settings.theme === 'dark' ? '白色主题（图纸模式）' : '暗色主题（阻焊模式）'}
+            className="rounded p-1.5 text-silk-300 transition-colors hover:bg-ink-800 hover:text-silk-100"
+          >
+            {settings.theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           <button
             onClick={() => setShowSettings(v => !v)}
             aria-label="设置"

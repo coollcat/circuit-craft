@@ -9,6 +9,15 @@
     <meta property="og:description" content="从点亮一颗 LED，到打出你的第一块 PCB。" />
     <meta property="og:image" content="/og-cover.png" />
     <title>回路工坊 CircuitCraft — PCB 电路学习闯关</title>
+    <script>
+      // 防首帧闪暗：React 挂载前从进度存档读主题，亮色用户直接以 data-theme="light" 起绘
+      try {
+        var saved = JSON.parse(localStorage.getItem('cc-save-v1') || 'null');
+        if (saved && saved.state && saved.state.settings && saved.state.settings.theme === 'light') {
+          document.documentElement.dataset.theme = 'light';
+        }
+      } catch (e) { /* 存档损坏则保持默认暗色 */ }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

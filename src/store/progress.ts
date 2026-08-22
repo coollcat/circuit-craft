@@ -9,6 +9,8 @@ export interface ProgressSettings {
   sound: boolean;
   motion: boolean;
   solderCursor: boolean;
+  /** 全站明暗主题：dark=阻焊暗房（默认），light=图纸白 */
+  theme: 'dark' | 'light';
 }
 
 export interface ProgressState {
@@ -47,7 +49,7 @@ export const useProgress = create<ProgressState>()(
       stars: {},
       completed: [],
       hintsUsed: {},
-      settings: { sound: true, motion: true, solderCursor: false },
+      settings: { sound: true, motion: true, solderCursor: false, theme: 'dark' },
 
       completeLevel: (id, stars) =>
         set(state => {
@@ -103,7 +105,7 @@ export const useProgress = create<ProgressState>()(
           stars: {},
           completed: [],
           hintsUsed: {},
-          settings: { sound: true, motion: true, solderCursor: false },
+          settings: { sound: true, motion: true, solderCursor: false, theme: 'dark' },
         }),
     }),
     { name: 'cc-save-v1' },

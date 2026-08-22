@@ -136,7 +136,8 @@ function PaletteChip({ item, used, locked, onAdd }: { item: ComponentSpec; used?
       )}
     >
       <div className="h-12 w-12 text-silk-100">
-        <svg viewBox="-40 -40 80 80" className="h-full w-full">
+        {/* 符号色票固定阻焊深底：明暗主题下元件符号始终按暗底丝印渲染（与实物板一致） */}
+        <svg viewBox="-40 -40 80 80" className="h-full w-full rounded-md" style={{ background: '#0E1611' }}>
           <SymbolGlyph type={item.type} closed={item.params?.closed === true} />
         </svg>
       </div>
