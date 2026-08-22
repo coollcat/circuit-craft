@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" width="480" height="360">
+  <!-- 空态插图：小焊台吉祥物趴在空白 PCB 上睡觉 -->
+  <rect width="480" height="360" fill="none"/>
+  <!-- blank PCB -->
+  <g>
+    <rect x="80" y="220" width="320" height="90" rx="10" fill="#0E1611" stroke="#1F7A4C" stroke-width="2.5"/>
+    <!-- a few unconnected traces -->
+    <path d="M110 292 L150 252 L210 252" fill="none" stroke="#26402F" stroke-width="3" stroke-linecap="round"/>
+    <path d="M120 302 L170 262 L170 244" fill="none" stroke="#26402F" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="110" cy="292" r="5" fill="#26402F"/>
+    <circle cx="210" cy="252" r="5" fill="#26402F"/>
+    <circle cx="370" cy="292" r="5" fill="#26402F"/>
+    <path d="M370 292 L330 252 L290 252" fill="none" stroke="#26402F" stroke-width="3" stroke-linecap="round"/>
+    <!-- silkscreen dashed box -->
+    <rect x="226" y="270" width="70" height="26" rx="4" fill="none" stroke="#55524A" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="261" y="288" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="13" fill="#55524A">EMPTY</text>
+  </g>
+  <!-- sleeping soldering-station mascot lying on the board -->
+  <g transform="translate(240,178)">
+    <!-- body -->
+    <rect x="-58" y="-40" width="116" height="82" rx="26" fill="#1F7A4C"/>
+    <rect x="-58" y="-40" width="116" height="82" rx="26" fill="none" stroke="#2E9E63" stroke-width="3"/>
+    <!-- closed eyes (sleeping) -->
+    <path d="M-34 -6 Q-26 2 -18 -6" fill="none" stroke="#0A100D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M18 -6 Q26 2 34 -6" fill="none" stroke="#0A100D" stroke-width="4" stroke-linecap="round"/>
+    <!-- small mouth -->
+    <path d="M-7 14 Q0 19 7 14" fill="none" stroke="#0A100D" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- iron resting beside, tip dim -->
+    <rect x="52" y="6" width="58" height="16" rx="8" transform="rotate(18 52 14)" fill="#26402F"/>
+    <path d="M104 26 L128 38" stroke="#55524A" stroke-width="7" stroke-linecap="round"/>
+    <!-- control knob -->
+    <circle cx="0" cy="34" r="8" fill="#0A100D"/>
+    <circle cx="0" cy="34" r="8" fill="none" stroke="#2E9E63" stroke-width="2"/>
+  </g>
+  <!-- Zzz bubbles -->
+  <g font-family="'JetBrains Mono',monospace" font-weight="700" fill="#CFC9B4">
+    <text x="318" y="130" font-size="26" opacity="0.9">Z</text>
+    <text x="342" y="106" font-size="20" opacity="0.6">z</text>
+    <text x="360" y="88" font-size="15" opacity="0.35">z</text>
+  </g>
+  <circle cx="310" cy="148" r="3" fill="#8E8976" opacity="0.5"/>
+  <circle cx="300" cy="160" r="2" fill="#8E8976" opacity="0.35"/>
+</svg>
