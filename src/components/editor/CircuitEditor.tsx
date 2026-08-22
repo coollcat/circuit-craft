@@ -107,6 +107,14 @@ export default function CircuitEditor({
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
   // 画布明/暗主题（localStorage + 同页事件同步，见 canvasTheme.ts）
   const { name: themeName, theme: T, toggle: toggleTheme } = useCanvasTheme();
+  // 光标高频跟踪：ref 每次必记；仅当渲染真正依赖它（正在画导线的橡皮筋线）时才 setState，
+  // 否则空闲移动鼠标也会让整棵 SVG 场景 reconcile（含每个元件的 mainParamText 重算）。
+  const cursorRef = useRef<Pt>({ x: 0, y: 0 });
+  /* eslint-disable react-hooks/refs -- trackCursor 只在指针事件回调里调用；下方 ref 镜像为 rAF 循环服务的既有写法 */
+  const trackCursor = (w: Pt) => {
+    cursorRef.current = w;
+    if (wireFrom) setCursor(w);
+  };
 
   // refs 供 rAF 循环读取（避免高频 setState）
   const viewRef = useRef(view);
@@ -117,6 +125,7 @@ export default function CircuitEditor({
   visualsRef.current = visuals;
   const themeNameRef = useRef(themeName);
   themeNameRef.current = themeName;
+  /* eslint-enable react-hooks/refs */
   // 起线手势：fresh=本次 pointerdown 刚按下（尚未进入点击布线模式）；moved=是否拖过
   const gestureRef = useRef<{ fresh: boolean; moved: boolean; downX: number; downY: number } | null>(null);
   const particleRef = useRef(new ParticleSystem());
@@ -217,7 +226,7 @@ export default function CircuitEditor({
     }
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const w = toWorld(e.clientX, e.clientY);
-    setCursor(w);
+    trackCursor(w);
     onInteract?.();
 
     if (probeMode) {
@@ -279,7 +288,7 @@ export default function CircuitEditor({
 
   const onPointerMove = (e: React.PointerEvent) => {
     const w = toWorld(e.clientX, e.clientY);
-    setCursor(w);
+    trackCursor(w);
     // 起线手势：移动超过 6px 视为「拖拽起线」（区别于单击进入点击布线模式）
     const g = gestureRef.current;
     if (g && wireFrom && !g.moved && Math.hypot(e.clientX - g.downX, e.clientY - g.downY) > 6) g.moved = true;
@@ -434,7 +443,7 @@ export default function CircuitEditor({
         const startIdx = Math.max(0, LAYER_ORDER.indexOf(wireStartLayer));
         const cur = LAYER_ORDER[(startIdx + holes) % LAYER_ORDER.length];
         const next = LAYER_ORDER[(startIdx + holes + 1) % LAYER_ORDER.length];
-        const pt: ViaPoint = { x: Math.round(cursor.x / GRID) * GRID, y: Math.round(cursor.y / GRID) * GRID, hole: true };
+        const pt: ViaPoint = { x: Math.round(cursorRef.current.x / GRID) * GRID, y: Math.round(cursorRef.current.y / GRID) * GRID, hole: true };
         setViaPts(v => [...v, pt]);
         toast(`过孔换层：${LAYER_LABEL[cur]} → ${LAYER_LABEL[next]}`, 'info');
         sfxClick();
@@ -471,7 +480,7 @@ export default function CircuitEditor({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sel, readOnly, emitChange, wireFrom, viaPts, cancelWire, cursor, wireStartLayer, rotateComp]);
+  }, [sel, readOnly, emitChange, wireFrom, viaPts, cancelWire, wireStartLayer, rotateComp, setSel]); // 光标走 cursorRef，不进依赖：避免监听器随鼠标移动反复拆挂
 
   /* ---------------- 粒子 / 烟雾循环 ---------------- */
   useEffect(() => {

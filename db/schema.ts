@@ -17,7 +17,8 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// 会话令牌：登录/注册时签发，前端 localStorage 持有
+// 会话令牌：登录/注册时签发，前端 localStorage 持有。
+// expiresAt 为空 = 旧数据（永不过期，保持向后兼容）；新签发一律带 30 天 TTL。
 export const sessions = mysqlTable(
   "sessions",
   {
@@ -25,6 +26,7 @@ export const sessions = mysqlTable(
     userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
     token: varchar("token", { length: 128 }).notNull().unique(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at"),
   },
   (t) => [index("idx_sessions_user_id").on(t.userId)],
 );

@@ -1,9 +1,11 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, or } from "drizzle-orm";
 import { getDb } from "./connection";
 import { users, sessions, saves } from "@db/schema";
 
 const USERNAME_RE = /^[a-zA-Z0-9_一-龥-]{3,24}$/;
+/** 会话有效期：30 天 */
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * 用户不存在时用于「陪跑」的 dummy 盐：让 login 两条路径都执行一次
@@ -132,8 +134,17 @@ export async function loginUser(username: string, password: string) {
 }
 
 async function createSession(userId: number): Promise<string> {
+  const db = getDb();
   const token = randomBytes(24).toString("hex");
-  await getDb().insert(sessions).values({ userId, token });
+  // 惰性清理：该用户已过期的会话顺手删掉，避免表无限增长（无需后台定时任务）
+  await db
+    .delete(sessions)
+    .where(and(eq(sessions.userId, userId), lt(sessions.expiresAt, new Date())));
+  await db.insert(sessions).values({
+    userId,
+    token,
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+  });
   return token;
 }
 
@@ -148,7 +159,13 @@ export async function getSessionUser(token: string) {
     .select({ userId: sessions.userId, username: users.username })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
-    .where(eq(sessions.token, token))
+    .where(
+      and(
+        eq(sessions.token, token),
+        // expiresAt 为空 = 旧会话（保持有效）；非空则必须未过期
+        or(isNull(sessions.expiresAt), gt(sessions.expiresAt, new Date())),
+      ),
+    )
     .limit(1);
   return rows[0] ?? null;
 }

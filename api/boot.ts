@@ -5,6 +5,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
+import { closeDb } from "./queries/connection";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -24,10 +25,23 @@ export default app;
 if (env.isProduction) {
   const { serve } = await import("@hono/node-server");
   const { serveStaticFiles } = await import("./lib/vite");
-  serveStaticFiles(app);
 
-  const port = parseInt(process.env.PORT || "3000");
-  serve({ fetch: app.fetch, port }, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  const port = Number.parseInt(process.env.PORT ?? "3000", 10);
+  const listenPort = Number.isFinite(port) ? port : 3000; // PORT=abc 之类的脏值兜底
+
+  serveStaticFiles(app);
+  const server = serve({ fetch: app.fetch, port: listenPort }, () => {
+    console.log(`Server running on http://localhost:${listenPort}/`);
   });
+
+  // 优雅退出：停接新请求 → 关 MySQL 连接池 → 超时强杀兜底
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    process.on(signal, () => {
+      console.log(`\n${signal} received: shutting down...`);
+      server.close(() => {
+        void closeDb().finally(() => process.exit(0));
+      });
+      setTimeout(() => process.exit(0), 3000).unref();
+    });
+  }
 }

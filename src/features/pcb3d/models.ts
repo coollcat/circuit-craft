@@ -226,12 +226,13 @@ export function buildComponent(comp: ComponentSpec): THREE.Group {
       break;
     }
     case 'ldr': {
-      // 光敏电阻：陶瓷圆盘 + 顶面蛇形电极（红色圆片示意）+ 两根直插引脚
+      // 光敏电阻：陶瓷圆盘 + 顶面蛇形电极（红色圆片示意）+ 引脚外伸到焊盘位（±5.08mm）
       g.add(cylY(MAT.ceramic, 2.6, 1.6, 0, 1.6, 0));
       g.add(cylY(std('#8B3A2E', 0.55, 0.15), 2.0, 0.35, 0, 2.55, 0));
       g.add(box(MAT.silver, 3.4, 0.12, 0.35, 0, 2.78, 0));
       g.add(box(MAT.silver, 0.35, 0.12, 3.4, 0, 2.78, 0));
-      g.add(pin(-2.54, 0, 1.2), pin(2.54, 0, 1.2));
+      g.add(leadBetween(MAT.lead, new THREE.Vector3(-2.4, 1.4, 0), new THREE.Vector3(-5.08, 0.15, 0), 0.28));
+      g.add(leadBetween(MAT.lead, new THREE.Vector3(2.4, 1.4, 0), new THREE.Vector3(5.08, 0.15, 0), 0.28));
       break;
     }
     case 'thermistor': {
@@ -403,11 +404,11 @@ export function buildComponent(comp: ComponentSpec): THREE.Group {
       break;
     }
     case 'buzzer': {
-      // 有源蜂鸣器：黑色圆柱腔体 + 顶部中心小孔
+      // 有源蜂鸣器：黑色圆柱腔体 + 顶部中心小孔；引脚对齐焊盘 ±5.08mm
       g.add(cylY(MAT.black, 4.2, 5.2, 0, 2.6, 0));
       g.add(cylY(MAT.blackFlat, 4.05, 0.3, 0, 5.3, 0));
       g.add(cylY(MAT.blackFlat, 0.55, 0.25, 0, 5.5, 0));
-      g.add(pin(-2.54, 1.27, 1), pin(2.54, -1.27, 1));
+      g.add(pin(-5.08, 0, 1), pin(5.08, 0, 1));
       break;
     }
     case 'speaker': {
@@ -418,7 +419,7 @@ export function buildComponent(comp: ComponentSpec): THREE.Group {
       disposables.push(coneGeo);
       g.add(new THREE.Mesh(coneGeo, MAT.whitePlastic)); // 纸盆（上小下大）
       g.add(cylY(MAT.silver, 1.8, 1.3, 0, 4.2, 0)); // 磁路钢缸
-      g.add(pin(-3.8, 0.8, 0.9), pin(3.8, 0.8, 0.9));
+      g.add(pin(-5.08, 0, 0.9), pin(5.08, 0, 0.9));
       break;
     }
     case 'transformer': {
@@ -428,7 +429,8 @@ export function buildComponent(comp: ComponentSpec): THREE.Group {
       for (const dz of [-2.2, 2.2]) {
         g.add(box(MAT.copper, 6.5, 0.35, 1.4, 0, 6.35, dz)); // 绕组压条示意
       }
-      g.add(pin(-2.54, -2.54, 1), pin(-2.54, 2.54, 1), pin(2.54, -2.54, 1), pin(2.54, 2.54, 1));
+      // 四脚对齐焊盘：x=±5.08mm（端口 ±32px），z=±2.54mm（端口 ±16px）
+      g.add(pin(-5.08, -2.54, 1), pin(-5.08, 2.54, 1), pin(5.08, -2.54, 1), pin(5.08, 2.54, 1));
       break;
     }
   }

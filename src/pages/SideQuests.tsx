@@ -201,22 +201,23 @@ export default function SideQuests() {
 
               {/* 轨道：蓝色走线 + 关卡焊盘序列 */}
               <div className="relative flex-1 overflow-x-auto">
-                {/* 走线通电动画 */}
-                <svg className="absolute left-0 top-[52px] h-2 w-full" preserveAspectRatio="none" viewBox="0 0 1000 8">
-                  <motion.path
-                    d="M0 4 L1000 4"
-                    fill="none" stroke="#5B8DEF" strokeWidth="3" strokeOpacity={open ? 0.8 : 0.35}
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.8, delay: 0.3 + ti * 0.2 }}
-                  />
-                  {!open && (
-                    <motion.circle r="4" fill="#5B8DEF" fillOpacity="0.5">
-                      <animateMotion dur="6s" repeatCount="indefinite" path="M0 4 L1000 4" />
-                    </motion.circle>
-                  )}
-                </svg>
-                <div className="relative flex min-w-max items-start gap-8 pt-6">
+                {/* 走线画进 min-w-max 内容层：宽度随关卡数量增长，横向滚动时依然全覆盖 */}
+                <div className="relative min-w-max">
+                  <svg className="absolute left-0 top-[52px] h-2 w-full" preserveAspectRatio="none" viewBox="0 0 1000 8">
+                    <motion.path
+                      d="M0 4 L1000 4"
+                      fill="none" stroke="#5B8DEF" strokeWidth="3" strokeOpacity={open ? 0.8 : 0.35}
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      transition={{ duration: 0.8, delay: 0.3 + ti * 0.2 }}
+                    />
+                    {!open && (
+                      <motion.circle r="4" fill="#5B8DEF" fillOpacity="0.5">
+                        <animateMotion dur="6s" repeatCount="indefinite" path="M0 4 L1000 4" />
+                      </motion.circle>
+                    )}
+                  </svg>
+                  <div className="relative flex items-start gap-8 pt-6">
                   {levels.map((l, i) => {
                     const st = stateOf(l);
                     const starCount = stars[l.id] ?? 0;
@@ -292,6 +293,7 @@ export default function SideQuests() {
                       </button>
                     )}
                   </motion.div>
+                  </div>
                 </div>
               </div>
             </motion.div>
