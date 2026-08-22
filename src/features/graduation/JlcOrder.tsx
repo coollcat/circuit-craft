@@ -78,15 +78,6 @@ export default function JlcOrder({ visitor, onComplete }: { visitor: boolean; on
   };
   useEffect(() => () => timers.current.forEach(t => window.clearTimeout(t)), []);
 
-  const submit = () => {
-    setPhase('production');
-    setStation(0);
-    STATIONS.forEach((_, i) => {
-      timers.current.push(window.setTimeout(() => setStation(i + 1), 1000 * (i + 1)));
-    });
-    timers.current.push(window.setTimeout(finishOrder, 6200));
-  };
-
   const finishOrder = () => {
     const no = orderNo ?? makeOrderNo();
     setEta(etaPlus4Days());
@@ -98,6 +89,15 @@ export default function JlcOrder({ visitor, onComplete }: { visitor: boolean; on
   };
 
   const [eta, setEta] = useState('');
+
+  const submit = () => {
+    setPhase('production');
+    setStation(0);
+    STATIONS.forEach((_, i) => {
+      timers.current.push(window.setTimeout(() => setStation(i + 1), 1000 * (i + 1)));
+    });
+    timers.current.push(window.setTimeout(finishOrder, 6200));
+  };
 
   return (
     <div>

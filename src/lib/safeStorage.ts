@@ -72,3 +72,16 @@ export function safeRemoveItem(key: string): void {
     /* 删除失败无妨：内存副本已清 */
   }
 }
+
+/** zustand persist 的 StateStorage 适配器：createJSONStorage(() => safeStateStorage()) */
+export function safeStateStorage() {
+  return {
+    getItem: (name: string) => safeGetItem(name),
+    setItem: (name: string, value: string): void => {
+      safeSetItem(name, value);
+    },
+    removeItem: (name: string) => {
+      safeRemoveItem(name);
+    },
+  };
+}

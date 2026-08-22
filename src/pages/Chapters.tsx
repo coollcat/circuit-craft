@@ -344,7 +344,7 @@ export default function Chapters() {
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-silk-500">{nextLevel.briefing}</p>
               <motion.div animate={{ boxShadow: ['0 0 4px rgba(63,196,127,0.4)', '0 0 14px rgba(63,196,127,0.8)', '0 0 4px rgba(63,196,127,0.4)'] }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 2.8 }} className="mt-3 rounded-md">
                 <PadButton to={`/play/${nextLevel.id}`} variant="primary" size="L" className="w-full">
-                  <Play className="h-4 w-4" /> 继续 {nextLevel.id.replace('c', '').replace('-', '-')} 关
+                  <Play className="h-4 w-4" /> 继续 {nextLevel.id.replace('c', '')} 关
                 </PadButton>
               </motion.div>
             </motion.div>

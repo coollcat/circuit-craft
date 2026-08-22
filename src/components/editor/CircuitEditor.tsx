@@ -51,6 +51,9 @@ export interface CircuitEditorProps {
   onCompDoubleClick?: (comp: ComponentSpec, anchor: { x: number; y: number }) => void;
   onSelect?: (sel: { kind: 'comp' | 'wire'; id: string } | null) => void;
   onInteract?: () => void;
+  /** 调色板拖放：dropItems 提供 id→元件映射，命中后以画布世界坐标（16px 吸附）回调 */
+  dropItems?: ComponentSpec[];
+  onDropItem?: (item: ComponentSpec, at: { x: number; y: number }) => void;
   className?: string;
 }
 
@@ -87,7 +90,7 @@ export function mainParamText(c: ComponentSpec): string {
 }
 
 export default function CircuitEditor({
-  circuit, onChange, visuals, readOnly, ghost, probeMode, onProbe, onCompDoubleClick, onSelect, onInteract, className,
+  circuit, onChange, visuals, readOnly, ghost, probeMode, onProbe, onCompDoubleClick, onSelect, onInteract, dropItems, onDropItem, className,
 }: CircuitEditorProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -590,6 +593,21 @@ export default function CircuitEditor({
       onDoubleClick={onDoubleClick}
       onWheel={onWheel}
       onContextMenu={e => e.preventDefault()}
+      onDragOver={e => {
+        if (dropItems && onDropItem) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }
+      }}
+      onDrop={e => {
+        if (!dropItems || !onDropItem) return;
+        const id = e.dataTransfer.getData('application/x-cc-palette');
+        const item = dropItems.find(p => p.id === id);
+        if (!item) return;
+        e.preventDefault();
+        const w = toWorld(e.clientX, e.clientY);
+        onDropItem(item, { x: Math.round(w.x / GRID) * GRID, y: Math.round(w.y / GRID) * GRID });
+      }}
     >
       <svg className="absolute inset-0 h-full w-full">
         <defs>

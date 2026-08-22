@@ -1,7 +1,8 @@
 // 毕业设计向导状态（毕业设计专属，独立于全局关卡进度）
 // localStorage 键 cc-graduation-v1，可中断续做
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { safeStateStorage } from '@/lib/safeStorage';
 
 export interface BomSelection {
   ldo: string | null;
@@ -25,6 +26,8 @@ export interface GradState {
   gerberExported: boolean;
   orderPlaced: boolean;
   orderNo: string | null;
+  /** 毕业证书编号：下单时一次性生成并持久化，刷新页面不再漂移 */
+  certNo: string | null;
   boardColor: string;
   orderPrice: number;
   startedAt: number;
@@ -47,6 +50,7 @@ const initial = {
   gerberExported: false,
   orderPlaced: false,
   orderNo: null as string | null,
+  certNo: null as string | null,
   boardColor: 'green',
   orderPrice: 0,
   startedAt: Date.now(),
@@ -60,7 +64,7 @@ export const useGrad = create<GradState>()(
       set: patch => set(patch),
       resetGrad: () => set({ ...initial, startedAt: Date.now() }),
     }),
-    { name: 'cc-graduation-v1' },
+    { name: 'cc-graduation-v1', storage: createJSONStorage(safeStateStorage) },
   ),
 );
 

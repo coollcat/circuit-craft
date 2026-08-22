@@ -116,8 +116,8 @@ export default function Sandbox() {
   const palette = useMemo(fullSandboxPalette, []);
   const emptyUsed = useMemo(() => new Set<string>(), []);
 
-  /* ---------------- 放置元件（自动生成位号） ---------------- */
-  const addFromPalette = useCallback((item: ComponentSpec) => {
+  /* ---------------- 放置元件（自动生成位号；at 提供时为拖放落点） ---------------- */
+  const addFromPalette = useCallback((item: ComponentSpec, at?: { x: number; y: number }) => {
     setCircuit(c => {
       const prefix = REFDES_PREFIX[item.type] ?? 'U';
       let n = 1;
@@ -126,8 +126,8 @@ export default function Sandbox() {
         ...item,
         id: `${prefix}${n}`,
         params: { ...(item.params ?? {}) },
-        x: 240 + ((c.components.length * 3) % 5) * 96,
-        y: 112 + (Math.floor(c.components.length / 5) % 4) * 112,
+        x: at ? at.x : 240 + ((c.components.length * 3) % 5) * 96,
+        y: at ? at.y : 112 + (Math.floor(c.components.length / 5) % 4) * 112,
       };
       return { ...c, components: [...c.components, comp] };
     });
@@ -440,6 +440,8 @@ export default function Sandbox() {
             onChange={setCircuit}
             visuals={visuals}
             probeMode={probingChannel !== null}
+            dropItems={palette}
+            onDropItem={(item, at) => addFromPalette(item, at)}
             onProbe={p => {
               if (probingChannel !== null) {
                 setChannels(cs => cs.map((c, i) => (i === probingChannel ? { probe: p } : c)));

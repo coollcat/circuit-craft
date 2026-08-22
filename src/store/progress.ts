@@ -1,7 +1,8 @@
 // 回路工坊 — 进度 Store（路径与 API 冻结）
 // zustand + persist，localStorage 键 cc-save-v1
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { safeStateStorage } from '@/lib/safeStorage';
 import { LEVELS, SIDE_QUESTS } from '@/content/levels';
 import type { LevelDef } from '@/engine/types';
 
@@ -108,7 +109,7 @@ export const useProgress = create<ProgressState>()(
           settings: { sound: true, motion: true, solderCursor: false, theme: 'dark' },
         }),
     }),
-    { name: 'cc-save-v1' },
+    { name: 'cc-save-v1', storage: createJSONStorage(safeStateStorage) },
   ),
 );
 

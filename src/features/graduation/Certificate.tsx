@@ -69,7 +69,15 @@ export default function Certificate({ visitor }: { visitor: boolean }) {
 
   // 「首席打板人」是毕业下单后的专属荣誉，仅此一处授予；星数阶梯称号走统一 titles.ts
   const title = grad.orderPlaced ? GRADUATION_HONOR : titleForStars(totalStars);
-  const certNo = useMemo(() => `CC-GRAD-2024-${String(Math.floor(1000 + Math.random() * 8999))}`, []);
+  // 证书编号持久化：下单时生成一次，此后刷新/重进保持不变（旧存档无编号则就地补发）
+  const certNo = useMemo(
+    () => grad.certNo ?? `CC-GRAD-2024-${String(Math.floor(1000 + Math.random() * 8999))}`,
+    [grad.certNo],
+  );
+  useEffect(() => {
+    if (!visitor && grad.certNo !== certNo) set({ certNo });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [certNo]);
   const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
   const minutes = Math.max(1, Math.round(((grad.finishedAt ?? Date.now()) - grad.startedAt) / 60000));
 

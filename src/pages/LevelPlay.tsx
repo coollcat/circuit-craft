@@ -9,6 +9,7 @@ import { evaluateGoals, formatSI, solveDC, type GoalStatus } from '@/engine/solv
 import { FIXTURE_LEVELS } from '@/engine/fixtures';
 import { getLevel, LEVELS, SIDE_QUESTS } from '@/content/levels';
 import { buildSolutionCircuit, deriveSolutionSteps, type SolutionStep } from '@/content/solution';
+import Placeholder from '@/pages/Placeholder';
 import { useProgress } from '@/store/progress';
 import CircuitEditor, { type EditorVisuals } from '@/components/editor/CircuitEditor';
 import PalettePanel from '@/components/editor/PalettePanel';
@@ -94,8 +95,7 @@ function goalKey(g: GoalCheck): string {
 export default function LevelPlay() {
   const { levelId } = useParams();
   const content = levelId ? getLevel(levelId) : undefined;
-  const fixture = (levelId && FIXTURE_LEVELS.find(l => l.id === levelId)) || FIXTURE_LEVELS[0];
-  const level = content ?? fixture;
+  const fixture = (levelId && FIXTURE_LEVELS.find(l => l.id === levelId)) || undefined;
   const navigate = useNavigate();
   // URL 直达未解锁关卡 → 重定向回章节地图并提示（fixture 兜底关不参与解锁判定）
   const locked = useProgress(s => (content ? !s.isLevelUnlocked(content.id) : false));
@@ -104,8 +104,18 @@ export default function LevelPlay() {
       navigate('/chapters', { replace: true, state: { toast: `「${content.title}」还没解锁——先通关前面的关卡。` } });
     }
   }, [content, locked, navigate]);
+  // 未知关卡：明确 404，而不是静默落到示例关（旧行为会让人误以为拼错的 id 是真实关卡）
+  if (!content && !fixture) {
+    return (
+      <Placeholder
+        tag="404"
+        title="这条走线断了"
+        desc={`关卡「${levelId}」不存在——回章节地图重新上电吧。`}
+      />
+    );
+  }
   if (content && locked) return null;
-  return <LevelPlayInner key={level.id} level={level} isFixtureFallback={!content} />;
+  return <LevelPlayInner key={(content ?? fixture)!.id} level={(content ?? fixture)!} isFixtureFallback={!content} />;
 }
 
 function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtureFallback: boolean }) {
@@ -463,6 +473,19 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
             visuals={visuals}
             ghost={ghost}
             probeMode={probingChannel !== null}
+            dropItems={level.palette}
+            onDropItem={(item, at) => {
+              if (usedIds.has(item.id)) {
+                toast(`${item.id} 已在画布上（每种限放一个）。`, 'info');
+                return;
+              }
+              setCircuit(c => ({
+                ...c,
+                components: [...c.components, { ...item, params: { ...(item.params ?? {}) }, x: at.x, y: at.y }],
+              }));
+              toast(`${item.id} 已落到画布（${at.x}, ${at.y}）。`, 'ok');
+              lastInteract.current = Date.now();
+            }}
             onProbe={p => {
               if (probingChannel !== null) {
                 setChannels(cs => cs.map((c, i) => (i === probingChannel ? { probe: p } : c)));
