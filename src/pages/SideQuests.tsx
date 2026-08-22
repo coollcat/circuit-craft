@@ -26,6 +26,9 @@ const SIDE_META: Record<string, { play: string; point: string }> = {
   'sb-3': { play: '调采样率旋钮观察混叠现象', point: '采样定理直觉' },
   'sb-4': { play: '过零抖动问题 → 加迟滞解决', point: '施密特触发直觉' },
   'sb-5': { play: '信号链原理图 + 简化 PCB 布局 + BOM', point: '完整信号链工程化' },
+  'sb-6': { play: '算出 π 型衰减器三颗电阻，看 −3dB 落点', point: '阻抗匹配、dB 与功率减半' },
+  'sb-7': { play: '调 L/C 让陷波器对准干扰频点', point: 'LC 谐振 f₀=1/(2π√LC)、陷波/选频' },
+  'sb-8': { play: '二极管+RC 把载波包络摘下来', point: '包络检波、矿石收音机原理' },
 };
 
 interface TrackDef {
@@ -48,7 +51,7 @@ const TRACKS: TrackDef[] = [
   },
   {
     track: 'side-b', key: 'B', name: '让传感器说人话：进阶信号处理', subtitle: 'SIDE QUEST B',
-    desc: '真实世界的信号是脏的。放大、滤波、整形——最后做一块真能用的传感器信号处理小板。',
+    desc: '真实世界的信号是脏的。放大、滤波、整形，再进射频世界：衰减、陷波与检波——最后做一块真能用的传感器信号处理小板。',
     difficulty: '★★★★', icon: AudioWaveform, unlockText: '通关主线第 5 章解锁', needChapter: 5, gradName: '支线毕业：传感器小板',
   },
 ];
@@ -92,7 +95,9 @@ export default function SideQuests() {
     return 'locked';
   };
 
-  const b5Done = completed.includes('sb-5');
+  // 支线 B 毕业板：轨道最后一关通关即点亮（新增关卡自动纳入，不再硬编码 id）
+  const sbLast = SIDE_QUESTS.filter(l => l.track === 'side-b').sort((a, b) => a.index - b.index).at(-1);
+  const b5Done = sbLast ? completed.includes(sbLast.id) : false;
 
   /* 轨道间联动提示（打字机，进入后延迟 1s 播一次） */
   const hintText = '丝印提示：支线 A 的 ADC 知识会让主线 5-4 变简单 · 支线 B-5 需要主线第 4 章的布局技能';
