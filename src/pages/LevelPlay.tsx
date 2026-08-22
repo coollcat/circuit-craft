@@ -314,8 +314,14 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
   const usedIds = useMemo(() => new Set(circuit.components.map(c => c.id)), [circuit]);
   const addFromPalette = (item: CircuitSpec['components'][number]) => {
     if (usedIds.has(item.id)) return;
-    const idx = circuit.components.length;
-    const comp = { ...item, params: { ...(item.params ?? {}) }, x: 240 + (idx % 4) * 96, y: 96 + Math.floor((idx % 8) / 4) * 96 };
+    // 落点做占位扫描：避开 preset/已放元件，不再叠在电池或 LED 上
+    const taken = new Set(circuitRef.current.components.map(c => `${Math.round(c.x)}:${Math.round(c.y)}`));
+    let pos = { x: 240, y: 320 };
+    for (let i = 0; i < 200; i++) {
+      const p = { x: 240 + (i % 4) * 112, y: 96 + Math.floor(i / 4) * 112 };
+      if (!taken.has(`${p.x}:${p.y}`)) { pos = p; break; }
+    }
+    const comp = { ...item, params: { ...(item.params ?? {}) }, x: pos.x, y: pos.y };
     setCircuit(c => ({ ...c, components: [...c.components, comp] }));
     toast(`${item.id} 已放到画布，拖动调整位置（16px 网格吸附）。`, 'info');
     lastInteract.current = Date.now();
