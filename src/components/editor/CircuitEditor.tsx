@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Layers, Moon, RotateCw, Sun } from 'lucide-react';
 import type { CircuitSpec, ComponentSpec, PortRef, ViaPoint, WireLayer, WireSpec } from '@/engine/types';
-import { compileCircuit, formatSI, numParam, portKey } from '@/engine/solver';
+import { compileCircuit, formatSI, numParam, passiveR, portKey } from '@/engine/solver';
 import { ParticleSystem, SmokeSystem, pathLength, type WireFlowState, type WirePath } from '@/engine/particles';
 import { PORT_GEOM, SymbolGlyph, compRadius, portWorldPos } from './symbols';
 import { LAYER_ORDER, buildWirePolyline, buildWireSegments, distToPolyline, ptsToPath, type Pt } from './routing';
@@ -68,6 +68,12 @@ export function mainParamText(c: ComponentSpec): string {
     case 'pot': return `${formatSI(numParam(c, ['resistance', 'r'], 1e4), 'Ω')}·${Math.round(numParam(c, ['wiper', 'ratio'], 0.5) * 100)}%`;
     case 'battery': case 'vsrc': return formatSI(numParam(c, ['voltage', 'v'], 5), 'V');
     case 'led': case 'diode': return `Vf=${numParam(c, 'vf', 0.7)}V`;
+    case 'schottky': return `Vf=${numParam(c, 'vf', 0.3)}V`;
+    case 'ldr': return `${formatSI(passiveR(c), 'Ω')}·${Math.round(numParam(c, 'light', 300))}lx`;
+    case 'thermistor': return `${formatSI(passiveR(c), 'Ω')}·${Math.round(numParam(c, 'temp', 25))}°C`;
+    case 'buzzer': return formatSI(numParam(c, ['resistance'], 30), 'Ω');
+    case 'speaker': return formatSI(numParam(c, ['impedance', 'r'], 8), 'Ω');
+    case 'transformer': return `×${numParam(c, 'ratio', 1)}`;
     case 'zener': return `${numParam(c, 'vz', 5.1)}V`;
     case 'funcgen': return `${g('waveform') ?? 'sine'} ${formatSI(numParam(c, ['freq', 'fs'], 1000), 'Hz')}`;
     case 'fuse': return formatSI(numParam(c, 'rating', 0.5), 'A');

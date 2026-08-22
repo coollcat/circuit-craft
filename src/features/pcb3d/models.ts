@@ -198,20 +198,56 @@ export function buildComponent(comp: ComponentSpec): THREE.Group {
       break;
     }
     case 'diode':
-    case 'zener': {
-      const body = new THREE.Mesh(GEO.cyl, MAT.black);
+    case 'zener':
+    case 'schottky': {
+      const body = new THREE.Mesh(GEO.cyl, comp.type === 'schottky' ? MAT.blackFlat : MAT.black);
       body.scale.set(1.05, 4.4, 1.05);
       body.rotation.z = Math.PI / 2;
       body.position.y = 1.4;
       g.add(body);
-      // 阴极色环（稳压管用银灰，普通二极管用白）
-      const band = new THREE.Mesh(GEO.cyl, comp.type === 'zener' ? MAT.silver : MAT.whitePlastic);
-      band.scale.set(1.1, 0.9, 1.1);
-      band.rotation.z = Math.PI / 2;
-      band.position.set(1.7, 1.4, 0);
-      g.add(band);
+      // 阴极色环（稳压管银灰 / 肖特基双白环 / 普通二极管白）
+      if (comp.type === 'schottky') {
+        for (const dx of [1.2, 2.1]) {
+          const band = new THREE.Mesh(GEO.cyl, MAT.whitePlastic);
+          band.scale.set(1.1, 0.55, 1.1);
+          band.rotation.z = Math.PI / 2;
+          band.position.set(dx, 1.4, 0);
+          g.add(band);
+        }
+      } else {
+        const band = new THREE.Mesh(GEO.cyl, comp.type === 'zener' ? MAT.silver : MAT.whitePlastic);
+        band.scale.set(1.1, 0.9, 1.1);
+        band.rotation.z = Math.PI / 2;
+        band.position.set(1.7, 1.4, 0);
+        g.add(band);
+      }
       g.add(leadBetween(MAT.lead, new THREE.Vector3(-2.2, 1.4, 0), new THREE.Vector3(-5.08, 0.15, 0), 0.28));
       g.add(leadBetween(MAT.lead, new THREE.Vector3(2.2, 1.4, 0), new THREE.Vector3(5.08, 0.15, 0), 0.28));
+      break;
+    }
+    case 'ldr': {
+      // 光敏电阻：陶瓷圆盘 + 顶面蛇形电极（红色圆片示意）+ 两根直插引脚
+      g.add(cylY(MAT.ceramic, 2.6, 1.6, 0, 1.6, 0));
+      g.add(cylY(std('#8B3A2E', 0.55, 0.15), 2.0, 0.35, 0, 2.55, 0));
+      g.add(box(MAT.silver, 3.4, 0.12, 0.35, 0, 2.78, 0));
+      g.add(box(MAT.silver, 0.35, 0.12, 3.4, 0, 2.78, 0));
+      g.add(pin(-2.54, 0, 1.2), pin(2.54, 0, 1.2));
+      break;
+    }
+    case 'thermistor': {
+      // NTC 玻璃珠：水滴状玻璃壳 + 长引脚
+      const bead = new THREE.Mesh(GEO.dome, MAT.glass);
+      bead.scale.setScalar(1.3);
+      bead.position.y = 1.7;
+      g.add(bead);
+      const beadLow = new THREE.Mesh(GEO.cyl, MAT.glass);
+      beadLow.scale.set(1.3, 0.9, 1.3);
+      beadLow.position.y = 1.25;
+      g.add(beadLow);
+      const core = cylY(MAT.copper, 0.55, 0.9, 0, 1.7, 0);
+      g.add(core);
+      g.add(leadBetween(MAT.lead, new THREE.Vector3(-0.8, 1.2, 0), new THREE.Vector3(-5.08, 0.15, 0), 0.26));
+      g.add(leadBetween(MAT.lead, new THREE.Vector3(0.8, 1.2, 0), new THREE.Vector3(5.08, 0.15, 0), 0.26));
       break;
     }
     case 'ic':
@@ -364,6 +400,35 @@ export function buildComponent(comp: ComponentSpec): THREE.Group {
       loop.rotation.x = Math.PI / 2;
       loop.position.y = 2.6;
       g.add(loop);
+      break;
+    }
+    case 'buzzer': {
+      // 有源蜂鸣器：黑色圆柱腔体 + 顶部中心小孔
+      g.add(cylY(MAT.black, 4.2, 5.2, 0, 2.6, 0));
+      g.add(cylY(MAT.blackFlat, 4.05, 0.3, 0, 5.3, 0));
+      g.add(cylY(MAT.blackFlat, 0.55, 0.25, 0, 5.5, 0));
+      g.add(pin(-2.54, 1.27, 1), pin(2.54, -1.27, 1));
+      break;
+    }
+    case 'speaker': {
+      // 扬声器：盆架 + 纸盆锥（非共享几何）+ 磁缸
+      g.add(cylY(MAT.blackFlat, 4.9, 1.4, 0, 0.7, 0)); // 盆架底环
+      const coneGeo = new THREE.CylinderGeometry(1.7, 4.6, 2.2, 24);
+      coneGeo.translate(0, 2.6, 0);
+      disposables.push(coneGeo);
+      g.add(new THREE.Mesh(coneGeo, MAT.whitePlastic)); // 纸盆（上小下大）
+      g.add(cylY(MAT.silver, 1.8, 1.3, 0, 4.2, 0)); // 磁路钢缸
+      g.add(pin(-3.8, 0.8, 0.9), pin(3.8, 0.8, 0.9));
+      break;
+    }
+    case 'transformer': {
+      // 变压器：EI 铁芯方体 + 中缝叠片 + 绕组压条 + 四根引脚
+      g.add(box(std('#264A66', 0.5, 0.35), 8.5, 6, 6.4, 0, 3.2, 0)); // 浸漆铁芯叠厚
+      g.add(box(MAT.ferrite, 1.1, 6.4, 6.8, 0, 3.2, 0)); // 中缝可见铁芯
+      for (const dz of [-2.2, 2.2]) {
+        g.add(box(MAT.copper, 6.5, 0.35, 1.4, 0, 6.35, dz)); // 绕组压条示意
+      }
+      g.add(pin(-2.54, -2.54, 1), pin(-2.54, 2.54, 1), pin(2.54, -2.54, 1), pin(2.54, 2.54, 1));
       break;
     }
   }

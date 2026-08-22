@@ -19,8 +19,11 @@ export const PORT_NAMES: Record<ComponentType, string[]> = {
   inductor: ['a', 'b'],
   pot: ['a', 'b', 'w'],
   diode: ['a', 'k'],
+  schottky: ['a', 'k'],
   led: ['a', 'k'],
   zener: ['a', 'k'],
+  ldr: ['a', 'b'],
+  thermistor: ['a', 'b'],
   switch: ['a', 'b'],
   button: ['a', 'b'],
   npn: ['c', 'b', 'e'],
@@ -37,6 +40,9 @@ export const PORT_NAMES: Record<ComponentType, string[]> = {
   voltmeter: ['pos', 'neg'],
   ammeter: ['a', 'b'],
   module: ['in', 'out', 'vcc', 'gnd'], // RF 模块教学模型
+  buzzer: ['a', 'b'],
+  speaker: ['a', 'b'],
+  transformer: ['p1', 'p2', 's1', 's2'], // 原边/副边
 };
 
 export const DEFAULT_PARAMS: Record<ComponentType, Record<string, number | string | boolean>> = {
@@ -48,8 +54,11 @@ export const DEFAULT_PARAMS: Record<ComponentType, Record<string, number | strin
   inductor: { inductance: 1e-3 },
   pot: { resistance: 10000, wiper: 0.5 },
   diode: { vf: 0.7, rOn: 2 },
+  schottky: { vf: 0.3, rOn: 1 },
   led: { vf: 2.0, rOn: 5, imax: 0.02 },
   zener: { vf: 0.7, vz: 5.1, rOn: 2, rz: 10 },
+  ldr: { light: 300 }, // 环境光照 lux：500kΩ(暗) → ~1kΩ(强光)
+  thermistor: { r25: 10000, temp: 25 }, // NTC B=3950 教学模型
   switch: { closed: false },
   button: { closed: false },
   npn: { vf: 0.7, vceSat: 0.2, beta: 100, rOn: 2 },
@@ -66,6 +75,9 @@ export const DEFAULT_PARAMS: Record<ComponentType, Record<string, number | strin
   voltmeter: {},
   ammeter: {},
   module: {},
+  buzzer: { resistance: 30 },
+  speaker: { impedance: 8 },
+  transformer: { ratio: 1 }, // 匝数比 Ns/Np
 };
 
 export interface CompMeta {
@@ -86,8 +98,11 @@ export const COMP_META: Record<ComponentType, CompMeta> = {
   inductor: { name: '电感', group: '无源', note: 'DC 视为 1mΩ 小电阻' },
   pot: { name: '电位器', group: '无源', note: '分压双电阻模型，wiper=抽头比例' },
   diode: { name: '二极管', group: '半导体', maxCurrent: 1, note: '分段线性：Vf=0.7V + rOn' },
+  schottky: { name: '肖特基二极管', group: '半导体', maxCurrent: 1, note: '低压降快检波：Vf≈0.3V + rOn' },
   led: { name: 'LED', group: '半导体', note: '分段线性 Vf=2V；I>3×额定持续 0.1s 烧毁' },
   zener: { name: '稳压管', group: '半导体', note: '正向同二极管，反向击穿 vz + rz' },
+  ldr: { name: '光敏电阻', group: '无源', note: '光照越强阻值越小：500kΩ(暗) → ~1kΩ(强光)' },
+  thermistor: { name: '热敏电阻 NTC', group: '无源', note: '温度越高阻值越小：B=3950 教学模型' },
   switch: { name: '开关', group: '机电', note: '开=1GΩ / 合=1mΩ' },
   button: { name: '按键', group: '机电', note: '开=1GΩ / 合=1mΩ' },
   npn: { name: 'NPN 三极管', group: '半导体', note: '简化开关模型：Vbe>0.7 且 B 有电流 → C-E 饱和（Vce(sat)≈0.2V 等效 rOn）' },
@@ -104,6 +119,9 @@ export const COMP_META: Record<ComponentType, CompMeta> = {
   voltmeter: { name: '电压表', group: '仪器', note: '内阻 1GΩ' },
   ammeter: { name: '电流表', group: '仪器', note: '内阻 1mΩ' },
   module: { name: 'RF 模块', group: '集成', note: '教学近似：out 跟随 in 的单位增益缓冲 + 1kΩ 供电负载' },
+  buzzer: { name: '有源蜂鸣器', group: '机电', maxCurrent: 0.3, note: '内置振荡源，通电即响；教学模型为音圈电阻负载' },
+  speaker: { name: '扬声器', group: '机电', maxCurrent: 0.5, note: '音圈 = 纯阻负载（常见 4~32Ω）；音频电流驱动发声' },
+  transformer: { name: '变压器', group: '无源', note: '理想比模型：副边电压 = 匝数比 × 原边电压；原边励磁阻抗 1kΩ' },
 };
 
 const GMIN = 1e-12;
@@ -129,6 +147,27 @@ export function numParam(c: ComponentSpec, keys: string | string[], fallback: nu
 }
 export function boolParam(c: ComponentSpec, key: string): boolean {
   return c.params?.[key] === true;
+}
+
+/** 阻性元件族（电阻/光敏/热敏/蜂鸣器/扬声器）的等效阻值：stamp 与支路电流共用同一套公式 */
+export function passiveR(c: ComponentSpec): number {
+  switch (c.type) {
+    case 'resistor': return Math.max(numParam(c, ['resistance', 'r'], 220), 1e-6);
+    case 'ldr': {
+      // 光照 lux → 阻值：暗 500kΩ，每 +10lux 灵敏度折半式下降；强光下限 ~1kΩ
+      const light = Math.max(numParam(c, 'light', 300), 0);
+      return Math.min(Math.max(5e5 / (1 + light / 10), 400), 6e5);
+    }
+    case 'thermistor': {
+      // NTC：R(T) = R25 × exp(B(1/T − 1/T25))，B=3950
+      const tk = Math.min(Math.max(numParam(c, 'temp', 25), -40), 200) + 273.15;
+      const r25 = Math.max(numParam(c, 'r25', 10000), 1);
+      return Math.min(Math.max(r25 * Math.exp(3950 * (1 / tk - 1 / 298.15)), 0.5), 20e6);
+    }
+    case 'buzzer': return Math.max(numParam(c, ['resistance'], 30), 1);
+    case 'speaker': return Math.max(numParam(c, ['impedance', 'r'], 8), 0.5);
+    default: return NaN;
+  }
 }
 export function strParam(c: ComponentSpec, keys: string | string[], fallback: string): string {
   const list = Array.isArray(keys) ? keys : [keys];
@@ -272,6 +311,11 @@ export function compileCircuit(circuit: CircuitSpec): Compiled {
       vsrcBranches.push({ comp: c, kind: 'rf-buf', netP: netOfPort(c, 'out'), netN: 0 });
     } else if (c.type === 'opamp') {
       vsrcBranches.push({ comp: c, kind: 'opamp', netP: netOfPort(c, 'out'), netN: 0 });
+    } else if (c.type === 'transformer') {
+      const ns1 = netOfPort(c, 's1');
+      const ns2 = netOfPort(c, 's2');
+      if (ns1 === ns2) error = `变压器「${c.id}」的副边被导线直接短接了——匝数比再高也救不了短路。`;
+      vsrcBranches.push({ comp: c, kind: 'xfmr', netP: ns1, netN: ns2 });
     }
   }
 
@@ -445,6 +489,12 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
           b[row] = Math.min(Math.max(vin, 0), Math.abs(vcc) > 0.5 ? vcc : 5);
           break;
         }
+        case 'xfmr': {
+          // 理想比模型：副边电压 = 匝数比 × 原边电压（原边只有 1kΩ 励磁负载，与副边解耦 → 两轮迭代收敛）
+          const k = numParam(c, 'ratio', 1);
+          b[row] = k * (nodeV(netOfPort(c, 'p1'), vPrev) - nodeV(netOfPort(c, 'p2'), vPrev));
+          break;
+        }
         case 'opamp': {
           const mode = opampMode.get(c.id) ?? 0;
           if (mode === 0) {
@@ -469,6 +519,16 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
       const R = (r: number) => 1 / Math.min(Math.max(r, 1e-6), 1e12);
       switch (c.type) {
         case 'resistor': stampG(netOfPort(c, 'a'), netOfPort(c, 'b'), R(numParam(c, ['resistance', 'r'], 220))); break;
+        case 'ldr':
+        case 'thermistor':
+        case 'buzzer':
+        case 'speaker':
+          stampG(netOfPort(c, 'a'), netOfPort(c, 'b'), R(passiveR(c)));
+          break;
+        case 'transformer':
+          // 原边励磁阻抗 1kΩ；副边是受控电压源支路（见 vsrcBranches）
+          stampG(netOfPort(c, 'p1'), netOfPort(c, 'p2'), R(1000));
+          break;
         case 'fuse': stampG(netOfPort(c, 'a'), netOfPort(c, 'b'), blown ? GMIN : R(0.05)); break;
         case 'voltmeter': stampG(netOfPort(c, 'pos'), netOfPort(c, 'neg'), R(R_OPEN)); break;
         case 'ammeter': stampG(netOfPort(c, 'a'), netOfPort(c, 'b'), R(R_SHORT)); break;
@@ -520,8 +580,9 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
           break;
         }
         case 'diode':
+        case 'schottky':
         case 'led': {
-          const vf = numParam(c, 'vf', c.type === 'led' ? 2 : 0.7);
+          const vf = numParam(c, 'vf', c.type === 'led' ? 2 : c.type === 'schottky' ? 0.3 : 0.7);
           const rOn = numParam(c, 'rOn', 5);
           const vd = nodeV(netOfPort(c, 'a'), vPrev) - nodeV(netOfPort(c, 'k'), vPrev);
           if (!blown && vd > vf * 0.95) {
@@ -619,6 +680,11 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
       branchCurrents.set(`${br.comp.id}:${br.port}`, i);
       return;
     }
+    // 变压器副边电流挂在 "id:s" 键下，把 "id" 留给元素循环写入原边励磁电流
+    if (br.kind === 'xfmr') {
+      branchCurrents.set(`${br.comp.id}:s`, i);
+      return;
+    }
     branchCurrents.set(br.comp.id, i);
     if (br.kind === 'opamp' || br.kind === 'ldo') opampOut.set(br.comp.id, nodeV(br.netP, x));
   });
@@ -629,6 +695,16 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
     let i = 0;
     switch (c.type) {
       case 'resistor': i = (V(c, 'a') - V(c, 'b')) / Math.max(numParam(c, ['resistance', 'r'], 220), 1e-6); break;
+      case 'ldr':
+      case 'thermistor':
+      case 'buzzer':
+      case 'speaker':
+        i = (V(c, 'a') - V(c, 'b')) / passiveR(c);
+        break;
+      case 'transformer':
+        // 原边励磁电流（副边电流在 "id:s" 键下，由支路未知量写入）
+        i = (V(c, 'p1') - V(c, 'p2')) / 1000;
+        break;
       case 'fuse': i = blown ? 0 : (V(c, 'a') - V(c, 'b')) / 0.05; break;
       case 'voltmeter': i = (V(c, 'pos') - V(c, 'neg')) / R_OPEN; break;
       case 'ammeter': i = (V(c, 'a') - V(c, 'b')) / R_SHORT; break;
@@ -660,8 +736,8 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
         i = (V(c, 'a') - V(c, 'w')) / Math.max(rT * w, 1e-6);
         break;
       }
-      case 'diode': case 'led': {
-        const vf = numParam(c, 'vf', c.type === 'led' ? 2 : 0.7);
+      case 'diode': case 'schottky': case 'led': {
+        const vf = numParam(c, 'vf', c.type === 'led' ? 2 : c.type === 'schottky' ? 0.3 : 0.7);
         const rOn = numParam(c, 'rOn', 5);
         const vd = V(c, 'a') - V(c, 'k');
         i = !blown && vd > vf ? (vd - vf) / rOn : vd * GMIN;
@@ -809,7 +885,8 @@ export function evaluateGoal(goal: GoalCheck, circuit: CircuitSpec, res: SolveRe
         const ports = PORT_NAMES[c.type];
         const blown = state?.blown.has(c.id);
         let conductive = true;
-        if (['capacitor', 'crystal', 'voltmeter', 'opamp', 'mcu'].includes(c.type)) conductive = false;
+        // transformer 四端口若整体互连会把原副边短接，故按非导通处理（耦合走受控源，不走连通性）
+        if (['capacitor', 'crystal', 'voltmeter', 'opamp', 'mcu', 'transformer'].includes(c.type)) conductive = false;
         if ((c.type === 'switch' || c.type === 'button') && !boolParam(c, 'closed')) conductive = false;
         if ((c.type === 'fuse' || c.type === 'led') && blown) conductive = false;
         if (c.type === 'gnd' || c.type === 'antenna') conductive = false; // 单端口

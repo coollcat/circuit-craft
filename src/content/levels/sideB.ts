@@ -446,6 +446,8 @@ export const SIDE_B_LEVELS: LevelDef[] = [
     ],
     palette: [
       { id: 'D1', type: 'diode', x: 0, y: 0, params: { vf: 0.7 } },
+      // 检波升级件：肖特基低压降（知识卡提到的现代方案），与 D1 二选一
+      { id: 'D2', type: 'schottky', x: 0, y: 0, params: { vf: 0.3 } },
       { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 10e-9 } },
       { id: 'RL1', type: 'resistor', x: 0, y: 0, params: { resistance: 100000 } },
     ],

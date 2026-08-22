@@ -16,8 +16,11 @@ export const PORT_GEOM: Record<ComponentType, PortGeom[]> = {
   inductor: [{ name: 'a', x: -32, y: 0 }, { name: 'b', x: 32, y: 0 }],
   pot: [{ name: 'a', x: -32, y: 0 }, { name: 'b', x: 32, y: 0 }, { name: 'w', x: 0, y: -28 }],
   diode: [{ name: 'a', x: -32, y: 0 }, { name: 'k', x: 32, y: 0 }],
+  schottky: [{ name: 'a', x: -32, y: 0 }, { name: 'k', x: 32, y: 0 }],
   led: [{ name: 'a', x: -32, y: 0 }, { name: 'k', x: 32, y: 0 }],
   zener: [{ name: 'a', x: -32, y: 0 }, { name: 'k', x: 32, y: 0 }],
+  ldr: [{ name: 'a', x: -32, y: 0 }, { name: 'b', x: 32, y: 0 }],
+  thermistor: [{ name: 'a', x: -32, y: 0 }, { name: 'b', x: 32, y: 0 }],
   switch: [{ name: 'a', x: -32, y: 0 }, { name: 'b', x: 32, y: 0 }],
   button: [{ name: 'a', x: -32, y: 0 }, { name: 'b', x: 32, y: 0 }],
   npn: [{ name: 'b', x: -32, y: 0 }, { name: 'c', x: 16, y: -24 }, { name: 'e', x: 16, y: 24 }],
@@ -43,6 +46,12 @@ export const PORT_GEOM: Record<ComponentType, PortGeom[]> = {
   module: [
     { name: 'in', x: -32, y: -12 }, { name: 'out', x: 32, y: -12 },
     { name: 'vcc', x: -32, y: 12 }, { name: 'gnd', x: 32, y: 12 },
+  ],
+  buzzer: [{ name: 'a', x: -32, y: 0 }, { name: 'b', x: 32, y: 0 }],
+  speaker: [{ name: 'a', x: -32, y: 0 }, { name: 'b', x: 32, y: 0 }],
+  transformer: [
+    { name: 'p1', x: -32, y: -16 }, { name: 'p2', x: -32, y: 16 },
+    { name: 's1', x: 32, y: -16 }, { name: 's2', x: 32, y: 16 },
   ],
 };
 
@@ -137,6 +146,28 @@ export function SymbolGlyph({ type, closed, burned, stroke: strokeProp, burnedSt
         {L(-32, 0, -10, 0, 'l1')}{L(10, 0, 32, 0, 'l2')}
         <path d="M-10 -9 L-10 9 L10 0 Z" {...P} fill={stroke} />
         <line x1={10} y1={-9} x2={10} y2={9} {...P} />
+      </g>);
+    case 'schottky':
+      // 肖特基：阴极杠两端带 S 形弯钩
+      return (<g {...P}>
+        {L(-32, 0, -10, 0, 'l1')}{L(10, 0, 32, 0, 'l2')}
+        <path d="M-10 -9 L-10 9 L10 0 Z" {...P} fill={stroke} />
+        <path d="M6 -9 L14 -9 M10 -9 V9 M6 9 L14 9" {...P} />
+      </g>);
+    case 'ldr':
+      // 光敏电阻：电阻方块 + 斜射的两条光箭头
+      return (<g {...P}>
+        {L(-32, 0, -12, 0, 'l1')}{L(12, 0, 32, 0, 'l2')}
+        <rect x={-12} y={-9} width={24} height={18} rx={3} {...P} />
+        <path d="M-4 -16 L4 -26 M8 -16 L16 -26" {...P} stroke={burned ? stroke : '#FFB84D'} />
+        <path d="M4 -26 l-5 1 M4 -26 l0 5 M16 -26 l-5 1 M16 -26 l0 5" {...P} stroke={burned ? stroke : '#FFB84D'} />
+      </g>);
+    case 'thermistor':
+      // NTC：电阻 + 斜杠温度标记
+      return (<g {...P}>
+        {L(-32, 0, -12, 0, 'l1')}{L(12, 0, 32, 0, 'l2')}
+        <rect x={-12} y={-9} width={24} height={18} rx={3} {...P} />
+        <path d="M-8 -14 L2 -20" {...P} stroke={burned ? stroke : '#E56B6B'} />
       </g>);
     case 'led':
       return (<g {...P}>
@@ -260,6 +291,30 @@ export function SymbolGlyph({ type, closed, burned, stroke: strokeProp, burnedSt
         {L(-32, 12, -26, 12, 'v')}{L(32, 12, 26, 12, 'g')}
         <text x={0} y={4} fontSize={9} fill="#5B8DEF" textAnchor="middle" stroke="none" fontFamily="JetBrains Mono">RF</text>
       </g>);
+    case 'buzzer':
+      // 蜂鸣器：半圆 + 声波弧
+      return (<g {...P}>
+        {L(-32, 0, -14, 0, 'l1')}{L(20, 0, 32, 0, 'l2')}
+        <path d="M-14 -13 A13 13 0 0 1 -14 13 Z" {...P} />
+        <path d="M22 -10 Q28 0 22 10 M27 -14 Q35 0 27 14" {...P} stroke={burned ? stroke : acc} />
+      </g>);
+    case 'speaker':
+      // 扬声器：矩形音圈 + 梯形纸盆
+      return (<g {...P}>
+        {L(-32, 0, -18, 0, 'l1')}{L(-18, 0, -18, -10, 't1')}{L(-18, 0, -18, 10, 't2')}
+        <rect x={-22} y={-12} width={8} height={24} {...P} />
+        <path d="M-14 -16 L14 -26 L14 26 L-14 16 Z" {...P} />
+      </g>);
+    case 'transformer':
+      // 变压器：两侧线圈绕组 + 中间铁芯双竖线
+      return (<g {...P}>
+        {L(-32, -16, -18, -16, 'p1')}{L(-32, 16, -18, 16, 'p2')}
+        {L(18, -16, 32, -16, 's1')}{L(18, 16, 32, 16, 's2')}
+        <path d="M-18 -22 A6 6 0 0 1 -18 -10 A6 6 0 0 1 -18 2 A6 6 0 0 1 -18 14 A6 6 0 0 1 -18 26" {...P} transform="translate(0,-5) scale(1,0.62)" />
+        <path d="M18 -22 A6 6 0 0 0 18 -10 A6 6 0 0 0 18 2 A6 6 0 0 0 18 14 A6 6 0 0 0 18 26" {...P} transform="translate(0,-5) scale(1,0.62)" />
+        <line x1={-4} y1={-15} x2={-4} y2={15} {...P} />
+        <line x1={4} y1={-15} x2={4} y2={15} {...P} />
+      </g>);
   }
 }
 
@@ -299,6 +354,12 @@ export const PARAM_SCHEMA: Partial<Record<ComponentType, ParamField[]>> = {
     { key: 'vf', label: '正向压降', unit: 'V', min: 0.5, max: 1, step: 0.05 },
     { key: 'vz', label: '稳压值', unit: 'V', min: 2, max: 24, step: 0.1 },
   ],
+  schottky: [{ key: 'vf', label: '正向压降', unit: 'V', min: 0.15, max: 0.6, step: 0.05, help: '肖特基 ≈0.3V：检波与防反接首选' }],
+  ldr: [{ key: 'light', label: '环境光照', unit: 'lux', min: 0, max: 10000, step: 50, help: '光照越强阻值越小：暗 500kΩ → 强光 ~1kΩ' }],
+  thermistor: [
+    { key: 'temp', label: '温度', unit: '°C', min: -40, max: 150, step: 1, help: 'NTC：温度越高阻值越小（B=3950）' },
+    { key: 'r25', label: '25°C 标称阻值', unit: 'Ω', min: 100, max: 1e6, log: true },
+  ],
   switch: [{ key: 'closed', label: '闭合', toggle: true, help: '开=1GΩ / 合=1mΩ' }],
   button: [{ key: 'closed', label: '按下', toggle: true }],
   npn: [
@@ -327,6 +388,9 @@ export const PARAM_SCHEMA: Partial<Record<ComponentType, ParamField[]>> = {
   antenna: [{ key: 'impedance', label: '阻抗', unit: 'Ω', min: 10, max: 600, step: 1, help: '教学近似：对地纯阻' }],
   fuse: [{ key: 'rating', label: '熔断电流', unit: 'A', min: 0.05, max: 5, step: 0.05 }],
   crystal: [{ key: 'capacitance', label: '等效电容', unit: 'F', min: 1e-12, max: 100e-12, log: true }],
+  buzzer: [{ key: 'resistance', label: '音圈电阻', unit: 'Ω', min: 10, max: 100, step: 5 }],
+  speaker: [{ key: 'impedance', label: '音圈阻抗', unit: 'Ω', min: 3, max: 64, step: 1, help: '常见 4 / 8 / 16 / 32Ω' }],
+  transformer: [{ key: 'ratio', label: '匝数比 Ns/Np', min: 0.05, max: 20, log: true, help: '副边电压 = 原边电压 × 匝数比' }],
 };
 
 export function defaultParamsFor(type: ComponentType): Record<string, number | string | boolean> {

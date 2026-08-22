@@ -1,16 +1,18 @@
-// 回路工坊 — 全站共享类型契约（冻结，任何代理不得修改）
+// 回路工坊 — 全站共享类型契约（v2 扩展：新增元件需同步 solver 与两层 symbols，见 AGENTS 约定）
 export type NPCId = 'laozhou' | 'xiaohan' | 'lingong';
 export interface DialogueLine { speaker: NPCId; text: string; }
 
 export type ComponentType =
   | 'vsrc' | 'battery' | 'gnd'
   | 'resistor' | 'capacitor' | 'inductor' | 'pot'
-  | 'diode' | 'led' | 'zener'
+  | 'diode' | 'schottky' | 'led' | 'zener'
+  | 'ldr' | 'thermistor'
   | 'switch' | 'button'
   | 'npn' | 'pmos' | 'nmos'
   | 'opamp'
   | 'crystal' | 'antenna' | 'sensor' | 'mcu' | 'ic' | 'fuse'
-  | 'funcgen' | 'voltmeter' | 'ammeter' | 'module';
+  | 'funcgen' | 'voltmeter' | 'ammeter' | 'module'
+  | 'buzzer' | 'speaker' | 'transformer';
 
 export interface PortRef { comp: string; port: string; }
 // 导线层（wave6 新增，可选，向后兼容）：缺省 'top'，旧导线不变；仅视觉/组织分层，不影响仿真连通性。
