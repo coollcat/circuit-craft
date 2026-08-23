@@ -239,18 +239,6 @@ describe('布线布局：照抄解法无完全重合导线', () => {
     return best;
   }
 
-  function distToSegs(p: { x: number; y: number }, b: Pt[]): number {
-    let best = Infinity;
-    for (let i = 1; i < b.length; i++) {
-      const ax = b[i - 1], bx2 = b[i];
-      const vx = bx2.x - ax.x, vy = bx2.y - ax.y;
-      const l2 = vx * vx + vy * vy;
-      const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - ax.x) * vx + (p.y - ax.y) * vy) / l2));
-      best = Math.min(best, Math.hypot(p.x - (ax.x + t * vx), p.y - (ax.y + t * vy)));
-    }
-    return best;
-  }
-
   it.each(ALL.map(l => [l.id, l] as const))('%s', (_id, level) => {
     const built = buildSolutionCircuit(level);
     const byId = new Map(built.components.map(c => [c.id, c]));
