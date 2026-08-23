@@ -4,7 +4,7 @@
 // overlay 定位走 DOM style 直写（每帧），不经过 React 渲染循环。
 import { useEffect, useRef } from 'react';
 import { StudioScene, STUDIO_BG } from './StudioScene';
-import { specForEntry } from './specs';
+import { modelForEntry } from './specs';
 import { annotationsFor } from './annotations';
 import { cn } from '@/lib/utils';
 
@@ -46,7 +46,7 @@ export default function Component3DViewer({ entryId, name, className }: Componen
 
   // 条目切换 → 换展品与标注（复用同一上下文）
   useEffect(() => {
-    sceneRef.current?.setComponent(specForEntry(entryId), annotationsFor(entryId));
+    sceneRef.current?.setComponent(modelForEntry(entryId), annotationsFor(entryId));
   }, [entryId]);
 
   return (

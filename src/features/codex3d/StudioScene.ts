@@ -5,8 +5,9 @@
 // 亮背景下的观感通过曝光与布光收敛（「影棚模式」），仅 LED 的独立实例材质
 // 可安全调低 emissive（暗站里由电流驱动发光，影棚里给收敛的常亮微光）。
 import * as THREE from 'three';
-import type { ComponentSpec } from '@/engine/types';
 import { buildComponent, disposeComponent } from '@/features/pcb3d/models';
+import { buildExtraModel } from './extras';
+import type { EntryModel } from './specs';
 import type { AnnotationDef } from './annotations';
 
 export const STUDIO_BG = '#F4F1E8'; // 丝印米白灯箱
@@ -239,15 +240,15 @@ export class StudioScene {
   }
 
   /* ---------------- 数据入口 ---------------- */
-  /** 换展品：null → 通用贴片兜底模型 */
-  setComponent(spec: ComponentSpec | null, annotations: AnnotationDef[]): void {
+  /** 换展品：string → extras 实物模型；null → 通用贴片兜底模型 */
+  setComponent(model: EntryModel | null, annotations: AnnotationDef[]): void {
     this.annotations = annotations;
     if (this.comp) {
       this.scene.remove(this.comp);
       this.disposeGroup(this.comp);
       this.comp = null;
     }
-    const g = spec ? buildComponent(spec) : buildGenericFallback();
+    const g = typeof model === 'string' ? buildExtraModel(model) : model ? buildComponent(model) : buildGenericFallback();
     // 投影阴影；透明材质（玻璃管/LED 透镜）不投影，避免实心黑影
     g.traverse(o => {
       if (o instanceof THREE.Mesh) {
