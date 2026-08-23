@@ -1,64 +1,64 @@
 @echo off
 setlocal
-title »ØÂ·¹¤·» CircuitCraft
+title å›è·¯å·¥åŠ CircuitCraft
 cd /d "%~dp0"
 
-REM ---- »·¾³¼ì²é ----
+REM ---- ç¯å¢ƒæ£€æŸ¥ ----
 where node >nul 2>nul
 if errorlevel 1 goto no_node
 
 if exist node_modules goto menu
-echo [*] Ê×´ÎÔËĞĞ£ºÕıÔÚ°²×°ÒÀÀµ£¬Ô¼ 2-5 ·ÖÖÓ...
+echo [*] é¦–æ¬¡è¿è¡Œï¼šæ­£åœ¨å®‰è£…ä¾èµ–ï¼Œçº¦ 2-5 åˆ†é’Ÿ...
 call npm install --no-audit --no-fund
 if errorlevel 1 goto install_fail
 
 :menu
 echo.
 echo  ==========================================
-echo    »ØÂ·¹¤·» CircuitCraft Æô¶¯Æ÷
+echo    å›è·¯å·¥åŠ CircuitCraft å¯åŠ¨å™¨
 echo  ==========================================
-echo    [1] ¿ª·¢Ä£Ê½ - ÈÈ¸üĞÂ, Ä¬ÈÏ¶Ë¿Ú 5173
-echo    [2] Éú²úÄ£Ê½ - ¹¹½¨ + ±¾µØ·şÎñÆ÷, Ğè MySQL
-echo    [3] ½öÖØĞÂ¹¹½¨Ç°¶Ë
+echo    [1] å¼€å‘æ¨¡å¼ - çƒ­æ›´æ–°, é»˜è®¤ç«¯å£ 5173
+echo    [2] ç”Ÿäº§æ¨¡å¼ - æ„å»º + æœ¬åœ°æœåŠ¡å™¨, éœ€ MySQL
+echo    [3] ä»…é‡æ–°æ„å»ºå‰ç«¯
 echo  ==========================================
-choice /c 123 /n /m " ÇëÑ¡Ôñ [1-3]: "
+choice /c 123 /n /m " è¯·é€‰æ‹© [1-3]: "
 if errorlevel 3 goto buildonly
 if errorlevel 2 goto prod
 
 :dev
-echo [*] Æô¶¯¿ª·¢·şÎñÆ÷, Ctrl+C Í£Ö¹...
+echo [*] å¯åŠ¨å¼€å‘æœåŠ¡å™¨, Ctrl+C åœæ­¢...
 call npm run dev
 goto end
 
 :prod
 if exist dist\boot.js goto prod_run
-echo [*] Î´·¢ÏÖ¹¹½¨²úÎï, ÏÈÖ´ĞĞ¹¹½¨...
+echo [*] æœªå‘ç°æ„å»ºäº§ç‰©, å…ˆæ‰§è¡Œæ„å»º...
 call npm run build
 if errorlevel 1 goto build_fail
 
 :prod_run
-echo [*] Æô¶¯Éú²ú·şÎñÆ÷, Ctrl+C Í£Ö¹...
+echo [*] å¯åŠ¨ç”Ÿäº§æœåŠ¡å™¨, Ctrl+C åœæ­¢...
 call npm run start
 goto end
 
 :buildonly
 call npm run build
 if errorlevel 1 goto build_fail
-echo [OK] ¹¹½¨Íê³É, Êä³öÔÚ dist Ä¿Â¼
+echo [OK] æ„å»ºå®Œæˆ, è¾“å‡ºåœ¨ dist ç›®å½•
 goto end
 
 :no_node
-echo [X] Î´¼ì²âµ½ Node.js, ÇëÏÈ°²×°: https://nodejs.org
+echo [X] æœªæ£€æµ‹åˆ° Node.js, è¯·å…ˆå®‰è£…: https://nodejs.org
 pause
 exit /b 1
 
 :install_fail
-echo [X] ÒÀÀµ°²×°Ê§°Ü, Çë¼ì²éÍøÂçºóÖØÊÔ¡£
+echo [X] ä¾èµ–å®‰è£…å¤±è´¥, è¯·æ£€æŸ¥ç½‘ç»œåé‡è¯•ã€‚
 pause
 exit /b 1
 
 :build_fail
-echo [X] ¹¹½¨Ê§°Ü¡£
+echo [X] æ„å»ºå¤±è´¥ã€‚
 pause
 exit /b 1
 

@@ -102,12 +102,16 @@ export function paletteNeeded(level: LevelDef): Set<string> {
   return need;
 }
 
-/** 在已有元件旁找一个不重叠的网格位 */
+/** 在已有元件旁找不重叠的落点：两行交错布局（奇偶件错开纵向相位），
+ *  避免多颗新件同基线排开 —— 否则它们到同一目标（地/公共引脚）的斜线会完全重合 */
 function freeSlot(components: ComponentSpec[], index: number): { x: number; y: number } {
   const taken = new Set(components.map(c => `${Math.round(c.x)}:${Math.round(c.y)}`));
   for (let i = index; i < index + 200; i++) {
-    const x = 96 + (i % 6) * 128;
-    const y = 480 + Math.floor(i / 6) * 112;
+    const col = i % 4;
+    const row = Math.floor(i / 4);
+    // 行内再按奇偶上下错位 40px：相邻元件不同基线，route45 到共点的斜线自然分离
+    const x = 128 + col * 160;
+    const y = 464 + row * 152 + (i % 2) * 40;
     if (!taken.has(`${x}:${y}`)) return { x, y };
   }
   return { x: 96, y: 480 };
