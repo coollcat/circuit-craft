@@ -4,6 +4,16 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useNavigate, useParams } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Box, Check, Lightbulb, Stamp, Trophy } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { CircuitSpec, DialogueLine, GoalCheck, LevelDef, StarCondition, WireSpec } from '@/engine/types';
 import { evaluateGoals, formatSI, solveDC, type GoalStatus } from '@/engine/solver';
 import { FIXTURE_LEVELS } from '@/engine/fixtures';
@@ -119,6 +129,7 @@ export default function LevelPlay() {
 }
 
 function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtureFallback: boolean }) {
+  const navigate = useNavigate();
   const [circuit, setCircuit] = useState<CircuitSpec>(() => clonePreset(level));
   const circuitRef = useRef(circuit);
   circuitRef.current = circuit;
@@ -144,6 +155,8 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
   const [barIdle, setBarIdle] = useState(false);
   const [selInfo, setSelInfo] = useState<{ kind: 'comp' | 'wire'; id: string } | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  // 离开确认：不用 window.confirm —— 某些嵌入环境会静默拒绝原生弹窗导致永远无法返回
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const completeLevel = useProgress(s => s.completeLevel);
   const useHint = useProgress(s => s.useHint);
@@ -411,7 +424,10 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
         <Link
           to="/chapters"
           onClick={e => {
-            if (circuit.wires.length > 0 && !victory && !window.confirm('电路还没保存，确定离开吗？')) e.preventDefault();
+            if (circuit.wires.length > 0 && !victory) {
+              e.preventDefault();
+              setConfirmLeave(true);
+            }
           }}
           className="flex items-center gap-1 text-xs text-silk-500 hover:text-silk-100"
         >
@@ -577,6 +593,22 @@ function LevelPlayInner({ level, isFixtureFallback }: { level: LevelDef; isFixtu
           />
         );
       })()}
+
+      {/* ---------- 离开确认（应用内对话框，替代被部分环境吞掉的 window.confirm） ---------- */}
+      <AlertDialog open={confirmLeave} onOpenChange={setConfirmLeave}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>离开这一关？</AlertDialogTitle>
+            <AlertDialogDescription>
+              画布上的连线尚未保存，返回章节地图后会恢复为本关初始状态。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>留下继续焊</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate('/chapters')}>离开</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ---------- 过关结算 ---------- */}
       <VictoryModal

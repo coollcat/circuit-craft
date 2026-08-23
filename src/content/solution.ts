@@ -133,12 +133,14 @@ export function buildSolutionCircuit(level: LevelDef, base?: CircuitSpec): Circu
     if (c) c.params = { ...c.params, [k]: v };
   };
 
-  /* 1) 放置解法需要的 palette 元件（目标引用或 component-placed 补齐），空位摆放 */
+  /* 1) 放置解法需要的 palette 元件：内容手写了非零坐标则照用（可做逐关布局设计），
+        否则空位交错摆放；与已有元件重叠时退回自动找位 */
   const needed = paletteNeeded(level);
   let slot = 0;
   for (const p of level.palette) {
     if (byId.has(p.id) || !needed.has(p.id)) continue;
-    const pos = freeSlot(components, slot++);
+    const authored = (p.x !== 0 || p.y !== 0) && !components.some(c => c.x === p.x && c.y === p.y);
+    const pos = authored ? { x: p.x, y: p.y } : freeSlot(components, slot++);
     const comp: ComponentSpec = { ...p, params: { ...(p.params ?? {}) }, x: pos.x, y: pos.y };
     components.push(comp);
     byId.set(comp.id, comp);

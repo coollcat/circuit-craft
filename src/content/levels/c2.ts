@@ -126,7 +126,8 @@ export const C2_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：你手机里的芯片有上百亿个这样的三极管，每个比病毒还小。发明它的三位科学家拿了诺贝尔奖——电子时代就是从这个小黑块开始的。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 43000 } },
+      // 手写落位：BT1 与 Q1 之间的中继位，让基极偏置两根线短而直，且不与 e→neg 回流线交叉
+      { id: 'RP1', type: 'resistor', x: 192, y: 320, params: { resistance: 43000 } },
     ],
     preset: {
       components: [
