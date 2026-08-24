@@ -274,6 +274,10 @@ export default function CircuitEditor({
     }
     const comp = hitComp(w);
     if (comp) {
+      // 二次点击已选中元件 = 直接打开调参（不必找双击；拖拽不受影响，弹卡后仍可继续拖）
+      if (!readOnly && !comp.locked && sel?.kind === 'comp' && sel.id === comp.id) {
+        onCompDoubleClick?.(comp, { x: e.clientX, y: e.clientY });
+      }
       setSel({ kind: 'comp', id: comp.id });
       if (!comp.locked) {
         dragRef.current = { mode: 'comp', id: comp.id, dx: w.x - comp.x, dy: w.y - comp.y };
