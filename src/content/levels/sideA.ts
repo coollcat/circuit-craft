@@ -22,14 +22,16 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：这根「手指」内部是两只小开关一推一拉：举高时接通 3.3V，放低时接通地——所以它既能「吐」电流也能「吞」电流。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
+      // 限流电阻手写落位：贴 LED 下方，p0 馈线与 LED 回流各自短程直连
+      { id: 'RP1', type: 'resistor', x: 416, y: 432, params: { resistance: 220 } },
     ],
     preset: {
       components: [
         { id: 'BT1', type: 'battery', x: 64, y: 176, params: { voltage: 3.3 }, locked: true },
         { id: 'U1', type: 'mcu', x: 288, y: 176, params: { pinVoltage: 3.3, current: 20 }, locked: true },
         { id: 'LED1', type: 'led', x: 512, y: 176, params: { vf: 2 }, locked: true },
-        { id: 'GND1', type: 'gnd', x: 64, y: 336, locked: true },
+        // 地星汇聚点放在元件群重心偏下：各路地线从两侧扇入，不再沿同一条对角走廊叠线
+        { id: 'GND1', type: 'gnd', x: 352, y: 336, locked: true },
       ],
       wires: [],
     },
@@ -138,7 +140,8 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：机械按键触点会「抖」——接通瞬间弹跳几次，波形上是一串毛刺。软件消抖（延时 20ms 再读）或硬件消抖（并一颗小电容）是必修课。看波形，比讲道理管用。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 10000 } },
+      // 上拉电阻手写落位：从上方馈入 p1，与下方按键的馈线上下分离不贴行
+      { id: 'RP1', type: 'resistor', x: 256, y: 64, params: { resistance: 10000 } },
       { id: 'KEY1', type: 'button', x: 0, y: 0 },
     ],
     preset: {
@@ -263,7 +266,8 @@ export const SIDE_A_LEVELS: LevelDef[] = [
         { id: 'BT1', type: 'battery', x: 64, y: 176, params: { voltage: 3.3 }, locked: true },
         { id: 'U1', type: 'mcu', x: 320, y: 176, params: { pinVoltage: 3.3, current: 20 }, locked: true },
         { id: 'LED1', type: 'led', x: 544, y: 176, params: { vf: 2 }, locked: true },
-        { id: 'GND1', type: 'gnd', x: 64, y: 336, locked: true },
+        // 同 sa-1：地星点移到重心下方，避免多路地线沿左下对角走廊叠行
+        { id: 'GND1', type: 'gnd', x: 400, y: 360, locked: true },
       ],
       wires: [],
     },
@@ -328,7 +332,8 @@ export const SIDE_A_LEVELS: LevelDef[] = [
         { id: 'U1', type: 'mcu', x: 272, y: 176, params: { pinVoltage: 3.3, current: 20 }, locked: true },
         { id: 'MOD1', type: 'module', x: 480, y: 96, params: { band: '2.4G' }, locked: true },
         { id: 'LED1', type: 'led', x: 480, y: 256, params: { vf: 2 }, locked: true },
-        { id: 'GND1', type: 'gnd', x: 64, y: 336, locked: true },
+        // 地星点放在 U1 与右侧射频簇之间的鞍部：四路地线扇形汇入不共走廊
+        { id: 'GND1', type: 'gnd', x: 256, y: 432, locked: true },
       ],
       wires: [],
     },

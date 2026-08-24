@@ -188,16 +188,18 @@ export const C7_LEVELS: LevelDef[] = [
       { speaker: 'xiaohan', text: '（烙铁头亮起金光）主线通关！！回路工坊以你为荣！！' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 150 } },
+      // 限流电阻手写落位：贴在 U2 右下，让 p0→RP1→LED 指示链整体收在右侧，不再横穿地线走廊
+      { id: 'RP1', type: 'resistor', x: 560, y: 352, params: { resistance: 150 } },
     ],
     preset: {
       components: [
         { id: 'BT1', type: 'battery', x: 64, y: 176, params: { voltage: 5 }, locked: true },
         { id: 'U1', type: 'ic', x: 240, y: 176, params: { vout: 3.3, imax: 150 }, locked: true },
         { id: 'U2', type: 'mcu', x: 448, y: 160, params: { pinVoltage: 3.3, current: 20 }, locked: true },
-        { id: 'SEN1', type: 'sensor', x: 64, y: 320, params: { output: 1.65 }, locked: true },
+        { id: 'SEN1', type: 'sensor', x: 176, y: 432, params: { output: 1.65 }, locked: true },
         { id: 'LED1', type: 'led', x: 640, y: 176, params: { vf: 2 }, locked: true },
-        { id: 'GND1', type: 'gnd', x: 240, y: 352, locked: true },
+        // 地星点右移到 LDO/MCU 之间下方：LED 回流与 U2 回流呈不同走向
+        { id: 'GND1', type: 'gnd', x: 400, y: 520, locked: true },
       ],
       wires: [],
     },

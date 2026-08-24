@@ -74,15 +74,18 @@ export const C4_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：去耦电容为什么常用 100nF？因为 MCU 的瞬态电流脉冲在纳秒到微秒级，100nF 的谐振点恰好覆盖这段。大电容管「水库」，小电容管「消防栓」，常见做法是 10µF 和 100nF 搭配。' },
     ],
     palette: [
-      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 100e-9 } },
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
+      // 去耦电容手写落位：紧贴 U1 供电脚（本关教学点就是「10mm 内」）
+      { id: 'CP1', type: 'capacitor', x: 224, y: 272 },
+      // LED 限流电阻手写落位：LED 正下方，短程直连
+      { id: 'RP1', type: 'resistor', x: 432, y: 464, params: { resistance: 220 } },
     ],
     preset: {
       components: [
         { id: 'BT1', type: 'battery', x: 64, y: 176, params: { voltage: 5 }, locked: true },
         { id: 'U1', type: 'mcu', x: 320, y: 160, params: { pinVoltage: 5, current: 5 }, locked: true },
         { id: 'LED1', type: 'led', x: 544, y: 176, params: { vf: 2 }, locked: true },
-        { id: 'GND1', type: 'gnd', x: 64, y: 320, locked: true },
+        // 地星点放元件群质心下方：三路地线呈扇形汇入，不共用走廊
+        { id: 'GND1', type: 'gnd', x: 288, y: 368, locked: true },
       ],
       wires: [],
     },

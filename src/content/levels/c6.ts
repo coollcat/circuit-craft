@@ -76,12 +76,13 @@ export const C6_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：为什么是 50Ω 不是整数 100？1930 年代同轴电缆实验发现：空气介质同轴线在 30Ω 时功率容量最大、77Ω 时损耗最低——50Ω 是两者的折中，一用就是九十年。' },
     ],
     palette: [
-      { id: 'ANT1', type: 'antenna', x: 0, y: 0, params: { impedance: 75 } },
+      { id: 'ANT1', type: 'antenna', x: 384, y: 400, params: { impedance: 75 } },
     ],
     preset: {
       components: [
         { id: 'MOD1', type: 'module', x: 224, y: 176, params: { band: '433M' }, locked: true },
-        { id: 'GND1', type: 'gnd', x: 224, y: 336, locked: true },
+        // 地放左下角：与右侧手写落位的天线馈线分居两侧，互不贴行
+        { id: 'GND1', type: 'gnd', x: 96, y: 400, locked: true },
       ],
       wires: [],
     },

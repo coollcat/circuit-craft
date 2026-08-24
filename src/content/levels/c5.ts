@@ -22,7 +22,8 @@ export const C5_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：运放的开环增益高达 10 万倍，但我们故意用负反馈把它「压」到 10 倍——牺牲增益，换来精确、稳定、不挑个体。这是模拟设计最深的哲学：用过剩换确定。' },
     ],
     palette: [
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 9000 } },
+      // 反馈电阻手写落位：从运放上方馈入 inn，与 R1 的下方馈线上下分离
+      { id: 'RP2', type: 'resistor', x: 232, y: 56, params: { resistance: 9000 } },
     ],
     preset: {
       components: [
@@ -191,7 +192,8 @@ export const C5_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：传感器输出 0.1V 时，导线上的工频干扰可能就有 50mV。真实项目里放大之前先想屏蔽——这就是第 6 章和支线 B 要教你的。' },
     ],
     palette: [
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 19000 } },
+      // 反馈电阻手写落位（同 c5-1）：上方馈入 inn
+      { id: 'RP2', type: 'resistor', x: 232, y: 56, params: { resistance: 19000 } },
     ],
     preset: {
       components: [

@@ -61,6 +61,25 @@ it('diag', () => {
         pts: buildWirePolyline({ x: pa.x, y: pa.y }, [], { x: pb.x, y: pb.y }),
       };
     });
+    // 近距平行伴随：沿 A 采样，与 B 距离 <10px 的最长连续弧长 —— 视觉上"贴着走/叠着走"
+    function adjacencyRun(a: Pt[], b: Pt[]): number {
+      let best = 0, run = 0;
+      for (let d = 0; d < polyLen(a); d += 2) {
+        let remain = d;
+        let p: Pt = a[0];
+        for (let i = 1; i < a.length; i++) {
+          const segL = Math.hypot(a[i].x - a[i - 1].x, a[i].y - a[i - 1].y);
+          if (remain <= segL) {
+            const f = segL === 0 ? 0 : remain / segL;
+            p = { x: a[i - 1].x + (a[i].x - a[i - 1].x) * f, y: a[i - 1].y + (a[i].y - a[i - 1].y) * f };
+            break;
+          }
+          remain -= segL;
+        }
+        if (distToSegs(p, b) < 10) { run += 2; best = Math.max(best, run); } else run = 0;
+      }
+      return best;
+    }
     for (const w of wires) {
       console.log(`  wire ${w.label}  len=${polyLen(w.pts).toFixed(0)}  [${w.pts.map(p => `(${p.x},${p.y})`).join(' ')}]`);
     }
@@ -70,6 +89,10 @@ it('diag', () => {
         const cba = coverageBy(wires[j].pts, wires[i].pts);
         if (cab > 0.15 || cba > 0.15) {
           console.log(`  OVERLAP? [${wires[i].label}] vs [${wires[j].label}]  cov=${cab.toFixed(2)}/${cba.toFixed(2)}`);
+        }
+        const adj = Math.max(adjacencyRun(wires[i].pts, wires[j].pts), adjacencyRun(wires[j].pts, wires[i].pts));
+        if (adj >= 90) {
+          console.log(`  PARALLEL? [${wires[i].label}] vs [${wires[j].label}]  伴随 ${adj.toFixed(0)}px (<10px 间距)`);
         }
       }
     }
