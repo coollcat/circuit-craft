@@ -8,14 +8,14 @@ import TraceDivider from '@/components/TraceDivider';
 const WiringAnim = memo(function WiringAnim() {
   return (
     <svg viewBox="0 0 320 120" className="h-28 w-full">
-      <circle cx="40" cy="60" r="14" fill="#C9803C" />
+      <circle cx="40" cy="60" r="14" style={{ fill: 'rgb(var(--cc-copper-500))' }} />
       <circle cx="40" cy="60" r="6" fill="#060A08" />
-      <circle cx="280" cy="60" r="14" fill="#C9803C" />
+      <circle cx="280" cy="60" r="14" style={{ fill: 'rgb(var(--cc-copper-500))' }} />
       <circle cx="280" cy="60" r="6" fill="#060A08" />
       <path
         d="M54 60 L150 60 L170 40 L266 40"
         fill="none"
-        stroke="#3FC47F"
+        style={{ stroke: 'rgb(var(--cc-pcb-400))' }}
         strokeWidth="3"
         strokeLinejoin="round"
         strokeDasharray="230"
@@ -23,7 +23,7 @@ const WiringAnim = memo(function WiringAnim() {
       >
         <animate attributeName="stroke-dashoffset" values="230;0;0;230" keyTimes="0;0.55;0.85;1" dur="2s" repeatCount="indefinite" />
       </path>
-      <circle r="3.5" fill="#6FE3A1">
+      <circle r="3.5" style={{ fill: 'rgb(var(--cc-pcb-300))' }}>
         <animateMotion dur="2s" repeatCount="indefinite" path="M54 60 L150 60 L170 40 L266 40" keyPoints="0;1;1" keyTimes="0;0.55;1" calcMode="linear" />
       </circle>
     </svg>
@@ -34,29 +34,29 @@ const WiringAnim = memo(function WiringAnim() {
 const WaveAnim = memo(function WaveAnim() {
   return (
     <svg viewBox="0 0 320 120" className="h-28 w-full">
-      <path d="M0 60 H320" stroke="#1B2E24" strokeWidth="1" />
-      <path d="M0 20 V100 M160 20 V100" stroke="#1B2E24" strokeWidth="1" strokeDasharray="3 4" />
+      <path d="M0 60 H320" style={{ stroke: 'rgb(var(--cc-ink-700))' }} strokeWidth="1" />
+      <path d="M0 20 V100 M160 20 V100" style={{ stroke: 'rgb(var(--cc-ink-700))' }} strokeWidth="1" strokeDasharray="3 4" />
       <path id="inwave" d="M0 60 C13 20 27 20 40 60 C53 100 67 100 80 60 C93 20 107 20 120 60 C133 100 147 100 160 60 C173 20 187 20 200 60 C213 100 227 100 240 60 C253 20 267 20 280 60 C293 100 307 100 320 60"
-        fill="none" stroke="#45DCE8" strokeWidth="2" strokeDasharray="420" strokeDashoffset="0">
+        fill="none" style={{ stroke: 'var(--col-sig-cyan)' }} strokeWidth="2" strokeDasharray="420" strokeDashoffset="0">
         <animate attributeName="stroke-dashoffset" from="420" to="0" dur="3s" repeatCount="indefinite" />
       </path>
-      <path d="M160 60 C180 58 200 58 220 59 C250 60 280 60 320 60" fill="none" stroke="#E56BD6" strokeWidth="2" opacity="0.9">
+      <path d="M160 60 C180 58 200 58 220 59 C250 60 280 60 320 60" fill="none" style={{ stroke: 'var(--col-sig-magenta)' }} strokeWidth="2" opacity="0.9">
         <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.45;0.6;0.9;1" dur="3s" repeatCount="indefinite" />
       </path>
-      <text x="8" y="16" fontSize="9" fontFamily="'JetBrains Mono',monospace" fill="#45DCE8">CH1 IN</text>
-      <text x="248" y="16" fontSize="9" fontFamily="'JetBrains Mono',monospace" fill="#E56BD6">CH2 OUT</text>
+      <text x="8" y="16" fontSize="9" fontFamily="'JetBrains Mono',monospace" style={{ fill: 'var(--col-sig-cyan)' }}>CH1 IN</text>
+      <text x="248" y="16" fontSize="9" fontFamily="'JetBrains Mono',monospace" style={{ fill: 'var(--col-sig-magenta)' }}>CH2 OUT</text>
     </svg>
   );
 });
 
 /** 卡 3：Gerber 层叠展开（4s loop） */
 const LayersAnim = memo(function LayersAnim() {
-  const layers = ['#3FC47F', '#C9803C', '#45DCE8', '#E0A458'];
+  const layers = ['rgb(var(--cc-pcb-400))', 'rgb(var(--cc-copper-500))', 'var(--col-sig-cyan)', 'rgb(var(--cc-copper-400))'];
   return (
     <svg viewBox="0 0 320 120" className="h-28 w-full">
       {layers.map((c, i) => (
         <g key={c}>
-          <rect x="90" y="20" width="140" height="60" rx="4" fill="none" stroke={c} strokeWidth="2" opacity="0.9"
+          <rect x="90" y="20" width="140" height="60" rx="4" fill="none" style={{ stroke: c }} strokeWidth="2" opacity="0.9"
             transform={`translate(${i * 8}, ${i * 10})`}>
             <animateTransform attributeName="transform" type="translate"
               values={`0 0;${i * 8} ${i * 10};${i * 8} ${i * 10};0 0`} keyTimes="0;0.4;0.75;1"
@@ -64,7 +64,7 @@ const LayersAnim = memo(function LayersAnim() {
           </rect>
         </g>
       ))}
-      <text x="8" y="112" fontSize="9" fontFamily="'JetBrains Mono',monospace" fill="#8E8976">GERBER · 2 LAYERS · HASL</text>
+      <text x="8" y="112" fontSize="9" fontFamily="'JetBrains Mono',monospace" style={{ fill: 'var(--col-silk-500)' }}>GERBER · 2 LAYERS · HASL</text>
     </svg>
   );
 });

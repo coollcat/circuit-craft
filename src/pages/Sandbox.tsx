@@ -1,4 +1,4 @@
-// 自由沙盒 /sandbox —— 全部件解锁自由搭建 + 函数发生器 + 5 槽存档 + 分享码 + 老手挑战 + CSV 导出
+﻿// 自由沙盒 /sandbox —— 全部件解锁自由搭建 + 函数发生器 + 5 槽存档 + 分享码 + 老手挑战 + CSV 导出
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -644,7 +644,7 @@ export default function Sandbox() {
       <AnimatePresence>
         {importOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[65] flex items-center justify-center bg-ink-950/70 backdrop-blur-[8px]">
+            className="fixed inset-0 z-[65] flex items-center justify-center cc-scrim backdrop-blur-[8px]">
             <motion.div initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} className="panel-raised w-[480px] rounded-xl p-6">
               <h3 className="mb-2 text-lg font-bold text-silk-100">导入分享码</h3>
               <p className="mb-3 text-xs text-silk-500">粘贴以 CCT1- 开头的分享码：</p>

@@ -86,11 +86,12 @@ function traceSeg(x1: number, y1: number, x2: number, y2: number): string {
 
 type PadState = 'locked' | 'open' | 'done' | 'current';
 
+// 焊盘配色走主题变量（style 消费）：暗=阻焊板，亮=图纸纸面
 const PAD_STYLE: Record<PadState, { ring: string; fill: string; text: string }> = {
-  locked: { ring: '#1B2E24', fill: '#0E1611', text: '#55524A' },
-  open: { ring: '#2E9E63', fill: '#0E1611', text: '#6FE3A1' },
-  done: { ring: '#E0A458', fill: '#F0C078', text: '#060A08' },
-  current: { ring: '#45DCE8', fill: '#13211A', text: '#45DCE8' },
+  locked: { ring: 'rgb(var(--bd-line))', fill: 'rgb(var(--bd-pad))', text: 'rgb(var(--cc-silk-700))' },
+  open: { ring: 'rgb(var(--cc-pcb-500))', fill: 'rgb(var(--bd-pad))', text: 'rgb(var(--cc-pcb-300))' },
+  done: { ring: 'rgb(var(--cc-copper-400))', fill: 'rgb(var(--cc-copper-300))', text: 'rgb(var(--cc-ink-950))' },
+  current: { ring: 'rgb(var(--cc-sig-cyan))', fill: 'rgb(var(--bd-hole))', text: 'rgb(var(--cc-sig-cyan))' },
 };
 
 const GUIDE_KEY = 'cc-guide-chapters-v1';
@@ -243,13 +244,8 @@ export default function Chapters() {
     return () => clearTimeout(t);
   }, [shake]);
 
+  // 允许点击任意焊盘进入关卡（未解锁也可进入，进度系统会照常记录）
   const clickPad = (p: PadPos) => {
-    const st = stateOf(p.level);
-    if (st === 'locked') {
-      setShake(p.level.id);
-      setToast('先通关前面的关卡哦');
-      return;
-    }
     navigate(`/play/${p.level.id}`);
   };
 
@@ -416,15 +412,15 @@ export default function Chapters() {
           >
             <svg width={BOARD_W} height={BOARD_H} className="block">
               {/* 主板底色与邮票孔边缘 */}
-              <rect x="20" y="80" width={BOARD_W - 40} height={BOARD_H - 120} rx="12" fill="#0A100D" stroke="#1B2E24" strokeWidth="2" />
+              <rect x="20" y="80" width={BOARD_W - 40} height={BOARD_H - 120} rx="12" style={{ fill: 'rgb(var(--bd-bg))', stroke: 'rgb(var(--bd-line))' }} strokeWidth="2" />
               {Array.from({ length: 24 }).map((_, i) => (
-                <circle key={`t${i}`} cx={60 + i * 60} cy={86} r="4" fill="#13211A" stroke="#26402F" />
+                <circle key={`t${i}`} cx={60 + i * 60} cy={86} r="4" style={{ fill: 'rgb(var(--bd-hole))', stroke: 'rgb(var(--bd-hole-line))' }} />
               ))}
               {Array.from({ length: 24 }).map((_, i) => (
-                <circle key={`b${i}`} cx={60 + i * 60} cy={BOARD_H - 46} r="4" fill="#13211A" stroke="#26402F" />
+                <circle key={`b${i}`} cx={60 + i * 60} cy={BOARD_H - 46} r="4" style={{ fill: 'rgb(var(--bd-hole))', stroke: 'rgb(var(--bd-hole-line))' }} />
               ))}
-              <text x="40" y="106" fill="#55524A" fontSize="11" fontFamily="JetBrains Mono">MAINBOARD · REV A</text>
-              <text x={BOARD_W - 200} y={106} fill="#55524A" fontSize="11" fontFamily="JetBrains Mono">SN 2024-CC-001</text>
+              <text x="40" y="106" style={{ fill: 'rgb(var(--cc-silk-700))' }} fontSize="11" fontFamily="JetBrains Mono">MAINBOARD · REV A</text>
+              <text x={BOARD_W - 200} y={106} style={{ fill: 'rgb(var(--cc-silk-700))' }} fontSize="11" fontFamily="JetBrains Mono">SN 2024-CC-001</text>
 
               {/* 章节功能区（丝印边框） */}
               {CHAPTER_META.map((meta, zi) => {
@@ -432,7 +428,7 @@ export default function Chapters() {
                 const Icon = meta.icon;
                 return (
                   <g key={meta.chapter}>
-                    <rect x={z.x} y={z.y} width={z.w} height={z.h} rx="8" fill="none" stroke="#26402F" strokeWidth="1.5" strokeDasharray="6 4" />
+                    <rect x={z.x} y={z.y} width={z.w} height={z.h} rx="8" fill="none" style={{ stroke: 'rgb(var(--bd-line-soft))' }} strokeWidth="1.5" strokeDasharray="6 4" />
                     <g
                       className="cursor-pointer"
                       onClick={e => {
@@ -440,7 +436,7 @@ export default function Chapters() {
                         setDrawerCh(meta.chapter);
                       }}
                     >
-                      <rect x={z.x + 12} y={z.y - 14} width={z.w - 24} height="28" rx="6" fill="#0E1611" stroke="#1B2E24" />
+                      <rect x={z.x + 12} y={z.y - 14} width={z.w - 24} height="28" rx="6" style={{ fill: 'rgb(var(--bd-pad))', stroke: 'rgb(var(--bd-line))' }} />
                       <foreignObject x={z.x + 20} y={z.y - 12} width={z.w - 40} height="24">
                         <div className="flex h-6 items-center gap-2">
                           <span className="flex h-5 w-5 items-center justify-center rounded-full border border-copper-500/60">
@@ -451,7 +447,7 @@ export default function Chapters() {
                         </div>
                       </foreignObject>
                     </g>
-                    <text x={z.x + 16} y={z.y + z.h - 12} fill="#55524A" fontSize="11" fontFamily="JetBrains Mono" letterSpacing="1">
+                    <text x={z.x + 16} y={z.y + z.h - 12} style={{ fill: 'rgb(var(--cc-silk-700))' }} fontSize="11" fontFamily="JetBrains Mono" letterSpacing="1">
                       {meta.gag}
                     </text>
                   </g>
@@ -459,19 +455,18 @@ export default function Chapters() {
               })}
 
               {/* 主走线（暗淡底层） */}
-              <path d={tracePath} fill="none" stroke="#9A5E28" strokeWidth="4" strokeOpacity="0.35" strokeLinejoin="round" />
+              <path d={tracePath} fill="none" style={{ stroke: 'rgb(var(--cc-copper-600))' }} strokeWidth="4" strokeOpacity="0.35" strokeLinejoin="round" />
               {/* 已点亮走线 */}
               {litPath && (
                 <motion.path
                   d={litPath}
                   fill="none"
-                  stroke="#3FC47F"
+                  style={{ stroke: 'rgb(var(--cc-pcb-400))', filter: 'drop-shadow(0 0 4px rgba(63,196,127,0.55))' }}
                   strokeWidth="4"
                   strokeLinejoin="round"
                   initial={{ pathLength: 0 }}
                   animate={{ pathLength: 1 }}
                   transition={{ duration: 1.2, ease: 'easeInOut' }}
-                  style={{ filter: 'drop-shadow(0 0 4px rgba(63,196,127,0.55))' }}
                 />
               )}
 
@@ -484,13 +479,13 @@ export default function Chapters() {
                     {ch2last && (
                       <path
                         d={`M ${ch2last.x} ${ch2last.y} ${traceSeg(ch2last.x, ch2last.y, PORTAL_A.x, PORTAL_A.y)}`}
-                        fill="none" stroke="#5B8DEF" strokeWidth="3" strokeOpacity={sideAOpen ? 0.9 : 0.3} strokeLinejoin="round" strokeDasharray={sideAOpen ? '' : '6 5'}
+                        fill="none" style={{ stroke: 'rgb(var(--cc-sig-blue))' }} strokeWidth="3" strokeOpacity={sideAOpen ? 0.9 : 0.3} strokeLinejoin="round" strokeDasharray={sideAOpen ? '' : '6 5'}
                       />
                     )}
                     {ch5last && (
                       <path
                         d={`M ${ch5last.x} ${ch5last.y} ${traceSeg(ch5last.x, ch5last.y, PORTAL_B.x, PORTAL_B.y)}`}
-                        fill="none" stroke="#5B8DEF" strokeWidth="3" strokeOpacity={sideBOpen ? 0.9 : 0.3} strokeLinejoin="round" strokeDasharray={sideBOpen ? '' : '6 5'}
+                        fill="none" style={{ stroke: 'rgb(var(--cc-sig-blue))' }} strokeWidth="3" strokeOpacity={sideBOpen ? 0.9 : 0.3} strokeLinejoin="round" strokeDasharray={sideBOpen ? '' : '6 5'}
                       />
                     )}
                   </>
@@ -511,8 +506,8 @@ export default function Chapters() {
                     else setToast(name === '支线 A' ? '通关主线第 2 章解锁支线 A' : '通关主线第 5 章解锁支线 B');
                   }}
                 >
-                  <rect x={p.x - 20} y={p.y - 20} width="40" height="40" rx="6" fill={open ? '#13211A' : '#0E1611'} stroke={open ? '#5B8DEF' : '#1B2E24'} strokeWidth="2" />
-                  <text x={p.x} y={p.y + 5} textAnchor="middle" fill={open ? '#5B8DEF' : '#55524A'} fontSize="13" fontWeight="bold" fontFamily="Orbitron">
+                  <rect x={p.x - 20} y={p.y - 20} width="40" height="40" rx="6" style={{ fill: open ? 'rgb(var(--bd-hole))' : 'rgb(var(--bd-pad))', stroke: open ? 'rgb(var(--cc-sig-blue))' : 'rgb(var(--bd-line))' }} strokeWidth="2" />
+                  <text x={p.x} y={p.y + 5} textAnchor="middle" style={{ fill: open ? 'rgb(var(--cc-sig-blue))' : 'rgb(var(--cc-silk-700))' }} fontSize="13" fontWeight="bold" fontFamily="Orbitron">
                     {label}
                   </text>
                   {!open && (
@@ -520,7 +515,7 @@ export default function Chapters() {
                       <Lock className="h-3 w-3 text-silk-700" />
                     </foreignObject>
                   )}
-                  <text x={p.x} y={p.y + 36} textAnchor="middle" fill="#55524A" fontSize="10" fontFamily="JetBrains Mono">
+                  <text x={p.x} y={p.y + 36} textAnchor="middle" style={{ fill: 'rgb(var(--cc-silk-700))' }} fontSize="10" fontFamily="JetBrains Mono">
                     {name}
                   </text>
                 </g>
@@ -535,20 +530,20 @@ export default function Chapters() {
                   else setToast('通关第 6 章解锁毕业设计');
                 }}
               >
-                <circle cx={GRAD_PAD.x} cy={GRAD_PAD.y} r={GRAD_PAD.r + 6} fill="none" stroke="#C9803C" strokeOpacity="0.4" strokeWidth="2" />
-                <circle cx={GRAD_PAD.x} cy={GRAD_PAD.y} r={GRAD_PAD.r} fill="url(#gradGold)" stroke="#E0A458" strokeWidth="2" />
+                <circle cx={GRAD_PAD.x} cy={GRAD_PAD.y} r={GRAD_PAD.r + 6} fill="none" style={{ stroke: 'rgb(var(--cc-copper-500))' }} strokeOpacity="0.4" strokeWidth="2" />
+                <circle cx={GRAD_PAD.x} cy={GRAD_PAD.y} r={GRAD_PAD.r} fill="url(#gradGold)" style={{ stroke: 'rgb(var(--cc-copper-400))' }} strokeWidth="2" />
                 <foreignObject x={GRAD_PAD.x - 14} y={GRAD_PAD.y - 14} width="28" height="28">
                   <GraduationCap className="h-7 w-7 text-ink-950" />
                 </foreignObject>
                 {!gradOpen && (
                   <text
-                    x={GRAD_PAD.x} y={GRAD_PAD.y + 44} textAnchor="middle" fill="#C9803C" fillOpacity="0.6"
+                    x={GRAD_PAD.x} y={GRAD_PAD.y + 44} textAnchor="middle" style={{ fill: 'rgb(var(--cc-copper-500))' }} fillOpacity="0.6"
                     fontSize="11" fontFamily="JetBrains Mono" transform={`rotate(-45 ${GRAD_PAD.x} ${GRAD_PAD.y + 40})`}
                   >
                     QC PASS
                   </text>
                 )}
-                <text x={GRAD_PAD.x} y={GRAD_PAD.y + (gradOpen ? 44 : 60)} textAnchor="middle" fill="#8E8976" fontSize="11" fontFamily="JetBrains Mono">
+                <text x={GRAD_PAD.x} y={GRAD_PAD.y + (gradOpen ? 44 : 60)} textAnchor="middle" style={{ fill: 'rgb(var(--cc-silk-500))' }} fontSize="11" fontFamily="JetBrains Mono">
                   毕业设计
                 </text>
               </g>
@@ -580,28 +575,28 @@ export default function Chapters() {
                     {/* 当前关脉冲环 */}
                     {st === 'current' && (
                       <motion.circle
-                        cx={p.x} cy={p.y} r="18" fill="none" stroke="#45DCE8" strokeWidth="2"
+                        cx={p.x} cy={p.y} r="18" fill="none" strokeWidth="2"
+                        style={{ stroke: 'rgb(var(--cc-sig-cyan))', transformOrigin: `${p.x}px ${p.y}px` }}
                         animate={{ scale: [1, 1.35], opacity: [0.9, 0] }}
                         transition={{ duration: 1.5, repeat: Infinity }}
-                        style={{ transformOrigin: `${p.x}px ${p.y}px` }}
                       />
                     )}
                     {/* 可玩呼吸 */}
                     {st === 'open' && (
                       <motion.circle
-                        cx={p.x} cy={p.y} r="16" fill="none" stroke="#2E9E63" strokeWidth="2"
+                        cx={p.x} cy={p.y} r="16" fill="none" stroke="rgb(var(--cc-pcb-500))" strokeWidth="2"
                         animate={{ opacity: [0.5, 1, 0.5] }}
                         transition={{ duration: 2, repeat: Infinity }}
                       />
                     )}
                     <motion.circle
                       cx={p.x} cy={p.y} r="14"
-                      fill={s.fill} stroke={s.ring} strokeWidth="2.5"
+                      style={{ fill: s.fill, stroke: s.ring }} strokeWidth="2.5"
                       animate={shake === p.level.id ? { x: [0, -3, 3, -3, 3, 0] } : {}}
                       transition={{ duration: 0.3 }}
                     />
                     {st === 'done' ? (
-                      <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="11" fontWeight="bold" fill={s.text} fontFamily="JetBrains Mono">
+                      <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="11" fontWeight="bold" style={{ fill: s.text }} fontFamily="JetBrains Mono">
                         {'★'.repeat(Math.max(starCount, 1))}
                       </text>
                     ) : st === 'locked' ? (
@@ -609,7 +604,7 @@ export default function Chapters() {
                         <Lock className="h-3 w-3 text-silk-700" />
                       </foreignObject>
                     ) : (
-                      <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="10" fontWeight="bold" fill={s.text} fontFamily="JetBrains Mono">
+                      <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="10" fontWeight="bold" style={{ fill: s.text }} fontFamily="JetBrains Mono">
                         {p.level.chapter}-{p.level.index}
                       </text>
                     )}
@@ -619,9 +614,9 @@ export default function Chapters() {
 
               <defs>
                 <linearGradient id="gradGold" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#9A5E28" />
-                  <stop offset="55%" stopColor="#C9803C" />
-                  <stop offset="100%" stopColor="#F0C078" />
+                  <stop offset="0%" style={{ stopColor: 'rgb(var(--cc-copper-600))' }} />
+                  <stop offset="55%" style={{ stopColor: 'rgb(var(--cc-copper-500))' }} />
+                  <stop offset="100%" style={{ stopColor: 'rgb(var(--cc-copper-300))' }} />
                 </linearGradient>
               </defs>
             </svg>
@@ -630,16 +625,16 @@ export default function Chapters() {
           {/* 小地图 */}
           <div className="panel absolute right-4 top-4 z-10 rounded-md p-1.5">
             <svg width="120" height="80" viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}>
-              <rect x="20" y="80" width={BOARD_W - 40} height={BOARD_H - 120} fill="#0A100D" stroke="#26402F" />
+              <rect x="20" y="80" width={BOARD_W - 40} height={BOARD_H - 120} style={{ fill: 'rgb(var(--bd-bg))', stroke: 'rgb(var(--bd-line-soft))' }} />
               {ZONES.map((z, i) => (
-                <rect key={i} x={z.x} y={z.y} width={z.w} height={z.h} fill="none" stroke="#2E9E63" strokeOpacity="0.6" strokeWidth="6" />
+                <rect key={i} x={z.x} y={z.y} width={z.w} height={z.h} fill="none" style={{ stroke: 'rgb(var(--cc-pcb-500))' }} strokeOpacity="0.6" strokeWidth="6" />
               ))}
               {/* 视口框：板坐标 = (容器坐标 - 板偏移 24px - view 平移) / 缩放 */}
               <rect
                 x={(-view.x - BOARD_OX) / view.k} y={(-view.y - BOARD_OY) / view.k}
                 width={mapSize.w / view.k}
                 height={mapSize.h / view.k}
-                fill="none" stroke="#45DCE8" strokeWidth="8"
+                fill="none" style={{ stroke: 'rgb(var(--cc-sig-cyan))' }} strokeWidth="8"
               />
             </svg>
           </div>
@@ -685,7 +680,7 @@ export default function Chapters() {
             <>
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-                className="absolute inset-0 z-30 bg-ink-950/60 backdrop-blur-sm"
+                className="cc-scrim absolute inset-0 z-30 backdrop-blur-sm"
                 onClick={() => setDrawerCh(null)}
               />
               <motion.aside
@@ -729,7 +724,7 @@ export default function Chapters() {
                           <motion.button
                             key={l.id}
                             initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
-                            onClick={() => (st === 'locked' ? setToast('先通关前面的关卡哦') : (setDrawerCh(null), navigate(`/play/${l.id}`)))}
+                            onClick={() => (setDrawerCh(null), navigate(`/play/${l.id}`))}
                             className={cn(
                               'flex items-center gap-3 rounded-md border px-3 py-2 text-left text-xs transition-colors',
                               st === 'locked' ? 'border-ink-700 text-silk-700' : 'border-ink-600 text-silk-300 hover:border-pcb-400 hover:text-silk-100',
@@ -762,7 +757,7 @@ export default function Chapters() {
           {knowledgeOf && (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-              className="absolute inset-0 z-50 flex items-center justify-center bg-ink-950/70 backdrop-blur-sm"
+              className="cc-scrim absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
               onClick={() => setKnowledgeOf(null)}
             >
               <motion.div
@@ -798,7 +793,7 @@ export default function Chapters() {
           {guideStep >= 0 && (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
-              className="absolute inset-0 z-[60] flex items-center justify-center bg-ink-950/80"
+              className="cc-scrim absolute inset-0 z-[60] flex items-center justify-center"
               onClick={() => {
                 if (guideStep < guideSteps.length - 1) setGuideStep(guideStep + 1);
                 else {

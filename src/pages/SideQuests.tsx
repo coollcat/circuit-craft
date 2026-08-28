@@ -1,4 +1,4 @@
-// 支线任务 Side Quests（/sidequests）—— 双支线蓝色岔路地图与关卡入口
+﻿// 支线任务 Side Quests（/sidequests）—— 双支线蓝色岔路地图与关卡入口
 // 支线 A「ESP32 单片机入门」6 关 / 支线 B「进阶信号处理」5 关 + 支线毕业设计介绍卡
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -206,13 +206,13 @@ export default function SideQuests() {
                   <svg className="absolute left-0 top-[52px] h-2 w-full" preserveAspectRatio="none" viewBox="0 0 1000 8">
                     <motion.path
                       d="M0 4 L1000 4"
-                      fill="none" stroke="#5B8DEF" strokeWidth="3" strokeOpacity={open ? 0.8 : 0.35}
+                      fill="none" style={{ stroke: 'rgb(var(--cc-sig-blue))' }} strokeWidth="3" strokeOpacity={open ? 0.8 : 0.35}
                       initial={{ pathLength: 0 }}
                       animate={{ pathLength: 1 }}
                       transition={{ duration: 0.8, delay: 0.3 + ti * 0.2 }}
                     />
                     {!open && (
-                      <motion.circle r="4" fill="#5B8DEF" fillOpacity="0.5">
+                      <motion.circle r="4" style={{ fill: 'rgb(var(--cc-sig-blue))' }} fillOpacity="0.5">
                         <animateMotion dur="6s" repeatCount="indefinite" path="M0 4 L1000 4" />
                       </motion.circle>
                     )}
@@ -375,7 +375,7 @@ export default function SideQuests() {
         {showBoard && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/75 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center cc-scrim backdrop-blur-sm"
             onClick={() => setShowBoard(false)}
           >
             <motion.div

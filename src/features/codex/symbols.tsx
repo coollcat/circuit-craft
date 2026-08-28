@@ -1,20 +1,21 @@
-/* eslint-disable react-refresh/only-export-components */
+﻿/* eslint-disable react-refresh/only-export-components */
 // IEC 风格自绘元件原理图符号
-// 统一约定：viewBox 0 0 96 48，2px 线宽，silk-100(#F2EFE3) 描边，端口圆点 sig-cyan(#45DCE8)
+// 统一约定：viewBox 0 0 96 48，2px 线宽，silk-100 描边，端口圆点 sig-cyan
+// 颜色走 --col-* 主题变量（经 style 消费，SVG 属性不支持 var()），明暗主题自动跟随
 import type { JSX } from 'react';
 
-const SILK = '#F2EFE3';
-const CYAN = '#45DCE8';
+const SILK = 'var(--col-silk-100)';
+const CYAN = 'var(--col-sig-cyan)';
 const SW = 2;
 
 function Port({ x, y }: { x: number; y: number }) {
-  return <circle cx={x} cy={y} r={3} fill={CYAN} />;
+  return <circle cx={x} cy={y} r={3} style={{ fill: CYAN }} />;
 }
 
 function Frame({ children, ports }: { children: React.ReactNode; ports: [number, number][] }) {
   return (
     <svg viewBox="0 0 96 48" className="h-full w-full" aria-hidden>
-      <g stroke={SILK} strokeWidth={SW} fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <g style={{ stroke: SILK }} strokeWidth={SW} fill="none" strokeLinecap="round" strokeLinejoin="round">
         {children}
       </g>
       {ports.map(([x, y], i) => (
@@ -56,7 +57,7 @@ export const SymInductor = () => (
 export const SymDiode = () => (
   <Frame ports={[[6, 24], [90, 24]]}>
     <path d="M6 24 H36" />
-    <path d="M36 12 L36 36 L62 24 Z" fill={SILK} />
+    <path d="M36 12 L36 36 L62 24 Z" style={{ fill: SILK }} />
     <path d="M62 12 V36" />
     <path d="M62 24 H90" />
   </Frame>
@@ -66,7 +67,7 @@ export const SymDiode = () => (
 export const SymLed = () => (
   <Frame ports={[[6, 24], [90, 24]]}>
     <path d="M6 24 H36" />
-    <path d="M36 12 L36 36 L62 24 Z" fill={SILK} />
+    <path d="M36 12 L36 36 L62 24 Z" style={{ fill: SILK }} />
     <path d="M62 12 V36" />
     <path d="M62 24 H90" />
     <path d="M46 10 L56 2 M56 2 l-6 1 M56 2 l-1 6" />
@@ -78,7 +79,7 @@ export const SymLed = () => (
 export const SymZener = () => (
   <Frame ports={[[6, 24], [90, 24]]}>
     <path d="M6 24 H36" />
-    <path d="M36 12 L36 36 L62 24 Z" fill={SILK} />
+    <path d="M36 12 L36 36 L62 24 Z" style={{ fill: SILK }} />
     <path d="M68 8 L62 12 V36 L56 40" />
     <path d="M62 24 H90" />
   </Frame>
@@ -88,9 +89,9 @@ export const SymZener = () => (
 export const SymSwitch = () => (
   <Frame ports={[[6, 24], [90, 24]]}>
     <path d="M6 24 H26" />
-    <circle cx="30" cy="24" r="2.5" fill={SILK} />
+    <circle cx="30" cy="24" r="2.5" style={{ fill: SILK }} />
     <path d="M30 24 L62 10" />
-    <circle cx="66" cy="24" r="2.5" fill={SILK} />
+    <circle cx="66" cy="24" r="2.5" style={{ fill: SILK }} />
     <path d="M70 24 H90" />
   </Frame>
 );
@@ -128,7 +129,7 @@ export const SymNmos = () => (
     <path d="M38 12 V20 M38 22 V26 M38 28 V36" />
     <path d="M38 16 H66 V10 H90" />
     <path d="M38 24 H52" />
-    <path d="M52 20 L52 28 L44 24 Z" fill={SILK} />
+    <path d="M52 20 L52 28 L44 24 Z" style={{ fill: SILK }} />
     <path d="M52 24 H66 V38 H90" />
   </Frame>
 );
@@ -142,7 +143,7 @@ export const SymPmos = () => (
     <path d="M38 12 V20 M38 22 V26 M38 28 V36" />
     <path d="M38 16 H66 V10 H90" />
     <path d="M38 24 H46" />
-    <path d="M46 20 L46 28 L54 24 Z" fill={SILK} />
+    <path d="M46 20 L46 28 L54 24 Z" style={{ fill: SILK }} />
     <path d="M54 24 H66 V38 H90" />
   </Frame>
 );
@@ -198,7 +199,7 @@ export const SymEsp32 = () => (
     <text
       x="34"
       y="33"
-      fill={SILK}
+      style={{ fill: SILK }}
       stroke="none"
       fontSize="9"
       fontFamily="JetBrains Mono, monospace"
@@ -290,7 +291,7 @@ export const SymMcu = () => (
     <rect x="24" y="6" width="48" height="36" rx="2" />
     <path d="M10 14 H24 M10 24 H24 M10 34 H24" />
     <path d="M72 14 H86 M72 24 H86 M72 34 H86" />
-    <text x="34" y="29" fill={SILK} stroke="none" fontSize="10" fontFamily="JetBrains Mono, monospace">
+    <text x="34" y="29" style={{ fill: SILK }} stroke="none" fontSize="10" fontFamily="JetBrains Mono, monospace">
       MCU
     </text>
   </Frame>
@@ -303,7 +304,7 @@ export const SymIc = () => (
     <path d="M14 14 H22 M14 24 H22 M14 34 H22" />
     <path d="M74 14 H82 M74 24 H82 M74 34 H82" />
     <path d="M44 6 a4 4 0 0 0 8 0" />
-    <circle cx="30" cy="13" r="1.5" fill={SILK} />
+    <circle cx="30" cy="13" r="1.5" style={{ fill: SILK }} />
   </Frame>
 );
 
@@ -315,15 +316,15 @@ export const SymModule = () => (
     <path d="M74 14 H82 M74 24 H82 M74 34 H82" />
     <rect x="30" y="12" width="20" height="14" rx="1.5" strokeWidth={1.5} />
     <path d="M56 12 h10 M56 17 h10 M56 22 h6" strokeWidth={1.5} />
-    <circle cx="30" cy="36" r="1.5" fill={SILK} />
+    <circle cx="30" cy="36" r="1.5" style={{ fill: SILK }} />
   </Frame>
 );
 
 /** 蜂鸣器（半圆罩 + 出声弧） */
 export const SymBuzzer = () => (
   <Frame ports={[[48, 44]]}>
-    <path d="M34 30 a14 14 0 0 1 28 0 Z" fill="none" stroke={SILK} strokeWidth={SW} />
-    <circle cx="48" cy="22" r="1.5" fill={SILK} stroke="none" />
+    <path d="M34 30 a14 14 0 0 1 28 0 Z" fill="none" style={{ stroke: SILK }} strokeWidth={SW} />
+    <circle cx="48" cy="22" r="1.5" style={{ fill: SILK }} stroke="none" />
     <path d="M66 16 a10 10 0 0 1 0 12 M72 12 a16 16 0 0 1 0 20" />
     <path d="M48 30 V44" />
   </Frame>
@@ -332,10 +333,10 @@ export const SymBuzzer = () => (
 /** 继电器（线圈框 + 触点） */
 export const SymRelay = () => (
   <Frame ports={[[16, 12], [16, 36], [70, 12], [86, 12]]}>
-    <rect x="16" y="6" width="16" height="36" fill="none" stroke={SILK} strokeWidth={SW} />
+    <rect x="16" y="6" width="16" height="36" fill="none" style={{ stroke: SILK }} strokeWidth={SW} />
     <path d="M16 42 L32 6" />
     <path d="M32 24 H54" strokeDasharray="3 3" />
-    <circle cx="62" cy="16" r="2" fill={SILK} stroke="none" />
+    <circle cx="62" cy="16" r="2" style={{ fill: SILK }} stroke="none" />
     <path d="M54 24 L62 16 M70 12 H62" />
     <path d="M62 16 L70 12" />
     <path d="M70 12 H86" />
@@ -346,7 +347,7 @@ export const SymRelay = () => (
 export const SymMotor = () => (
   <Frame ports={[[48, 6], [48, 42]]}>
     <circle cx="48" cy="24" r="14" />
-    <text x="48" y="29" fill={SILK} stroke="none" fontSize="12" textAnchor="middle" fontFamily="JetBrains Mono, monospace">M</text>
+    <text x="48" y="29" style={{ fill: SILK }} stroke="none" fontSize="12" textAnchor="middle" fontFamily="JetBrains Mono, monospace">M</text>
     <path d="M48 6 V10 M48 38 V42" />
   </Frame>
 );
@@ -354,21 +355,21 @@ export const SymMotor = () => (
 /** 舵机（方框 + 摇臂 + 三线） */
 export const SymServo = () => (
   <Frame ports={[[10, 12], [10, 24], [10, 36]]}>
-    <rect x="26" y="8" width="34" height="32" rx="3" fill="none" stroke={SILK} strokeWidth={SW} />
+    <rect x="26" y="8" width="34" height="32" rx="3" fill="none" style={{ stroke: SILK }} strokeWidth={SW} />
     <path d="M43 24 m-5 0 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0" />
     <path d="M43 24 L66 12" />
-    <circle cx="66" cy="12" r="2" fill={SILK} stroke="none" />
+    <circle cx="66" cy="12" r="2" style={{ fill: SILK }} stroke="none" />
     <path d="M10 12 H26 M10 24 H26 M10 36 H26" />
-    <text x="64" y="40" fill={SILK} stroke="none" fontSize="8" fontFamily="JetBrains Mono, monospace">SV</text>
+    <text x="64" y="40" style={{ fill: SILK }} stroke="none" fontSize="8" fontFamily="JetBrains Mono, monospace">SV</text>
   </Frame>
 );
 
 /** 数码管（方框 + 8.） */
 export const SymSeg7 = () => (
   <Frame ports={[[20, 10], [20, 24], [20, 38]]}>
-    <rect x="28" y="4" width="26" height="40" rx="2" fill="none" stroke={SILK} strokeWidth={SW} />
-    <text x="41" y="30" fill={SILK} stroke="none" fontSize="18" textAnchor="middle" fontFamily="JetBrains Mono, monospace">8</text>
-    <circle cx="48" cy="38" r="1.5" fill={SILK} stroke="none" />
+    <rect x="28" y="4" width="26" height="40" rx="2" fill="none" style={{ stroke: SILK }} strokeWidth={SW} />
+    <text x="41" y="30" style={{ fill: SILK }} stroke="none" fontSize="18" textAnchor="middle" fontFamily="JetBrains Mono, monospace">8</text>
+    <circle cx="48" cy="38" r="1.5" style={{ fill: SILK }} stroke="none" />
     <path d="M20 10 H28 M20 24 H28 M20 38 H28" />
   </Frame>
 );
@@ -390,7 +391,7 @@ export const SymThermistor = () => (
     <path d="M6 24 H26 M70 24 H90" />
     <rect x="26" y="15" width="44" height="18" />
     <path d="M30 12 L44 36" />
-    <text x="52" y="38" fill={SILK} stroke="none" fontSize="9" fontFamily="JetBrains Mono, monospace">t°</text>
+    <text x="52" y="38" style={{ fill: SILK }} stroke="none" fontSize="9" fontFamily="JetBrains Mono, monospace">t°</text>
   </Frame>
 );
 
@@ -398,7 +399,7 @@ export const SymThermistor = () => (
 export const SymSchottky = () => (
   <Frame ports={[[6, 24], [90, 24]]}>
     <path d="M6 24 H36" />
-    <path d="M36 12 L36 36 L62 24 Z" fill={SILK} />
+    <path d="M36 12 L36 36 L62 24 Z" style={{ fill: SILK }} />
     <path d="M62 12 V36 M62 24 H90" />
     <path d="M56 12 H62 V17 M62 31 V36 H68" />
   </Frame>
@@ -407,18 +408,18 @@ export const SymSchottky = () => (
 /** 线性稳压器（三端框 IN-GND-OUT） */
 export const SymLdo = () => (
   <Frame ports={[[10, 24], [48, 44], [86, 24]]}>
-    <rect x="24" y="8" width="48" height="28" rx="2" fill="none" stroke={SILK} strokeWidth={SW} />
+    <rect x="24" y="8" width="48" height="28" rx="2" fill="none" style={{ stroke: SILK }} strokeWidth={SW} />
     <path d="M10 24 H24 M72 24 H86 M48 36 V44" />
-    <text x="48" y="28" fill={SILK} stroke="none" fontSize="10" textAnchor="middle" fontFamily="JetBrains Mono, monospace">7805</text>
+    <text x="48" y="28" style={{ fill: SILK }} stroke="none" fontSize="10" textAnchor="middle" fontFamily="JetBrains Mono, monospace">7805</text>
   </Frame>
 );
 
 /** 555 定时器（8 脚框） */
 export const Sym555 = () => (
   <Frame ports={[[14, 12], [14, 24], [14, 36], [82, 12], [82, 24], [82, 36]]}>
-    <rect x="22" y="4" width="52" height="40" rx="2" fill="none" stroke={SILK} strokeWidth={SW} />
+    <rect x="22" y="4" width="52" height="40" rx="2" fill="none" style={{ stroke: SILK }} strokeWidth={SW} />
     <path d="M14 12 H22 M14 24 H22 M14 36 H22 M74 12 H82 M74 24 H82 M74 36 H82" />
-    <text x="48" y="28" fill={SILK} stroke="none" fontSize="11" textAnchor="middle" fontFamily="JetBrains Mono, monospace">555</text>
+    <text x="48" y="28" style={{ fill: SILK }} stroke="none" fontSize="11" textAnchor="middle" fontFamily="JetBrains Mono, monospace">555</text>
     <path d="M44 4 a4 4 0 0 0 8 0" />
   </Frame>
 );
@@ -437,8 +438,8 @@ export const SymTransformer = () => (
 export const SymSpeaker = () => (
   <Frame ports={[[10, 24]]}>
     <path d="M10 24 H28" />
-    <path d="M28 18 h8 v12 h-8 Z" fill="none" stroke={SILK} strokeWidth={SW} />
-    <path d="M36 18 L52 8 V40 L36 30" fill="none" stroke={SILK} strokeWidth={SW} />
+    <path d="M28 18 h8 v12 h-8 Z" fill="none" style={{ stroke: SILK }} strokeWidth={SW} />
+    <path d="M36 18 L52 8 V40 L36 30" fill="none" style={{ stroke: SILK }} strokeWidth={SW} />
     <path d="M58 18 a8 8 0 0 1 0 12 M64 13 a16 16 0 0 1 0 22" />
   </Frame>
 );

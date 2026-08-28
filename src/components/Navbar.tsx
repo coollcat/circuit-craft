@@ -84,7 +84,7 @@ export default function Navbar() {
                       <path
                         d="M0 5 L40 5 L46 1 L54 1 L60 5 L100 5"
                         fill="none"
-                        stroke="#3FC47F"
+                        style={{ stroke: 'rgb(var(--cc-pcb-400))' }}
                         strokeWidth="2"
                       />
                     </svg>

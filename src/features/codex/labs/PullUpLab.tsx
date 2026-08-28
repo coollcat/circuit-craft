@@ -19,8 +19,8 @@ const TRUTH: { mode: Mode; open: string; openV: number | null; closed: string }[
   { mode: 'none', open: '漂移 · 高阻', openV: null, closed: '0V · L' },
 ];
 
-const SILK = '#F2EFE3';
-const WIRE = { stroke: SILK, strokeWidth: 2, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+const SILK = 'var(--col-silk-100)';
+const WIRE = { style: { stroke: SILK }, strokeWidth: 2, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 const MONO = 'JetBrains Mono, monospace';
 
 export default function PullUpLab() {
@@ -43,7 +43,7 @@ export default function PullUpLab() {
 
   const voltage = floating ? noise[noise.length - 1] : mode === 'up' && !pressed ? 3.3 : 0;
   const currentMa = mode === 'up' && pressed ? 0.33 : 0;
-  const vColor = floating ? '#FFB84D' : voltage > 1.6 ? '#6FE3A1' : '#8E8976';
+  const vColor = floating ? 'rgb(var(--cc-sig-amber))' : voltage > 1.6 ? 'rgb(var(--cc-pcb-300))' : 'var(--col-silk-500)';
   const stateText = floating
     ? '高阻悬空 · 读数漂移'
     : voltage > 1.6
@@ -91,14 +91,14 @@ export default function PullUpLab() {
       {/* 电路场景 */}
       <svg viewBox="0 0 640 300" className="panel block w-full rounded-lg" style={{ height: 'auto' }}>
         {/* 3.3V 电源轨 */}
-        <line x1={90} y1={40} x2={330} y2={40} stroke="#C9803C" strokeWidth={3} strokeLinecap="round" />
-        <text x={86} y={34} fontSize={12} fill="#F0C078" fontFamily={MONO}>3.3V</text>
+        <line x1={90} y1={40} x2={330} y2={40} style={{ stroke: 'rgb(var(--cc-copper-500))' }} strokeWidth={3} strokeLinecap="round" />
+        <text x={86} y={34} fontSize={12} style={{ fill: 'rgb(var(--cc-copper-300))' }} fontFamily={MONO}>3.3V</text>
 
         {/* 上拉电阻（mode=up 实接 / mode=none 幽灵虚线 / mode=down 不画） */}
         {mode !== 'down' && (
           <g
             {...WIRE}
-            stroke={mode === 'none' ? '#55524A' : SILK}
+            style={{ stroke: mode === 'none' ? 'var(--col-silk-700)' : SILK }}
             strokeDasharray={mode === 'none' ? '5 4' : undefined}
             opacity={mode === 'none' ? 0.6 : 1}
           >
@@ -108,12 +108,12 @@ export default function PullUpLab() {
           </g>
         )}
         {mode === 'up' && (
-          <text x={236} y={84} fontSize={11} fill="#CFC9B4" fontFamily={MONO}>R 10kΩ</text>
+          <text x={236} y={84} fontSize={11} style={{ fill: 'var(--col-silk-300)' }} fontFamily={MONO}>R 10kΩ</text>
         )}
         {mode === 'none' && (
           <>
-            <text x={234} y={80} fontSize={13} fill="#FFB84D" fontFamily={MONO}>✕</text>
-            <text x={234} y={96} fontSize={10} fill="#8E8976" fontFamily={MONO}>未接</text>
+            <text x={234} y={80} fontSize={13} style={{ fill: 'rgb(var(--cc-sig-amber))' }} fontFamily={MONO}>✕</text>
+            <text x={234} y={96} fontSize={10} style={{ fill: 'var(--col-silk-500)' }} fontFamily={MONO}>未接</text>
           </>
         )}
 
@@ -123,21 +123,21 @@ export default function PullUpLab() {
             <line x1={220} y1={140} x2={140} y2={140} />
             <path d="M140 140 L146 148 L134 156 L146 164 L134 172 L146 180 L134 188 L140 196" />
             <line x1={140} y1={196} x2={140} y2={236} />
-            <text x={150} y={170} fontSize={11} fill="#CFC9B4" fontFamily={MONO} stroke="none">R 10kΩ</text>
+            <text x={150} y={170} fontSize={11} style={{ fill: 'var(--col-silk-300)' }} fontFamily={MONO} stroke="none">R 10kΩ</text>
           </g>
         )}
 
         {/* 节点 → 电压表 连线（随节点电平变色） */}
-        <line x1={220} y1={140} x2={388} y2={140} stroke={vColor} strokeWidth={2} opacity={0.9} />
-        <circle cx={220} cy={140} r={4.5} fill={vColor} style={floating ? { filter: 'drop-shadow(0 0 5px rgba(255,184,77,0.8))' } : voltage > 1.6 ? { filter: 'drop-shadow(0 0 5px rgba(111,227,161,0.8))' } : undefined} />
-        <text x={210} y={132} fontSize={10} fill="#8E8976" fontFamily={MONO} textAnchor="end">节点</text>
+        <line x1={220} y1={140} x2={388} y2={140} style={{ stroke: vColor }} strokeWidth={2} opacity={0.9} />
+        <circle cx={220} cy={140} r={4.5} style={{ fill: vColor, ...(floating ? { filter: 'drop-shadow(0 0 5px rgba(255,184,77,0.8))' } : voltage > 1.6 ? { filter: 'drop-shadow(0 0 5px rgba(111,227,161,0.8))' } : {}) }} />
+        <text x={210} y={132} fontSize={10} style={{ fill: 'var(--col-silk-500)' }} fontFamily={MONO} textAnchor="end">节点</text>
 
         {/* 节点 → 按键 → 地 */}
         <line x1={220} y1={140} x2={220} y2={180} {...WIRE} />
-        <circle cx={220} cy={180} r={2.5} fill={SILK} />
-        <circle cx={220} cy={206} r={2.5} fill={SILK} />
+        <circle cx={220} cy={180} r={2.5} style={{ fill: SILK }} />
+        <circle cx={220} cy={206} r={2.5} style={{ fill: SILK }} />
         {pressed ? (
-          <line x1={220} y1={180} x2={220} y2={206} stroke="#F0C078" strokeWidth={2.5} strokeLinecap="round" />
+          <line x1={220} y1={180} x2={220} y2={206} style={{ stroke: 'rgb(var(--cc-copper-300))' }} strokeWidth={2.5} strokeLinecap="round" />
         ) : (
           <g {...WIRE}>
             <line x1={206} y1={171} x2={234} y2={171} />
@@ -145,7 +145,7 @@ export default function PullUpLab() {
           </g>
         )}
         <line x1={220} y1={206} x2={220} y2={236} {...WIRE} />
-        <text x={240} y={198} fontSize={10} fill="#8E8976" fontFamily={MONO}>SW 按键 → GND</text>
+        <text x={240} y={198} fontSize={10} style={{ fill: 'var(--col-silk-500)' }} fontFamily={MONO}>SW 按键 → GND</text>
         {/* 按键热区（SVG 上也可按住） */}
         <rect x={196} y={158} width={48} height={62} fill="transparent" style={{ cursor: 'pointer' }} {...hold}>
           <title>按住 = 闭合到地</title>
@@ -153,32 +153,32 @@ export default function PullUpLab() {
 
         {/* 电压表 */}
         <circle cx={414} cy={140} r={24} {...WIRE} />
-        <text x={414} y={146} fontSize={15} fill="#45DCE8" fontFamily={MONO} textAnchor="middle">V</text>
+        <text x={414} y={146} fontSize={15} style={{ fill: 'var(--col-sig-cyan)' }} fontFamily={MONO} textAnchor="middle">V</text>
         <line x1={414} y1={164} x2={414} y2={236} {...WIRE} />
-        <text x={450} y={128} fontSize={10} fill="#8E8976" fontFamily={MONO}>节点电压</text>
-        <text x={450} y={150} fontSize={20} fontWeight={700} fill={vColor} fontFamily={MONO}>
+        <text x={450} y={128} fontSize={10} style={{ fill: 'var(--col-silk-500)' }} fontFamily={MONO}>节点电压</text>
+        <text x={450} y={150} fontSize={20} fontWeight={700} style={{ fill: vColor }} fontFamily={MONO}>
           {voltage.toFixed(2)}V
         </text>
-        <text x={450} y={168} fontSize={11} fill={vColor} fontFamily={MONO}>{stateText}</text>
+        <text x={450} y={168} fontSize={11} style={{ fill: vColor }} fontFamily={MONO}>{stateText}</text>
 
         {/* 悬空漂移小波形 */}
         {floating && (
           <g>
-            <rect x={246} y={96} width={106} height={36} fill="none" stroke="#55524A" strokeWidth={1} strokeDasharray="3 3" />
+            <rect x={246} y={96} width={106} height={36} fill="none" style={{ stroke: 'var(--col-silk-700)' }} strokeWidth={1} strokeDasharray="3 3" />
             <polyline
               points={noise.map((v, i) => `${246 + (i / (noise.length - 1)) * 106},${128 - (v / 3.3) * 28}`).join(' ')}
               fill="none"
-              stroke="#FFB84D"
+              style={{ stroke: 'rgb(var(--cc-sig-amber))' }}
               strokeWidth={1.5}
             />
-            <text x={246} y={90} fontSize={9} fill="#FFB84D" fontFamily={MONO}>悬空漂移 ⚠</text>
+            <text x={246} y={90} fontSize={9} style={{ fill: 'rgb(var(--cc-sig-amber))' }} fontFamily={MONO}>悬空漂移 ⚠</text>
           </g>
         )}
 
         {/* 地线母排 + 接地符号 */}
-        <line x1={110} y1={236} x2={430} y2={236} stroke="#8E8976" strokeWidth={2} />
+        <line x1={110} y1={236} x2={430} y2={236} style={{ stroke: 'var(--col-silk-500)' }} strokeWidth={2} />
         {[220, 414].map(x => (
-          <g key={x} {...WIRE} stroke="#8E8976">
+          <g key={x} {...WIRE} style={{ stroke: 'var(--col-silk-500)' }}>
             <line x1={x - 10} y1={242} x2={x + 10} y2={242} />
             <line x1={x - 6} y1={248} x2={x + 6} y2={248} />
             <line x1={x - 2.5} y1={254} x2={x + 2.5} y2={254} />

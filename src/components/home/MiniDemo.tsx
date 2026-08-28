@@ -186,10 +186,13 @@ export default function MiniDemo() {
                 key={i}
                 d={tracePath(a.x, a.y, b.x, b.y)}
                 fill="none"
-                stroke={lit ? '#3FC47F' : '#C9803C'}
                 strokeWidth="3"
                 strokeLinejoin="round"
-                style={lit ? { filter: 'drop-shadow(0 0 5px rgba(63,196,127,0.6))' } : undefined}
+                style={
+                  lit
+                    ? { stroke: 'rgb(var(--cc-pcb-400))', filter: 'drop-shadow(0 0 5px rgba(63,196,127,0.6))' }
+                    : { stroke: 'rgb(var(--cc-copper-500))' }
+                }
               />
             );
           })}
@@ -198,7 +201,7 @@ export default function MiniDemo() {
             <path
               d={tracePath(PORTS[dragFrom].x, PORTS[dragFrom].y, mouse.x, mouse.y)}
               fill="none"
-              stroke="#45DCE8"
+              style={{ stroke: 'var(--col-sig-cyan)' }}
               strokeWidth="2"
               strokeDasharray="6 5"
             />
@@ -206,25 +209,25 @@ export default function MiniDemo() {
 
           {/* 电池 5V */}
           <g>
-            <rect x="120" y="140" width="70" height="260" rx="8" fill="#13211A" stroke="#1B2E24" strokeWidth="2" />
-            <text x="155" y="128" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="14" fill="#45DCE8">BT1</text>
-            <text x="155" y="278" textAnchor="middle" fontSize="13" fill="#CFC9B4">5V</text>
-            <text x="155" y="296" textAnchor="middle" fontSize="10" fill="#8E8976">电池</text>
-            <path d="M150 160 h24 M162 148 v24" stroke="#F2EFE3" strokeWidth="3" />
-            <path d="M150 380 h24" stroke="#F2EFE3" strokeWidth="5" />
+            <rect x="120" y="140" width="70" height="260" rx="8" style={{ fill: 'rgb(var(--cc-ink-800))', stroke: 'rgb(var(--cc-ink-700))' }} strokeWidth="2" />
+            <text x="155" y="128" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="14" style={{ fill: 'var(--col-sig-cyan)' }}>BT1</text>
+            <text x="155" y="278" textAnchor="middle" fontSize="13" style={{ fill: 'var(--col-silk-300)' }}>5V</text>
+            <text x="155" y="296" textAnchor="middle" fontSize="10" style={{ fill: 'var(--col-silk-500)' }}>电池</text>
+            <path d="M150 160 h24 M162 148 v24" style={{ stroke: 'var(--col-silk-100)' }} strokeWidth="3" />
+            <path d="M150 380 h24" style={{ stroke: 'var(--col-silk-100)' }} strokeWidth="5" />
           </g>
 
           {/* 电阻 220Ω */}
           <g>
-            <text x="495" y="128" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="14" fill="#45DCE8">R1</text>
-            <rect x="430" y="160" width="130" height="30" rx="3" fill="#13211A" stroke="#F2EFE3" strokeWidth="2" />
-            <text x="495" y="181" textAnchor="middle" fontSize="13" fontFamily="'JetBrains Mono',monospace" fill="#CFC9B4">220Ω</text>
-            <text x="495" y="222" textAnchor="middle" fontSize="10" fill="#8E8976">限流电阻</text>
+            <text x="495" y="128" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="14" style={{ fill: 'var(--col-sig-cyan)' }}>R1</text>
+            <rect x="430" y="160" width="130" height="30" rx="3" style={{ fill: 'rgb(var(--cc-ink-800))', stroke: 'var(--col-silk-100)' }} strokeWidth="2" />
+            <text x="495" y="181" textAnchor="middle" fontSize="13" fontFamily="'JetBrains Mono',monospace" style={{ fill: 'var(--col-silk-300)' }}>220Ω</text>
+            <text x="495" y="222" textAnchor="middle" fontSize="10" style={{ fill: 'var(--col-silk-500)' }}>限流电阻</text>
           </g>
 
           {/* LED（红色） */}
           <g>
-            <text x="800" y="128" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="14" fill="#45DCE8">LED1</text>
+            <text x="800" y="128" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="14" style={{ fill: 'var(--col-sig-cyan)' }}>LED1</text>
             {/* 点亮光晕 */}
             {lit && (
               <motion.circle
@@ -245,18 +248,18 @@ export default function MiniDemo() {
               </radialGradient>
             </defs>
             {/* LED 符号：二极管 + 发光箭头 */}
-            <path d="M785 250 L815 265 L785 280 Z" fill={lit ? '#FF5263' : '#13211A'} stroke="#F2EFE3" strokeWidth="2" />
-            <path d="M815 248 L815 282" stroke="#F2EFE3" strokeWidth="3" />
-            <path d="M765 175 L765 250 M765 280 L765 365" stroke={lit ? '#3FC47F' : '#F2EFE3'} strokeWidth="2.5" />
-            <path d="M800 242 l10 -12 M810 246 l8 -12" stroke={lit ? '#FF5263' : '#8E8976'} strokeWidth="2" />
-            <text x="800" y="316" textAnchor="middle" fontSize="10" fill={lit ? '#FF5263' : '#8E8976'}>
+            <path d="M785 250 L815 265 L785 280 Z" style={{ fill: lit ? 'rgb(var(--cc-danger))' : 'rgb(var(--cc-ink-800))', stroke: 'var(--col-silk-100)' }} strokeWidth="2" />
+            <path d="M815 248 L815 282" style={{ stroke: 'var(--col-silk-100)' }} strokeWidth="3" />
+            <path d="M765 175 L765 250 M765 280 L765 365" style={{ stroke: lit ? 'rgb(var(--cc-pcb-400))' : 'var(--col-silk-100)' }} strokeWidth="2.5" />
+            <path d="M800 242 l10 -12 M810 246 l8 -12" style={{ stroke: lit ? 'rgb(var(--cc-danger))' : 'var(--col-silk-500)' }} strokeWidth="2" />
+            <text x="800" y="316" textAnchor="middle" fontSize="10" style={{ fill: lit ? 'rgb(var(--cc-danger))' : 'var(--col-silk-500)' }}>
               {lit ? '亮！' : '红色 LED'}
             </text>
           </g>
 
           {/* 电池内部到端口的短走线 */}
-          <path d="M190 175 H200 M190 365 H200" stroke="#C9803C" strokeWidth="3" />
-          <path d="M420 175 H430 M560 175 H570" stroke="#C9803C" strokeWidth="3" />
+          <path d="M190 175 H200 M190 365 H200" style={{ stroke: 'rgb(var(--cc-copper-500))' }} strokeWidth="3" />
+          <path d="M420 175 H430 M560 175 H570" style={{ stroke: 'rgb(var(--cc-copper-500))' }} strokeWidth="3" />
 
           {/* 端口焊盘 */}
           {(Object.keys(PORTS) as PortId[]).map(p => {
@@ -269,18 +272,16 @@ export default function MiniDemo() {
                   cy={pt.y}
                   r={isSource ? 13 : 11}
                   fill="none"
-                  stroke={isSource ? '#45DCE8' : 'rgba(201,128,60,0.4)'}
+                  style={{ stroke: isSource ? 'var(--col-sig-cyan)' : 'rgb(var(--cc-copper-500) / 0.4)' }}
                   strokeWidth="2"
                 />
                 <circle
                   cx={pt.x}
                   cy={pt.y}
                   r="7"
-                  fill="#C9803C"
-                  stroke="#0A100D"
-                  strokeWidth="2"
                   className="cursor-crosshair"
-                  style={{ pointerEvents: 'all' }}
+                  style={{ fill: 'rgb(var(--cc-copper-500))', stroke: '#0A100D', pointerEvents: 'all' }}
+                  strokeWidth="2"
                   onMouseDown={startWire(p)}
                   onMouseUp={endWire(p)}
                 />
@@ -290,7 +291,7 @@ export default function MiniDemo() {
                   textAnchor="middle"
                   fontSize="11"
                   fontFamily="'JetBrains Mono',monospace"
-                  fill="#8E8976"
+                  style={{ fill: 'var(--col-silk-500)' }}
                 >
                   {pt.label}
                 </text>

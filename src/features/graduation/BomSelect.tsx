@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+﻿/* eslint-disable react-refresh/only-export-components */
 // STEP 2 元器件选型 & BOM：模拟立创商城货架 + 实时热校核 / 成本 / 供货
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -533,7 +533,7 @@ export default function BomSelect({ visitor, onComplete }: { visitor: boolean; o
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-ink-950/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[90] flex items-center justify-center cc-scrim backdrop-blur-sm"
             onClick={() => setConfirm0402(false)}
           >
             <motion.div

@@ -18,21 +18,23 @@ export default function BottomCta() {
         <path
           d="M-10 250 L300 250 L340 210 L560 210 L600 250 L680 250"
           fill="none"
-          stroke={energized ? '#3FC47F' : '#9A5E28'}
           strokeWidth="3"
           strokeLinejoin="round"
           className="transition-colors duration-500"
-          style={energized ? { filter: 'drop-shadow(0 0 6px rgba(63,196,127,0.6))' } : undefined}
+          style={{
+            stroke: energized ? 'rgb(var(--cc-pcb-400))' : 'rgb(var(--cc-copper-600))',
+            ...(energized ? { filter: 'drop-shadow(0 0 6px rgba(63,196,127,0.6))' } : {}),
+          }}
         />
         <path
           d="M-10 70 L220 70 L260 110 L480 110 L520 70 L640 70"
           fill="none"
-          stroke="#1B2E24"
+          style={{ stroke: 'rgb(var(--cc-ink-700))' }}
           strokeWidth="2"
         />
-        <circle cx="-10" cy="250" r="6" fill="#C9803C" />
+        <circle cx="-10" cy="250" r="6" style={{ fill: 'rgb(var(--cc-copper-500))' }} />
         {energized && (
-          <circle r="4" fill="#6FE3A1">
+          <circle r="4" style={{ fill: 'rgb(var(--cc-pcb-300))' }}>
             <animateMotion
               dur="1.4s"
               repeatCount="1"

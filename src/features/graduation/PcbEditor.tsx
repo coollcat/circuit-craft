@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+﻿/* eslint-disable react-refresh/only-export-components */
 // STEP 3 PCB 布局布线 mini-game：摆放 → 45° 走线 → 铺铜 → 实时 DRC → 伪 3D 预览
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,6 +8,7 @@ import SilkTag from '@/components/SilkTag';
 import { cn } from '@/lib/utils';
 import { SealStamp, useToasts, ToastHost } from './ui';
 import { useGrad } from './store';
+import { useProgress } from '@/store/progress';
 import type { DialogueLine } from '@/engine/types';
 
 export const STEP3_LINES: DialogueLine[] = [
@@ -38,6 +39,7 @@ interface Comp {
   placed: boolean;
   pads: Pad[];
   fill: string;
+  fillLight?: string;
   silk?: string;
 }
 interface Trace {
@@ -48,32 +50,32 @@ interface Trace {
 
 const INITIAL_COMPS: Comp[] = [
   {
-    id: 'U1', name: 'ESP32 模组', w: 180, h: 255, x: 0, y: 0, placed: false, fill: '#26402F', silk: 'U1',
+    id: 'U1', name: 'ESP32 模组', w: 180, h: 255, x: 0, y: 0, placed: false, fill: '#26402F', fillLight: '#CFE5D7', silk: 'U1',
     pads: [
       { id: '3V3', dx: 172, dy: 60, net: '3V3' },
       { id: 'GND', dx: 172, dy: 200, net: 'GND' },
     ],
   },
   {
-    id: 'J1', name: 'Type-C 座', w: 90, h: 75, x: 0, y: 0, placed: false, fill: '#1B2E24', silk: 'J1',
+    id: 'J1', name: 'Type-C 座', w: 90, h: 75, x: 0, y: 0, placed: false, fill: '#1B2E24', fillLight: '#DCEAE0', silk: 'J1',
     pads: [
       { id: 'VBUS', dx: 8, dy: 20, net: 'VBUS' },
       { id: 'GND', dx: 8, dy: 55, net: 'GND' },
     ],
   },
   {
-    id: 'U3', name: 'LDO SOT-223', w: 65, h: 35, x: 0, y: 0, placed: false, fill: '#13211A', silk: 'U3',
+    id: 'U3', name: 'LDO SOT-223', w: 65, h: 35, x: 0, y: 0, placed: false, fill: '#13211A', fillLight: '#E4EEE7', silk: 'U3',
     pads: [
       { id: 'IN', dx: 6, dy: 17, net: 'VBUS' },
       { id: 'OUT', dx: 59, dy: 17, net: '3V3' },
     ],
   },
-  { id: 'U2', name: 'CH340', w: 100, h: 60, x: 0, y: 0, placed: false, fill: '#13211A', silk: 'U2', pads: [] },
-  { id: 'Y1', name: '40MHz 晶振', w: 32, h: 25, x: 0, y: 0, placed: false, fill: '#3a3325', silk: 'Y1', pads: [] },
-  { id: 'SW1', name: 'RST 按键', w: 60, h: 60, x: 0, y: 0, placed: false, fill: '#1B2E24', silk: 'SW1', pads: [] },
-  { id: 'SW2', name: 'BOOT 按键', w: 60, h: 60, x: 0, y: 0, placed: false, fill: '#1B2E24', silk: 'SW2', pads: [] },
-  { id: 'C1', name: '去耦电容', w: 24, h: 14, x: 0, y: 0, placed: false, fill: '#5a4a2a', silk: 'C1', pads: [] },
-  { id: 'JP1', name: '排针 2×6', w: 150, h: 25, x: 0, y: 0, placed: false, fill: '#101c15', silk: 'JP1', pads: [] },
+  { id: 'U2', name: 'CH340', w: 100, h: 60, x: 0, y: 0, placed: false, fill: '#13211A', fillLight: '#E4EEE7', silk: 'U2', pads: [] },
+  { id: 'Y1', name: '40MHz 晶振', w: 32, h: 25, x: 0, y: 0, placed: false, fill: '#3a3325', fillLight: '#EAE2C6', silk: 'Y1', pads: [] },
+  { id: 'SW1', name: 'RST 按键', w: 60, h: 60, x: 0, y: 0, placed: false, fill: '#1B2E24', fillLight: '#DCEAE0', silk: 'SW1', pads: [] },
+  { id: 'SW2', name: 'BOOT 按键', w: 60, h: 60, x: 0, y: 0, placed: false, fill: '#1B2E24', fillLight: '#DCEAE0', silk: 'SW2', pads: [] },
+  { id: 'C1', name: '去耦电容', w: 24, h: 14, x: 0, y: 0, placed: false, fill: '#5a4a2a', fillLight: '#EFE3C2', silk: 'C1', pads: [] },
+  { id: 'JP1', name: '排针 2×6', w: 150, h: 25, x: 0, y: 0, placed: false, fill: '#101c15', fillLight: '#E0EAE2', silk: 'JP1', pads: [] },
 ];
 
 const NETS = [
@@ -83,6 +85,54 @@ const NETS = [
 ] as const;
 
 type Phase = 'place' | 'route' | 'pour';
+
+/* ---------- 画布配色：暗=阻焊板，亮=图纸纸面（跟随全站 data-theme） ---------- */
+const PALETTES = {
+  dark: {
+    bg: '#0A100D',
+    grid: 'rgba(63,196,127,0.10)',
+    board: '#0E1611',
+    boardLine: '#C9803C',
+    pour: 'rgba(91,141,239,0.14)',
+    pourLine: 'rgba(91,141,239,0.25)',
+    sweep: 'rgba(111,227,161,0.6)',
+    hatch: 'rgba(255,176,32,0.35)',
+    hatchLine: 'rgba(255,176,32,0.6)',
+    hatchText: 'rgba(255,184,77,0.9)',
+    gnd: '#5B8DEF',
+    power: '#C9803C',
+    preview: 'rgba(63,196,127,0.7)',
+    silk: '#F2EFE3',
+    pad: '#E0A458',
+    hole: '#060A08',
+    padText: '#F0C078',
+    antFill: 'rgba(91,141,239,0.25)',
+    antText: '#5B8DEF',
+    start: '#45DCE8',
+  },
+  light: {
+    bg: '#F7F6EF',
+    grid: 'rgba(27,116,71,0.20)',
+    board: '#FFFDF4',
+    boardLine: '#9C622A',
+    pour: 'rgba(59,102,196,0.12)',
+    pourLine: 'rgba(59,102,196,0.22)',
+    sweep: 'rgba(23,138,80,0.55)',
+    hatch: 'rgba(169,106,0,0.30)',
+    hatchLine: 'rgba(169,106,0,0.55)',
+    hatchText: 'rgba(140,88,0,0.95)',
+    gnd: '#3B66C4',
+    power: '#9C622A',
+    preview: 'rgba(23,138,80,0.65)',
+    silk: '#22271E',
+    pad: '#C9803C',
+    hole: '#FAF8F0',
+    padText: '#7A4A18',
+    antFill: 'rgba(59,102,196,0.16)',
+    antText: '#3B66C4',
+    start: '#0E7C8C',
+  },
+} as const;
 
 const snap = (v: number) => Math.round(v / 8) * 8;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -106,6 +156,7 @@ function route45(a: [number, number], b: [number, number]): [number, number][] {
 export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; onComplete: () => void }) {
   const grad = useGrad();
   const set = useGrad(s => s.set);
+  const theme = useProgress(s => s.settings.theme);
   const [comps, setComps] = useState<Comp[]>(INITIAL_COMPS);
   const [traces, setTraces] = useState<Trace[]>([]);
   const [phase, setPhase] = useState<Phase>('place');
@@ -174,11 +225,12 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
     const dpr = 2;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, CANVAS.w, CANVAS.h);
+    const pal = PALETTES[theme];
 
     // 背景网格
-    ctx.fillStyle = '#0A100D';
+    ctx.fillStyle = pal.bg;
     ctx.fillRect(0, 0, CANVAS.w, CANVAS.h);
-    ctx.fillStyle = 'rgba(63,196,127,0.10)';
+    ctx.fillStyle = pal.grid;
     for (let x = BOARD.x; x <= BOARD.x + BOARD.w; x += 8 * MM) {
       for (let y = BOARD.y; y <= BOARD.y + BOARD.h; y += 8 * MM) {
         ctx.fillRect(x, y, 1.5, 1.5);
@@ -186,9 +238,9 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
     }
 
     // 板框（阻焊）
-    ctx.fillStyle = '#0E1611';
+    ctx.fillStyle = pal.board;
     ctx.fillRect(BOARD.x, BOARD.y, BOARD.w, BOARD.h);
-    ctx.strokeStyle = '#C9803C';
+    ctx.strokeStyle = pal.boardLine;
     ctx.lineWidth = 2;
     ctx.strokeRect(BOARD.x, BOARD.y, BOARD.w, BOARD.h);
 
@@ -198,9 +250,9 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
       ctx.beginPath();
       ctx.rect(BOARD.x, BOARD.y, BOARD.w * pourT, BOARD.h);
       ctx.clip();
-      ctx.fillStyle = 'rgba(91,141,239,0.14)';
+      ctx.fillStyle = pal.pour;
       ctx.fillRect(BOARD.x + 2, BOARD.y + 2, BOARD.w - 4, BOARD.h - 4);
-      ctx.strokeStyle = 'rgba(91,141,239,0.25)';
+      ctx.strokeStyle = pal.pourLine;
       ctx.lineWidth = 1;
       for (let i = -BOARD.h; i < BOARD.w; i += 12) {
         ctx.beginPath();
@@ -210,7 +262,7 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
       }
       ctx.restore();
       if (pourT < 1) {
-        ctx.fillStyle = 'rgba(111,227,161,0.6)';
+        ctx.fillStyle = pal.sweep;
         ctx.fillRect(BOARD.x + BOARD.w * pourT - 2, BOARD.y, 3, BOARD.h);
       }
     }
@@ -220,7 +272,7 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
     ctx.beginPath();
     ctx.rect(KEEPOUT.x, KEEPOUT.y, KEEPOUT.w, KEEPOUT.h);
     ctx.clip();
-    ctx.strokeStyle = 'rgba(255,176,32,0.35)';
+    ctx.strokeStyle = pal.hatch;
     ctx.lineWidth = 1.5;
     for (let i = -KEEPOUT.h; i < KEEPOUT.w + KEEPOUT.h; i += 10) {
       ctx.beginPath();
@@ -229,17 +281,17 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
       ctx.stroke();
     }
     ctx.restore();
-    ctx.strokeStyle = 'rgba(255,176,32,0.6)';
+    ctx.strokeStyle = pal.hatchLine;
     ctx.setLineDash([4, 4]);
     ctx.strokeRect(KEEPOUT.x, KEEPOUT.y, KEEPOUT.w, KEEPOUT.h);
     ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(255,184,77,0.9)';
+    ctx.fillStyle = pal.hatchText;
     ctx.font = '10px "JetBrains Mono",monospace';
     ctx.fillText('ANTENNA KEEPOUT · 禁布区', KEEPOUT.x + 8, KEEPOUT.y + 14);
 
     // 走线
     for (const t of traces) {
-      ctx.strokeStyle = t.net === 'GND' ? '#5B8DEF' : '#C9803C';
+      ctx.strokeStyle = t.net === 'GND' ? pal.gnd : pal.power;
       ctx.lineWidth = Math.max(2.5, t.widthMil * 0.254);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -251,7 +303,7 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
     // 布线预览
     if (routeStart) {
       const pts = route45(routeStart.pos, mouse);
-      ctx.strokeStyle = 'rgba(63,196,127,0.7)';
+      ctx.strokeStyle = pal.preview;
       ctx.lineWidth = Math.max(2.5, widthMil * 0.254);
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
@@ -263,20 +315,20 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
     // 元件
     for (const c of comps) {
       if (!c.placed) continue;
-      ctx.fillStyle = c.fill;
+      ctx.fillStyle = theme === 'light' && c.fillLight ? c.fillLight : c.fill;
       ctx.fillRect(c.x, c.y, c.w, c.h);
-      ctx.strokeStyle = '#F2EFE3';
+      ctx.strokeStyle = pal.silk;
       ctx.lineWidth = 1;
       ctx.strokeRect(c.x, c.y, c.w, c.h);
       // 丝印位号
-      ctx.fillStyle = '#F2EFE3';
+      ctx.fillStyle = pal.silk;
       ctx.font = 'bold 11px "JetBrains Mono",monospace';
       ctx.fillText(c.silk ?? c.id, c.x + 4, c.y + 13);
       // ESP32 天线区
       if (c.id === 'U1') {
-        ctx.fillStyle = 'rgba(91,141,239,0.25)';
+        ctx.fillStyle = pal.antFill;
         ctx.fillRect(c.x, c.y, c.w, 50);
-        ctx.fillStyle = '#5B8DEF';
+        ctx.fillStyle = pal.antText;
         ctx.font = '9px "JetBrains Mono",monospace';
         ctx.fillText('PCB ANT', c.x + 6, c.y + 30);
       }
@@ -285,13 +337,13 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
         const [px, py] = padPos(c, p);
         ctx.beginPath();
         ctx.arc(px, py, 7, 0, Math.PI * 2);
-        ctx.fillStyle = '#E0A458';
+        ctx.fillStyle = pal.pad;
         ctx.fill();
         ctx.beginPath();
         ctx.arc(px, py, 3, 0, Math.PI * 2);
-        ctx.fillStyle = '#060A08';
+        ctx.fillStyle = pal.hole;
         ctx.fill();
-        ctx.fillStyle = '#F0C078';
+        ctx.fillStyle = pal.padText;
         ctx.font = '8px "JetBrains Mono",monospace';
         ctx.fillText(p.id, px + 9, py + 3);
       }
@@ -301,11 +353,11 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
     if (routeStart) {
       ctx.beginPath();
       ctx.arc(routeStart.pos[0], routeStart.pos[1], 11, 0, Math.PI * 2);
-      ctx.strokeStyle = '#45DCE8';
+      ctx.strokeStyle = pal.start;
       ctx.lineWidth = 2;
       ctx.stroke();
     }
-  }, [comps, traces, pourT, routeStart, mouse, widthMil]);
+  }, [comps, traces, pourT, routeStart, mouse, widthMil, theme]);
 
   useEffect(() => {
     draw();
@@ -584,7 +636,7 @@ export default function PcbEditor({ visitor, onComplete }: { visitor: boolean; o
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-ink-950/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[90] flex items-center justify-center cc-scrim backdrop-blur-sm"
             onClick={() => setShow3d(false)}
           >
             <motion.div

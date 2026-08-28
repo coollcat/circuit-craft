@@ -44,20 +44,22 @@ export default function TraceDivider({
         <path
           d="M8 12 L430 12 L448 6 L470 6 L488 12 L512 12 L530 18 L552 18 L570 12 L992 12"
           fill="none"
-          stroke={lit ? '#3FC47F' : '#C9803C'}
           strokeWidth="2"
           strokeLinejoin="round"
           className={motionOn ? 'transition-colors duration-700' : undefined}
-          style={lit ? { filter: 'drop-shadow(0 0 4px rgba(63,196,127,0.55))' } : undefined}
+          style={{
+            stroke: lit ? 'rgb(var(--cc-pcb-400))' : 'rgb(var(--cc-copper-500))',
+            ...(lit ? { filter: 'drop-shadow(0 0 4px rgba(63,196,127,0.55))' } : {}),
+          }}
         />
         {/* 两端过孔 */}
-        <circle cx="8" cy="12" r="5" fill="#C9803C" />
+        <circle cx="8" cy="12" r="5" style={{ fill: 'rgb(var(--cc-copper-500))' }} />
         <circle cx="8" cy="12" r="2" fill="#060A08" />
-        <circle cx="992" cy="12" r="5" fill="#C9803C" />
+        <circle cx="992" cy="12" r="5" style={{ fill: 'rgb(var(--cc-copper-500))' }} />
         <circle cx="992" cy="12" r="2" fill="#060A08" />
         {/* 电流粒子：点亮时流过一次（动效关闭时不播） */}
         {lit && motionOn && (
-          <circle r="3" fill="#6FE3A1">
+          <circle r="3" style={{ fill: 'rgb(var(--cc-pcb-300))' }}>
             <animateMotion
               dur="1.2s"
               repeatCount="1"

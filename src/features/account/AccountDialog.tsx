@@ -1,4 +1,4 @@
-// AccountDialog 账号弹窗（PCB 工程风 Modal）
+﻿// AccountDialog 账号弹窗（PCB 工程风 Modal）
 // 动效遵循 design.md 5.2：遮罩 blur 8px + fade 200ms；内容 scale 0.96→1 + y 12→0，280ms
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -368,7 +368,7 @@ export default function AccountDialog() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-950/70 p-6 backdrop-blur-[8px]"
+          className="fixed inset-0 z-[100] flex items-center justify-center cc-scrim p-6 backdrop-blur-[8px]"
           onClick={closeDialog}
         >
           <motion.div

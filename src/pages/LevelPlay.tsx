@@ -1,4 +1,4 @@
-// 关卡游玩页 /play/:levelId —— 三栏工作台 + 准物理仿真 + 渐进提示 + 防卡关 + QC PASS 结算
+﻿// 关卡游玩页 /play/:levelId —— 三栏工作台 + 准物理仿真 + 渐进提示 + 防卡关 + QC PASS 结算
 // 数据暂为空时用 fixtures 兜底并显示「内容装载中」占位，不得报红。
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -107,13 +107,7 @@ export default function LevelPlay() {
   const content = levelId ? getLevel(levelId) : undefined;
   const fixture = (levelId && FIXTURE_LEVELS.find(l => l.id === levelId)) || undefined;
   const navigate = useNavigate();
-  // URL 直达未解锁关卡 → 重定向回章节地图并提示（fixture 兜底关不参与解锁判定）
-  const locked = useProgress(s => (content ? !s.isLevelUnlocked(content.id) : false));
-  useEffect(() => {
-    if (content && locked) {
-      navigate('/chapters', { replace: true, state: { toast: `「${content.title}」还没解锁——先通关前面的关卡。` } });
-    }
-  }, [content, locked, navigate]);
+  // 未解锁关卡不再强制重定向：允许自由进入任意关卡
   // 未知关卡：明确 404，而不是静默落到示例关（旧行为会让人误以为拼错的 id 是真实关卡）
   if (!content && !fixture) {
     return (
@@ -124,7 +118,6 @@ export default function LevelPlay() {
       />
     );
   }
-  if (content && locked) return null;
   return <LevelPlayInner key={(content ?? fixture)!.id} level={(content ?? fixture)!} isFixtureFallback={!content} />;
 }
 
@@ -755,7 +748,7 @@ function VictoryModal({ open, level, stars, elapsed, hintsTier, compCount, circu
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 z-[65] flex items-center justify-center bg-ink-950/70 backdrop-blur-[8px]"
+          className="fixed inset-0 z-[65] flex items-center justify-center cc-scrim backdrop-blur-[8px]"
         >
           <motion.div
             initial={{ scale: 0.96, y: 12 }}

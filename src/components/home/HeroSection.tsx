@@ -242,8 +242,17 @@ export default function HeroSection({ onWatchDemo }: { onWatchDemo: () => void }
 
       <CurrentParticles />
 
-      {/* 内容 */}
-      <div className="relative ml-[8vw] max-w-[760px]" style={{ zIndex: 3 }}>
+      {/* 内容（Hero 底图恒为暗色照片，主题变量在此钉回暗色值，避免浅色主题下深字压深图） */}
+      <div
+        className="relative ml-[8vw] max-w-[760px]"
+        style={{
+          zIndex: 3,
+          '--cc-silk-100': '242 239 227',
+          '--cc-silk-300': '207 201 180',
+          '--cc-silk-500': '142 137 118',
+          '--cc-copper-400': '224 164 88',
+        } as React.CSSProperties}
+      >
         <div className="hero-fade mb-6">
           <SilkTag>GAMIFIED PCB LEARNING · 准物理仿真</SilkTag>
         </div>

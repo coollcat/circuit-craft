@@ -1,26 +1,27 @@
-/* eslint-disable react-refresh/only-export-components */
+﻿/* eslint-disable react-refresh/only-export-components */
 // 图鉴「原理图看一看」——手绘风典型应用小电路
 // 风格与 codex/symbols.tsx 一致：silk-100 描边 2px、JetBrains Mono 标注、sig-cyan 节点
+// 颜色走 --col-* 主题变量（经 style 消费），明暗主题自动跟随
 import type { JSX } from 'react';
 
-const SILK = '#F2EFE3';
-const CYAN = '#45DCE8';
-const COPPER = '#F0C078';
-const NOTE = '#A8A48F';
+const SILK = 'var(--col-silk-100)';
+const CYAN = 'var(--col-sig-cyan)';
+const COPPER = 'rgb(var(--cc-copper-300))';
+const NOTE = 'var(--col-silk-500)';
 
 /* ---------------- 基础件（全部为绝对坐标、水平取向） ---------------- */
 
 function W({ d, copper }: { d: string; copper?: boolean }) {
-  return <path d={d} stroke={copper ? COPPER : SILK} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />;
+  return <path d={d} style={{ stroke: copper ? COPPER : SILK }} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />;
 }
 
 function T({ x, y, c = NOTE, s = 10, anchor = 'middle', children }: { x: number; y: number; c?: string; s?: number; anchor?: 'start' | 'middle' | 'end'; children: React.ReactNode }) {
-  return <text x={x} y={y} fill={c} fontSize={s} textAnchor={anchor} fontFamily="JetBrains Mono, monospace" stroke="none">{children}</text>;
+  return <text x={x} y={y} style={{ fill: c }} fontSize={s} textAnchor={anchor} fontFamily="JetBrains Mono, monospace" stroke="none">{children}</text>;
 }
 
 /** 节点圆点 */
 function Dot({ x, y }: { x: number; y: number }) {
-  return <circle cx={x} cy={y} r={3} fill={CYAN} stroke="none" />;
+  return <circle cx={x} cy={y} r={3} style={{ fill: CYAN }} stroke="none" />;
 }
 
 /** 电阻：中心 (x,y)，引脚水平 */
@@ -28,7 +29,7 @@ function Res({ x, y, label }: { x: number; y: number; label?: string }) {
   return (
     <g>
       <W d={`M${x - 24} ${y} H${x - 14} M${x + 14} ${y} H${x + 24}`} />
-      <rect x={x - 14} y={y - 6} width={28} height={12} fill="none" stroke={SILK} strokeWidth={2} />
+      <rect x={x - 14} y={y - 6} width={28} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       {label && <T x={x} y={y - 10}>{label}</T>}
     </g>
   );
@@ -62,7 +63,7 @@ function Dio({ x, y, label, led, zener, schottky }: { x: number; y: number; labe
   return (
     <g>
       <W d={`M${x - 24} ${y} H${x - 10}`} />
-      <path d={`M${x - 10} ${y - 8} L${x - 10} ${y + 8} L${x + 8} ${y} Z`} fill={SILK} stroke="none" />
+      <path d={`M${x - 10} ${y - 8} L${x - 10} ${y + 8} L${x + 8} ${y} Z`} style={{ fill: SILK }} stroke="none" />
       <W d={`M${x + 8} ${y - 8} V${y + 8} M${x + 8} ${y} H${x + 24}`} />
       {zener && <W d={`M${x + 2} ${y - 8} H${x + 8} M${x + 8} ${y + 8} H${x + 14}`} />}
       {schottky && <W d={`M${x + 2} ${y - 8} H${x + 8} V${y - 5} M${x + 8} ${y + 5} V${y + 8} H${x + 14}`} />}
@@ -87,7 +88,7 @@ function Rail({ x, y, label }: { x: number; y: number; label: string }) {
   return (
     <g>
       <W d={`M${x} ${y} V${y + 10}`} />
-      <circle cx={x} cy={y - 2} r={3} fill="none" stroke={SILK} strokeWidth={2} />
+      <circle cx={x} cy={y - 2} r={3} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       <T x={x} y={y - 8} c={COPPER}>{label}</T>
     </g>
   );
@@ -109,9 +110,9 @@ function Batt({ x, y, label }: { x: number; y: number; label?: string }) {
 function Src({ x, y, label, wave }: { x: number; y: number; label?: string; wave?: boolean }) {
   return (
     <g>
-      <circle cx={x} cy={y} r={13} fill="none" stroke={SILK} strokeWidth={2} />
+      <circle cx={x} cy={y} r={13} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       {wave
-        ? <path d={`M${x - 8} ${y} q4 -10 8 0 q4 10 8 0`} transform={`translate(-4 0)`} stroke={SILK} strokeWidth={1.5} fill="none" />
+        ? <path d={`M${x - 8} ${y} q4 -10 8 0 q4 10 8 0`} transform={`translate(-4 0)`} style={{ stroke: SILK }} strokeWidth={1.5} fill="none" />
         : <><T x={x - 5} y={y - 1} s={9}>+</T><T x={x - 4} y={y + 9} s={9}>−</T></>}
       <W d={`M${x - 24} ${y} H${x - 13} M${x + 13} ${y} H${x + 24}`} />
       {label && <T x={x} y={y + 26}>{label}</T>}
@@ -123,7 +124,7 @@ function Src({ x, y, label, wave }: { x: number; y: number; label?: string; wave
 function Meter({ x, y, ch }: { x: number; y: number; ch: 'V' | 'A' }) {
   return (
     <g>
-      <circle cx={x} cy={y} r={11} fill="none" stroke={SILK} strokeWidth={2} />
+      <circle cx={x} cy={y} r={11} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       <T x={x} y={y + 4} c={SILK} s={11}>{ch}</T>
     </g>
   );
@@ -136,7 +137,7 @@ function Npn({ x, y, label }: { x: number; y: number; label?: string }) {
       <W d={`M${x - 24} ${y} H${x - 8} M${x - 8} ${y - 10} V${y + 10}`} />
       <W d={`M${x - 8} ${y - 4} L${x + 10} ${y - 16} M${x + 10} ${y - 16} V${y - 24}`} />
       <W d={`M${x - 8} ${y + 4} L${x + 10} ${y + 16} M${x + 10} ${y + 16} V${y + 24}`} />
-      <path d={`M${x + 4} ${y + 11} L${x + 10} ${y + 16} L${x + 1} ${y + 15} Z`} fill={SILK} stroke="none" />
+      <path d={`M${x + 4} ${y + 11} L${x + 10} ${y + 16} L${x + 1} ${y + 15} Z`} style={{ fill: SILK }} stroke="none" />
       {label && <T x={x + 20} y={y + 4}>{label}</T>}
     </g>
   );
@@ -149,7 +150,7 @@ function Nmos({ x, y, label }: { x: number; y: number; label?: string }) {
       <W d={`M${x - 24} ${y} H${x - 10} M${x - 10} ${y - 10} V${y + 10}`} />
       <W d={`M${x - 6} ${y - 12} V${y + 12}`} />
       <W d={`M${x - 6} ${y - 8} H${x + 10} V${y - 24} M${x - 6} ${y + 8} H${x + 10} V${y + 24} M${x - 6} ${y} H${x + 2}`} />
-      <path d={`M${x - 2} ${y - 4} L${x + 4} ${y} L${x - 2} ${y + 4} Z`} fill={SILK} stroke="none" />
+      <path d={`M${x - 2} ${y - 4} L${x + 4} ${y} L${x - 2} ${y + 4} Z`} style={{ fill: SILK }} stroke="none" />
       {label && <T x={x + 20} y={y + 4}>{label}</T>}
     </g>
   );
@@ -162,7 +163,7 @@ function Pmos({ x, y, label }: { x: number; y: number; label?: string }) {
       <W d={`M${x - 24} ${y} H${x - 10} M${x - 10} ${y - 10} V${y + 10}`} />
       <W d={`M${x - 6} ${y - 12} V${y + 12}`} />
       <W d={`M${x - 6} ${y - 8} H${x + 10} V${y - 24} M${x - 6} ${y + 8} H${x + 10} V${y + 24} M${x + 4} ${y} H${x + 10}`} />
-      <path d={`M${x + 10} ${y - 4} L${x + 4} ${y} L${x + 10} ${y + 4} Z`} fill={SILK} stroke="none" />
+      <path d={`M${x + 10} ${y - 4} L${x + 4} ${y} L${x + 10} ${y + 4} Z`} style={{ fill: SILK }} stroke="none" />
       {label && <T x={x + 20} y={y + 4}>{label}</T>}
     </g>
   );
@@ -172,7 +173,7 @@ function Pmos({ x, y, label }: { x: number; y: number; label?: string }) {
 function OpAmp({ x, y }: { x: number; y: number }) {
   return (
     <g>
-      <path d={`M${x - 16} ${y - 18} L${x - 16} ${y + 18} L${x + 18} ${y} Z`} fill="none" stroke={SILK} strokeWidth={2} strokeLinejoin="round" />
+      <path d={`M${x - 16} ${y - 18} L${x - 16} ${y + 18} L${x + 18} ${y} Z`} fill="none" style={{ stroke: SILK }} strokeWidth={2} strokeLinejoin="round" />
       <T x={x - 10} y={y - 5} s={9}>−</T>
       <T x={x - 10} y={y + 13} s={9}>+</T>
       <W d={`M${x - 30} ${y - 8} H${x - 16} M${x - 30} ${y + 8} H${x - 16} M${x + 18} ${y} H${x + 30}`} />
@@ -184,7 +185,7 @@ function OpAmp({ x, y }: { x: number; y: number }) {
 function BoxI({ x, y, w, h, label, lp, rp }: { x: number; y: number; w: number; h: number; label: string; lp?: string[]; rp?: string[] }) {
   return (
     <g>
-      <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={3} fill="none" stroke={SILK} strokeWidth={2} />
+      <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={3} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       <T x={x} y={y + 3} c={SILK} s={11}>{label}</T>
       {(lp ?? []).map((p, i) => (
         <g key={`l${i}`}>
@@ -208,7 +209,7 @@ function Pot({ x, y, label }: { x: number; y: number; label?: string }) {
     <g>
       <Res x={x} y={y} label={label} />
       <W d={`M${x + 10} ${y - 18} L${x - 4} ${y - 6}`} />
-      <path d={`M${x - 4} ${y - 6} l8 -1 l-3 -6 Z`} fill={SILK} stroke="none" />
+      <path d={`M${x - 4} ${y - 6} l8 -1 l-3 -6 Z`} style={{ fill: SILK }} stroke="none" />
       <W d={`M${x + 10} ${y - 18} V${y - 24}`} />
     </g>
   );
@@ -219,8 +220,8 @@ function Sw({ x, y, label }: { x: number; y: number; label?: string }) {
   return (
     <g>
       <W d={`M${x - 24} ${y} H${x - 10} M${x + 10} ${y} H${x + 24}`} />
-      <circle cx={x - 10} cy={y} r={2} fill={SILK} stroke="none" />
-      <circle cx={x + 10} cy={y} r={2} fill={SILK} stroke="none" />
+      <circle cx={x - 10} cy={y} r={2} style={{ fill: SILK }} stroke="none" />
+      <circle cx={x + 10} cy={y} r={2} style={{ fill: SILK }} stroke="none" />
       <W d={`M${x - 10} ${y} L${x + 8} ${y - 10}`} />
       {label && <T x={x} y={y + 20}>{label}</T>}
     </g>
@@ -233,7 +234,7 @@ function Xtal({ x, y, label }: { x: number; y: number; label?: string }) {
     <g>
       <W d={`M${x - 24} ${y} H${x - 12} M${x + 12} ${y} H${x + 24}`} />
       <W d={`M${x - 12} ${y - 9} V${y + 9} M${x + 12} ${y - 9} V${y + 9}`} />
-      <rect x={x - 7} y={y - 6} width={14} height={12} fill="none" stroke={SILK} strokeWidth={2} />
+      <rect x={x - 7} y={y - 6} width={14} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       {label && <T x={x} y={y - 13}>{label}</T>}
     </g>
   );
@@ -244,7 +245,7 @@ function Fuse({ x, y, label }: { x: number; y: number; label?: string }) {
   return (
     <g>
       <W d={`M${x - 24} ${y} H${x - 12} M${x + 12} ${y} H${x + 24}`} />
-      <rect x={x - 12} y={y - 6} width={24} height={12} fill="none" stroke={SILK} strokeWidth={2} />
+      <rect x={x - 12} y={y - 6} width={24} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       <W d={`M${x - 12} ${y} H${x + 12}`} />
       {label && <T x={x} y={y - 10}>{label}</T>}
     </g>
@@ -264,7 +265,7 @@ function Ant({ x, y }: { x: number; y: number }) {
 function Motor({ x, y, label }: { x: number; y: number; label?: string }) {
   return (
     <g>
-      <circle cx={x} cy={y} r={12} fill="none" stroke={SILK} strokeWidth={2} />
+      <circle cx={x} cy={y} r={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       <T x={x} y={y + 4} c={SILK} s={11}>M</T>
       <W d={`M${x} ${y - 24} V${y - 12} M${x} ${y + 12} V${y + 24}`} />
       {label && <T x={x} y={y + 34}>{label}</T>}
@@ -277,8 +278,8 @@ function Spk({ x, y }: { x: number; y: number }) {
   return (
     <g>
       <W d={`M${x - 24} ${y} H${x - 14}`} />
-      <path d={`M${x - 14} ${y - 5} h7 v10 h-7 Z`} fill="none" stroke={SILK} strokeWidth={2} />
-      <path d={`M${x - 7} ${y - 5} L${x + 4} ${y - 12} V${y + 12} L${x - 7} ${y + 5}`} fill="none" stroke={SILK} strokeWidth={2} strokeLinejoin="round" />
+      <path d={`M${x - 14} ${y - 5} h7 v10 h-7 Z`} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
+      <path d={`M${x - 7} ${y - 5} L${x + 4} ${y - 12} V${y + 12} L${x - 7} ${y + 5}`} fill="none" style={{ stroke: SILK }} strokeWidth={2} strokeLinejoin="round" />
       <W d={`M${x + 9} ${y - 4} a6 6 0 0 1 0 8 M${x + 13} ${y - 8} a12 12 0 0 1 0 16`} />
     </g>
   );
@@ -289,8 +290,8 @@ function Buzz({ x, y, label }: { x: number; y: number; label?: string }) {
   return (
     <g>
       <W d={`M${x} ${y - 24} V${y - 6} M${x} ${y + 6} V${y + 24}`} />
-      <path d={`M${x - 11} ${y + 6} a11 11 0 0 1 22 0 Z`} fill="none" stroke={SILK} strokeWidth={2} />
-      <circle cx={x} cy={y} r={1.5} fill={SILK} stroke="none" />
+      <path d={`M${x - 11} ${y + 6} a11 11 0 0 1 22 0 Z`} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
+      <circle cx={x} cy={y} r={1.5} style={{ fill: SILK }} stroke="none" />
       {label && <T x={x + 16} y={y + 4}>{label}</T>}
     </g>
   );
@@ -300,7 +301,7 @@ function Buzz({ x, y, label }: { x: number; y: number; label?: string }) {
 function RelayCoil({ x, y, label }: { x: number; y: number; label?: string }) {
   return (
     <g>
-      <rect x={x - 10} y={y - 14} width={20} height={28} fill="none" stroke={SILK} strokeWidth={2} />
+      <rect x={x - 10} y={y - 14} width={20} height={28} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       <W d={`M${x - 10} ${y + 14} L${x + 10} ${y - 14}`} />
       <W d={`M${x} ${y - 24} V${y - 14} M${x} ${y + 14} V${y + 24}`} />
       {label && <T x={x + 16} y={y + 4}>{label}</T>}
@@ -328,7 +329,7 @@ function VarRes({ x, y, label }: { x: number; y: number; label?: string }) {
     <g>
       <Res x={x} y={y} />
       <W d={`M${x - 12} ${y + 12} L${x + 12} ${y - 12}`} />
-      <path d={`M${x + 12} ${y - 12} l-8 1 l3 6 Z`} fill={SILK} stroke="none" />
+      <path d={`M${x + 12} ${y - 12} l-8 1 l3 6 Z`} style={{ fill: SILK }} stroke="none" />
       {label && <T x={x} y={y - 11}>{label}</T>}
     </g>
   );
@@ -338,9 +339,9 @@ function VarRes({ x, y, label }: { x: number; y: number; label?: string }) {
 function Seg7({ x, y }: { x: number; y: number }) {
   return (
     <g>
-      <rect x={x - 10} y={y - 16} width={20} height={32} rx={2} fill="none" stroke={SILK} strokeWidth={2} />
+      <rect x={x - 10} y={y - 16} width={20} height={32} rx={2} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
       <T x={x} y={y + 5} c={COPPER} s={16}>8</T>
-      <circle cx={x + 6} cy={y + 11} r={1.5} fill={COPPER} stroke="none" />
+      <circle cx={x + 6} cy={y + 11} r={1.5} style={{ fill: COPPER }} stroke="none" />
     </g>
   );
 }

@@ -33,12 +33,21 @@
     --cc-danger: 255 82 99;
     /* ── 全色值变量：SVG 符号/内联样式直接消费 ── */
     --col-silk-100: #F2EFE3;
+    --col-silk-300: #CFC9B4;
     --col-silk-500: #8E8976;
     --col-sig-cyan: #45DCE8;
     --col-sig-amber: #FFB84D;
     --col-sig-blue: #5B8DEF;
     --col-sig-magenta: #E56BD6;
     --col-copper-500: #C9803C;
+
+    /* ── 章节主板配色：暗=阻焊板，亮=图纸纸面（SVG 经 style 内联消费） ── */
+    --bd-bg: 10 16 13;
+    --bd-pad: 14 22 17;
+    --bd-hole: 19 33 26;
+    --bd-hole-line: 38 64 47;
+    --bd-line: 27 46 36;
+    --bd-line-soft: 38 64 47;
 
     /* shadcn 基座令牌（暗色默认） */
     --background: 150 29% 3%;
@@ -101,12 +110,21 @@
     --cc-danger: 210 51 68;
 
     --col-silk-100: #22271E;
+    --col-silk-300: #454B3F;
     --col-silk-500: #6B7062;
     --col-sig-cyan: #0E7C8C;
     --col-sig-amber: #A96A00;
     --col-sig-blue: #3B66C4;
     --col-sig-magenta: #B23AA4;
     --col-copper-500: #9C622A;
+
+    /* 白色主题：主板变图纸纸面 */
+    --bd-bg: 251 250 243;
+    --bd-pad: 243 241 231;
+    --bd-hole: 233 231 219;
+    --bd-hole-line: 189 194 180;
+    --bd-line: 196 200 186;
+    --bd-line-soft: 214 217 205;
 
     /* shadcn 基座令牌（亮色） */
     --background: 45 33% 96%;
@@ -213,6 +231,30 @@
   }
   .text-glow-pcb {
     text-shadow: 0 0 12px rgba(63, 196, 127, 0.55);
+  }
+  /* 白色主题：纸面上发光改柔光，避免荧光刺眼 */
+  html[data-theme='light'] .glow-pcb {
+    box-shadow: 0 0 6px rgb(var(--cc-pcb-400) / 0.3);
+  }
+  html[data-theme='light'] .glow-danger {
+    box-shadow: 0 0 6px rgb(var(--cc-danger) / 0.28);
+  }
+  html[data-theme='light'] .glow-copper {
+    box-shadow: 0 0 6px rgb(var(--cc-copper-400) / 0.28);
+  }
+  html[data-theme='light'] .text-glow-copper {
+    text-shadow: none;
+  }
+  html[data-theme='light'] .text-glow-pcb {
+    text-shadow: none;
+  }
+
+  /* 模态遮罩：暗色用阻焊黑；白色主题奶油遮罩会发雾，改深灰绿 */
+  .cc-scrim {
+    background: rgb(6 10 8 / 0.72);
+  }
+  html[data-theme='light'] .cc-scrim {
+    background: rgb(29 34 27 / 0.5);
   }
 
   /* 阻焊开窗：铜色底纹数字条 */
