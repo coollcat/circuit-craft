@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as k from '../src/features/figures/kit/iso-kit';
-import { buildParts, HEIGHT, P, WIDTH } from '../src/features/figures/breadboard-led/geometry';
+import { buildParts, HEIGHT, LED_POS, LED_Z, P, WIDTH } from '../src/features/figures/breadboard-led/geometry';
 import { needlePath, pointerPath, RUNTIME_GEOMETRY } from '../src/features/figures/breadboard-led/parts';
 import {
   BURN_FACTOR, BURN_SECONDS, DIGIT_WEIGHTS, LED_IMAX, LED_RON, LED_VF, METER_FS, NEEDLE_SWEEP,
@@ -92,7 +92,9 @@ function tick(now) {
   shown = calm ? target : shown + (target - shown) * (1 - Math.exp(-dt / 0.12));
   shownNeedle = calm ? goal : shownNeedle + (goal - shownNeedle) * (1 - Math.exp(-dt / 0.16));
   draw();
-  const settled = !touring && Math.abs(target - shown) < 0.002 && Math.abs(goal - shownNeedle) < 0.002;
+  // 注意：烧灯计时靠每帧累加 dt，所以「过流待烧」期间绝不能停循环——
+  // 开启减动效时数值会瞬间到位，若按"动画是否收敛"停循环，1A 短路将永远不会烧灯。
+  const settled = !touring && lethalTime <= 0 && Math.abs(target - shown) < 0.002 && Math.abs(goal - shownNeedle) < 0.002;
   frame = visible && !settled ? requestAnimationFrame(tick) : 0;
 }
 
@@ -105,9 +107,16 @@ new IntersectionObserver((entries) => {
 }, { rootMargin: '120px 0px' }).observe(stage);
 
 let dragging = false, dragStartY = 0, dragStartDigit = 0, dragDial = 0;
-const dialAt = (event) => {
+// 视口坐标 → SVG 用户坐标。SVG 按 viewBox 缩放显示，不换算的话命中半径会整体错位：
+// 渲染宽度 ≠ 760 时拨盘拖不动、LED 也点不中（这条交互自查就是靠驱动页面才发现的）。
+const toUser = (event) => {
   const box = svg.getBoundingClientRect();
-  const x = event.clientX - box.left, y = event.clientY - box.top;
+  const scale = box.width / ${WIDTH};
+  return [(event.clientX - box.left) / scale, (event.clientY - box.top) / scale];
+};
+const LED_AT = ${JSON.stringify(LED_POS)};
+const dialAt = (event) => {
+  const [x, y] = toUser(event);
   for (let i = 0; i < dialCenters.length; i++) {
     if (Math.hypot(x - dialCenters[i][0], y - dialCenters[i][1]) < 26) return i;
   }
@@ -116,10 +125,10 @@ const dialAt = (event) => {
 stage.addEventListener('pointerdown', (event) => {
   const index = dialAt(event);
   if (index < 0) {
-    // 点 LED 附近 = 换一颗新灯
-    const box = svg.getBoundingClientRect();
-    const led = toScreen(${JSON.stringify(0)}, ${JSON.stringify(-52)}, ${JSON.stringify(12)});
-    if (Math.hypot(event.clientX - box.left - led[0], event.clientY - box.top - led[1]) < 30) {
+    // 点 LED 附近 = 换一颗新灯（坐标取自几何常量，避免两处各写一份而漂移）
+    const [ux, uy] = toUser(event);
+    const led = toScreen(LED_AT[0], LED_AT[1], ${LED_Z});
+    if (Math.hypot(ux - led[0], uy - led[1]) < 30) {
       burned = false; lethalTime = 0; stopTour(); draw();
     }
     return;
@@ -127,7 +136,9 @@ stage.addEventListener('pointerdown', (event) => {
   stopTour();
   dragging = true; dragDial = index; selected = index;
   dragStartY = event.clientY; dragStartDigit = digits[index];
-  stage.setPointerCapture(event.pointerId);
+  // 合成事件（自动化测试/部分浏览器）没有活跃指针，setPointerCapture 会抛 NotFoundError；
+  // 拖拽状态已经设好，捕获失败不影响交互，所以这里吞掉异常。
+  try { stage.setPointerCapture(event.pointerId); } catch { /* 无活跃指针 */ }
 });
 stage.addEventListener('pointermove', (event) => {
   if (!dragging) return;
@@ -155,6 +166,20 @@ stage.addEventListener('keydown', (event) => {
 });
 
 draw();
+
+// 自动化测试钩子（只读 + 事件派发；离线预览专用，站点组件没有这个）
+window.__fig = {
+  readout: () => readout.textContent,
+  digits: () => digits.slice(),
+  op: () => op(),
+  dialCenters: () => dialCenters,
+  ledScreen: () => toScreen(LED_AT[0], LED_AT[1], ${LED_Z}),
+  burned: () => burned,
+  glow: () => Number(glow ? glow.getAttribute('opacity') : 0),
+  pointer: (type, x, y) => stage.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', isPrimary: true })),
+  key: (k) => stage.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })),
+  svgBox: () => { const b = svg.getBoundingClientRect(); return { left: b.left, top: b.top, width: b.width, height: b.height }; },
+};
 `;
 
 const body = k.plateHtml({

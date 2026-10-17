@@ -2,7 +2,7 @@
 // + 每条必填「布线案例」(wiring) 与「计算方式」(calc)：典型接法配公式与代入示例。
 // + 「原理图看一看」(schematic)：MiniSchematic 手绘风典型应用小电路。
 import type { SchematicFig } from '../MiniSchematic';
-export type LabKind = 'bands' | 'rc' | 'led' | 'opamp' | 'pullup' | 'hyst';
+export type LabKind = 'bands' | 'rc' | 'led' | 'opamp' | 'pullup' | 'hyst' | 'servo';
 export type CategoryId = 'passive' | 'semi' | 'ic' | 'mech' | 'supply';
 
 export interface ParamRow {
@@ -1695,6 +1695,7 @@ ENTRIES.push(
     en: 'Servo',
     refdes: 'SV',
     category: 'mech',
+    lab: 'servo',
     tagline: '指哪转哪的角度执行器。',
     essence: '舵机：内置电机+减速+电位器反馈，按脉冲宽度转到指定角度。',
     plain: '大白话：你跟它说「转到 45 度」（用一个特定长短的脉冲），它就乖乖转到 45 度停住——机器人关节基本都是它。',

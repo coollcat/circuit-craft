@@ -8,6 +8,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { ensureIsoStyles } from '@/features/figures/isoStyles';
 
 const BreadboardLed = lazy(() => import('@/features/figures/breadboard-led/BreadboardLed'));
+const ServoFigure = lazy(() => import('@/features/figures/servo-sg90/ServoFigure'));
 
 function FigureFallback() {
   return (
@@ -40,6 +41,19 @@ const FIGURES: FigureMeta[] = [
       '烧了就点一下 LED 换一颗新灯 —— 真实实验里也是这么做的，但记得先把电阻调大。',
     ],
     node: <BreadboardLed />,
+  },
+  {
+    id: 'servo-sg90',
+    title: 'SG90 舵机 · 脉宽控角',
+    level: '第 4 章 · 舵机与执行器',
+    levelId: 'c4-2',
+    points: [
+      '舵机不看电压看脉宽：每 20ms（50Hz）来一个高电平脉冲，脉宽 0.5ms→0°、1.5ms→90°、2.5ms→180°。',
+      '拧旋钮 = 改脉宽：屏幕上那条方波的高电平宽度、白色手臂的角度、读数三者同步变化。',
+      '拧过 2.5ms 或低于 0.5ms：手臂顶到机械限位，嗡嗡响、电流从 10mA 冲到 700mA —— 这就是堵转，长时间会烧齿轮。',
+      '真实接线只有三根：棕 GND、红 +5V、橙信号；信号线接单片机任意 IO，用 PWM 外设发 50Hz 即可。',
+    ],
+    node: <ServoFigure />,
   },
 ];
 

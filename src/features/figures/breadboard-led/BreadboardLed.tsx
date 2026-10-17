@@ -130,7 +130,12 @@ export default function BreadboardLed() {
     }
     setSelected(index);
     dragging.current = { index, startY: event.clientY, startDigit: digits[index] };
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    // 合成事件/无活跃指针时 setPointerCapture 会抛 NotFoundError；拖拽状态已就绪，捕获失败不影响交互
+    try {
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    } catch {
+      /* 无活跃指针 */
+    }
   };
 
   const onPointerMove = (event: React.PointerEvent) => {
