@@ -96,16 +96,16 @@ export const COMP_META: Record<ComponentType, CompMeta> = {
   resistor: { name: '电阻', group: '无源', maxCurrent: 0.25 },
   capacitor: { name: '电容', group: '无源', note: 'DC 开路；时域用梯形法伴随模型' },
   inductor: { name: '电感', group: '无源', note: 'DC 视为 1mΩ 小电阻' },
-  pot: { name: '电位器', group: '无源', note: '分压双电阻模型，wiper=抽头比例' },
-  diode: { name: '二极管', group: '半导体', maxCurrent: 1, note: '分段线性：Vf=0.7V + rOn' },
+  pot: { name: '电位器', group: '无源', note: '分压双电阻模型：0=靠 b 端、1=靠 a 端，R_a→w=R·(1−w)、R_w→b=R·w' },
+  diode: { name: '二极管', group: '半导体', maxCurrent: 1, note: '单调分段线性：i = max(0, (Vd−Vf)/rOn)，Vf=0.7V' },
   schottky: { name: '肖特基二极管', group: '半导体', maxCurrent: 1, note: '低压降快检波：Vf≈0.3V + rOn' },
-  led: { name: 'LED', group: '半导体', note: '分段线性 Vf=2V；I>3×额定持续 0.1s 烧毁' },
-  zener: { name: '稳压管', group: '半导体', note: '正向同二极管，反向击穿 vz + rz' },
+  led: { name: 'LED', group: '半导体', note: '分段线性 Vf=2V；I>3×额定持续 0.1s（按仿真时间）烧毁' },
+  zener: { name: '稳压管', group: '半导体', note: '正向同二极管，反向击穿 vz + rz（无死区）' },
   ldr: { name: '光敏电阻', group: '无源', note: '光照越强阻值越小：500kΩ(暗) → ~1kΩ(强光)' },
   thermistor: { name: '热敏电阻 NTC', group: '无源', note: '温度越高阻值越小：B=3950 教学模型' },
   switch: { name: '开关', group: '机电', note: '开=1GΩ / 合=1mΩ' },
   button: { name: '按键', group: '机电', note: '开=1GΩ / 合=1mΩ' },
-  npn: { name: 'NPN 三极管', group: '半导体', note: '简化开关模型：Vbe>0.7 且 B 有电流 → C-E 饱和（Vce(sat)≈0.2V 等效 rOn）' },
+  npn: { name: 'NPN 三极管', group: '半导体', note: '有源区模型：Vbe>Vf 导通，Ic=min(β·Ib, 饱和上限 (Vce−vceSat)/rOn)' },
   pmos: { name: 'PMOS', group: '半导体', note: '开关模型：Vgs<-vt 导通' },
   nmos: { name: 'NMOS', group: '半导体', note: '开关模型：Vgs>vt 导通' },
   opamp: { name: '运算放大器', group: '集成', note: '理想 VCVS 增益 1e5，输出限幅于电源轨' },
@@ -121,7 +121,7 @@ export const COMP_META: Record<ComponentType, CompMeta> = {
   module: { name: 'RF 模块', group: '集成', note: '教学近似：out 跟随 in 的单位增益缓冲 + 1kΩ 供电负载' },
   buzzer: { name: '有源蜂鸣器', group: '机电', maxCurrent: 0.3, note: '内置振荡源，通电即响；教学模型为音圈电阻负载' },
   speaker: { name: '扬声器', group: '机电', maxCurrent: 0.5, note: '音圈 = 纯阻负载（常见 4~32Ω）；音频电流驱动发声' },
-  transformer: { name: '变压器', group: '无源', note: '理想比模型：副边电压 = 匝数比 × 原边电压；原边励磁阻抗 1kΩ' },
+  transformer: { name: '变压器', group: '无源', note: '理想变压器：副边电压 = 匝数比 × 原边电压；原边电流 = 匝数比 × 副边电流（Ip = −k·Is，能量守恒）' },
 };
 
 const GMIN = 1e-12;
@@ -134,14 +134,28 @@ export function portKey(p: PortRef): string {
   return `${p.comp}:${p.port}`;
 }
 
-/** 读取数值参数：按 keys 顺序取第一个存在的（主键 + 别名） */
+/**
+ * 读取数值参数：先按 keys 顺序在「用户 params」里找（主键 + 别名都算用户值），
+ * 全部缺失才回落到 DEFAULT_PARAMS（同样按 keys 顺序）。
+ * C5 修复：旧实现用 `c.params?.[k] ?? DEFAULT_PARAMS[type][k]` 逐键回退，
+ * 主键默认值先命中会导致 `r`/`c`/`l`/`v`/`value`/`fs` 等别名永远读不到
+ * （resistor{ r: 1000 } 仍按默认 220Ω 算）。两轮扫描保证「用户值优先于默认值」。
+ */
 export function numParam(c: ComponentSpec, keys: string | string[], fallback: number): number {
   const list = Array.isArray(keys) ? keys : [keys];
-  for (const k of list) {
-    const v = c.params?.[k] ?? DEFAULT_PARAMS[c.type][k];
-    if (v === undefined) continue;
+  const toNum = (v: number | string | boolean | undefined): number | undefined => {
+    if (v === undefined || typeof v === 'boolean') return undefined;
     const n = typeof v === 'number' ? v : Number(v);
-    if (Number.isFinite(n)) return n;
+    return Number.isFinite(n) ? n : undefined;
+  };
+  for (const k of list) {
+    const n = toNum(c.params?.[k]);
+    if (n !== undefined) return n;
+  }
+  const defs = DEFAULT_PARAMS[c.type];
+  for (const k of list) {
+    const n = toNum(defs[k]);
+    if (n !== undefined) return n;
   }
   return fallback;
 }
@@ -169,10 +183,16 @@ export function passiveR(c: ComponentSpec): number {
     default: return NaN;
   }
 }
+/** 读取字符串参数：与 numParam 同一套「用户 params 优先、别名可用」规则 */
 export function strParam(c: ComponentSpec, keys: string | string[], fallback: string): string {
   const list = Array.isArray(keys) ? keys : [keys];
   for (const k of list) {
-    const v = c.params?.[k] ?? DEFAULT_PARAMS[c.type][k];
+    const v = c.params?.[k];
+    if (typeof v === 'string') return v;
+  }
+  const defs = DEFAULT_PARAMS[c.type];
+  for (const k of list) {
+    const v = defs[k];
     if (typeof v === 'string') return v;
   }
   return fallback;
@@ -227,6 +247,12 @@ export interface Compiled {
   /** 需要电流未知量的电压源型支路 */
   vsrcBranches: { comp: ComponentSpec; kind: string; netP: number; netN: number; port?: string }[];
   floatingNets: Set<number>;
+  /**
+   * 仅靠 GMIN 锚定的「惰性网络」：没有任何直流耦合元件挂在上面
+   * （典型：opamp 未接的 vcc/vee 引脚、只接了一颗电容的节点）。
+   * 求解时只给这些网络补 GMIN 防奇异，正常网络不再被 GMIN 污染数值。
+   */
+  anchorNets: Set<number>;
   error?: string;
 }
 
@@ -280,9 +306,109 @@ export function compileCircuit(circuit: CircuitSpec): Compiled {
   const floatingNets = new Set<number>();
   for (const [n, cnt] of usage) if (n !== 0 && cnt === 1) floatingNets.add(n);
 
-  const vsrcBranches: Compiled['vsrcBranches'] = [];
-  let error: string | undefined;
   const netOfPort = (c: ComponentSpec, p: string) => netOf.get(`${c.id}:${p}`) ?? 0;
+
+  /* ------------------- C4：直流接地路径检查（DC 口径） -------------------
+   * 旧引擎给每个节点打 GMIN 到地，矩阵永不奇异 → 「没有接地参考」的电路也能
+   * 返回 ±半个电源电压且 ok:true。这里按 DC 口径（电容开路、断开开关开路、
+   * 半导体/电压源按可导通处理）求连通分量：与 net 0 没有直流通路的子电路
+   * 无法确定绝对电位，直接给可读错误；只有完全惰性、无任何直流耦合的网络
+   * （未接的运放电源脚等）才交给 GMIN 锚定，不误报。 */
+  const dcUf = new UnionFind();
+  const dcLink = (a: number, b: number) => dcUf.union(`n${a}`, `n${b}`);
+  /** 有直流耦合（或直流电流注入）的网络：孤立时才是错误，而非惰性节点 */
+  const activeNets = new Set<number>();
+  const linkActive = (a: number, b: number) => {
+    dcLink(a, b); activeNets.add(a); activeNets.add(b);
+  };
+  for (const c of circuit.components) {
+    const P = (p: string) => netOfPort(c, p);
+    switch (c.type) {
+      case 'resistor': case 'ldr': case 'thermistor': case 'buzzer': case 'speaker':
+      case 'fuse': case 'voltmeter': case 'ammeter': case 'inductor':
+        linkActive(P('a'), P('b'));
+        break;
+      case 'pot':
+        dcLink(P('a'), P('w')); dcLink(P('w'), P('b'));
+        activeNets.add(P('a')); activeNets.add(P('w')); activeNets.add(P('b'));
+        break;
+      case 'switch': case 'button':
+        if (boolParam(c, 'closed')) linkActive(P('a'), P('b'));
+        break;
+      case 'diode': case 'schottky': case 'led': case 'zener':
+        // 单向器件也视为可导通：这里只判断「是否完全孤立」，不判断工作点方向
+        linkActive(P('a'), P('k'));
+        break;
+      case 'npn':
+        linkActive(P('b'), P('e')); linkActive(P('c'), P('e'));
+        break;
+      case 'nmos': case 'pmos':
+        linkActive(P('d'), P('s'));
+        break;
+      case 'vsrc': case 'battery':
+        linkActive(P('pos'), P('neg'));
+        break;
+      case 'funcgen':
+        linkActive(P('out'), P('gnd'));
+        break;
+      case 'sensor':
+        linkActive(P('out'), 0);
+        break;
+      case 'mcu':
+        for (const pin of ['p0', 'p1', 'p2', 'p3']) {
+          if (boolParam(c, pin)) linkActive(P(pin), 0);
+        }
+        break;
+      case 'ic':
+        linkActive(P('in'), 0); linkActive(P('out'), 0);
+        break;
+      case 'module':
+        linkActive(P('vcc'), P('gnd')); linkActive(P('out'), 0);
+        break;
+      case 'opamp':
+        // 输出是受控电压源（out 对地）；inp/inn/vcc/vee 是高阻/只读端口，不构成直流通路
+        linkActive(P('out'), 0);
+        break;
+      case 'antenna':
+        linkActive(P('a'), 0);
+        break;
+      case 'transformer':
+        // 副边是独立电压源；原边在新耦合模型里没有对地电导，靠导线/电源接地
+        linkActive(P('s1'), P('s2'));
+        break;
+      case 'capacitor': case 'crystal': case 'gnd':
+        break;
+    }
+  }
+
+  const anchorNets = new Set<number>();
+  const isolatedNets: number[] = [];
+  const dcGroundRoot = dcUf.find('n0');
+  for (const n of nets) {
+    if (n === 0) continue;
+    const root = dcUf.find(`n${n}`);
+    if (root === dcGroundRoot) continue;
+    if (activeNets.has(n)) isolatedNets.push(n);
+    else anchorNets.add(n); // 惰性网络：GMIN 锚定即可
+  }
+
+  let groundError: string | undefined;
+  if (isolatedNets.length > 0) {
+    const first = isolatedNets[0];
+    let label = `节点 #${first}`;
+    for (const [key, net] of netOf) {
+      if (net === first) { label = key; break; }
+    }
+    const floating = [...floatingNets].find(n => isolatedNets.includes(n));
+    const hint = floating !== undefined ? `（节点 #${floating} 可能完全悬空）` : '';
+    groundError =
+      `电路没有接地参考：以「${label}」为代表的 ${isolatedNets.length} 个网络所在的子电路` +
+      `与 GND 之间没有直流通路，电位无法确定（也可能只是元件还没接线）${hint}。` +
+      `把电源负极接到地，或给这个子电路接一个 GND。`;
+  }
+
+  const vsrcBranches: Compiled['vsrcBranches'] = [];
+  let error: string | undefined = groundError;
   for (const c of circuit.components) {
     if (c.type === 'vsrc' || c.type === 'battery') {
       const np = netOfPort(c, 'pos');
@@ -312,14 +438,17 @@ export function compileCircuit(circuit: CircuitSpec): Compiled {
     } else if (c.type === 'opamp') {
       vsrcBranches.push({ comp: c, kind: 'opamp', netP: netOfPort(c, 'out'), netN: 0 });
     } else if (c.type === 'transformer') {
+      const np1 = netOfPort(c, 'p1');
+      const np2 = netOfPort(c, 'p2');
       const ns1 = netOfPort(c, 's1');
       const ns2 = netOfPort(c, 's2');
       if (ns1 === ns2) error = `变压器「${c.id}」的副边被导线直接短接了——匝数比再高也救不了短路。`;
+      if (np1 === np2) error = `变压器「${c.id}」的原边被导线直接短接了——励磁回路会烧穿绝缘。`;
       vsrcBranches.push({ comp: c, kind: 'xfmr', netP: ns1, netN: ns2 });
     }
   }
 
-  return { circuit, netOf, nets, nodeIndex, nodeCount, vsrcBranches, floatingNets, error };
+  return { circuit, netOf, nets, nodeIndex, nodeCount, vsrcBranches, floatingNets, anchorNets, error };
 }
 
 /* ---------------------------------- 动态元件状态（电容/电感/熔断） ---------------------------------- */
@@ -373,6 +502,26 @@ export function maxFuncgenFreq(circuit: CircuitSpec): number {
   return f;
 }
 
+/** 电路中 sensor 噪声源的最高频率（C9：不纳入步长决策会在 dt=1e-5 下混叠）；无则 0 */
+export function maxSensorNoiseFreq(circuit: CircuitSpec): number {
+  let f = 0;
+  for (const c of circuit.components) {
+    if (c.type === 'sensor' && numParam(c, 'noise', 0) > 0) {
+      f = Math.max(f, numParam(c, 'noiseFreq', 1000));
+    }
+  }
+  return f;
+}
+
+/**
+ * 电路里需要时域分辨率的最快信号频率：函数发生器频率 ∪ 传感器噪声频率。
+ * 仿真器据此决定自适应步长（C9）；步进判决只看 funcgen 时，159kHz 的 sensor
+ * 噪声会被 1e-5s 的步长混叠成数值假象（sb-7 陷波关）。
+ */
+export function maxSignalFreq(circuit: CircuitSpec): number {
+  return Math.max(maxFuncgenFreq(circuit), maxSensorNoiseFreq(circuit));
+}
+
 /* ---------------------------------- 线性求解：高斯消元（部分主元） ---------------------------------- */
 
 function solveLinear(A: number[][], b: number[]): number[] | null {
@@ -411,6 +560,13 @@ export interface SolveResult {
   /** 运放/LDO 输出电压 compId -> V */
   opampOut: Map<string, number>;
   iterations: number;
+  /**
+   * C6：非线性迭代是否真收敛（40 次上限内 maxDelta < 1e-7 且器件模式不再翻转）。
+   * 向后兼容新增字段：旧消费者忽略即可；耗尽上限时为 false，但 ok 仍可能为 true。
+   */
+  converged: boolean;
+  /** C6：最后一次迭代的未知量（节点电压/支路电流）最大变化量；首轮/失败时为 undefined */
+  residual?: number;
 }
 
 export interface SolveOptions {
@@ -425,11 +581,14 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
   const { time = 0, dt = 0, state, applyFailure = true } = opts;
   const fail = (error: string): SolveResult => ({
     ok: false, error, nodeVoltages: new Map([[0, 0]]), netOf: cp.netOf,
-    branchCurrents: new Map(), opampOut: new Map(), iterations: 0,
+    branchCurrents: new Map(), opampOut: new Map(), iterations: 0, converged: false,
   });
   if (cp.error) return fail(cp.error);
   if (cp.circuit.components.length === 0) {
-    return { ok: true, nodeVoltages: new Map([[0, 0]]), netOf: cp.netOf, branchCurrents: new Map(), opampOut: new Map(), iterations: 0 };
+    return {
+      ok: true, nodeVoltages: new Map([[0, 0]]), netOf: cp.netOf, branchCurrents: new Map(),
+      opampOut: new Map(), iterations: 0, converged: true, residual: 0,
+    };
   }
 
   const N = cp.nodeCount;
@@ -441,9 +600,26 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
 
   let vPrev = new Array<number>(dim).fill(0);
   const opampMode = new Map<string, number>(); // 0=线性 1=上限幅 -1=下限幅
+  /**
+   * C1：二极管族的分段线性模式（跨迭代保持，粘滞以避免阈值边界来回翻转）。
+   * 判据与读回完全一致：ON ⇔ vd > vf，且 i = max(0, (vd − vf) / rOn)。
+   */
+  const diodeOn = new Map<string, boolean>();
+  /** C1：稳压管模式 off=截止 / fwd=正向导通 / rev=反向击穿 */
+  const zenerMode = new Map<string, 'off' | 'fwd' | 'rev'>();
+  /** C3：NPN 模式 off=截止 / active=放大区(Ic=βIb) / sat=饱和区(Vce≈vceSat+rOn·Ic) */
+  const npnMode = new Map<string, 'off' | 'active' | 'sat'>();
+  const branchIndex = new Map<string, number>();
+  cp.vsrcBranches.forEach((br, k) => {
+    if (br.kind === 'xfmr') branchIndex.set(br.comp.id, k);
+  });
+  /** NPN 基极-发射极结的等效串联电阻（Ω）：Ib = (Vbe − vf) / rbe */
+  const NPN_RBE = 50;
   let x = vPrev;
   let xPrevGlobal: number[] | null = null;
   let iterations = 0;
+  let converged = false;
+  let residual: number | undefined;
 
   for (let iter = 0; iter < 40; iter++) {
     iterations = iter + 1;
@@ -490,7 +666,8 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
           break;
         }
         case 'xfmr': {
-          // 理想比模型：副边电压 = 匝数比 × 原边电压（原边只有 1kΩ 励磁负载，与副边解耦 → 两轮迭代收敛）
+          // C8：理想变压器（能量守恒口径）——副边电压 Vs = k·Vp；
+          // 原边电流由副边电流反射得到 Ip = −k·Is（k=匝数比），见下方 transformer 元件分支。
           const k = numParam(c, 'ratio', 1);
           b[row] = k * (nodeV(netOfPort(c, 'p1'), vPrev) - nodeV(netOfPort(c, 'p2'), vPrev));
           break;
@@ -525,10 +702,19 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
         case 'speaker':
           stampG(netOfPort(c, 'a'), netOfPort(c, 'b'), R(passiveR(c)));
           break;
-        case 'transformer':
-          // 原边励磁阻抗 1kΩ；副边是受控电压源支路（见 vsrcBranches）
-          stampG(netOfPort(c, 'p1'), netOfPort(c, 'p2'), R(1000));
+        case 'transformer': {
+          // C8：原边不再是固定 1kΩ 励磁，而是「副边负载反射」：Ip = −k·Is。
+          // KCL：p1 流出原边的电流 = −k·Is；p2 流出 = +k·Is（Is 为副边支路未知量，s1→s2）。
+          const k = numParam(c, 'ratio', 1);
+          const row = N + (branchIndex.get(c.id) ?? -1);
+          if (row >= N) {
+            const ip = idx(netOfPort(c, 'p1'));
+            const iq = idx(netOfPort(c, 'p2'));
+            if (ip >= 0) A[ip][row] += -k;
+            if (iq >= 0) A[iq][row] += k;
+          }
           break;
+        }
         case 'fuse': stampG(netOfPort(c, 'a'), netOfPort(c, 'b'), blown ? GMIN : R(0.05)); break;
         case 'voltmeter': stampG(netOfPort(c, 'pos'), netOfPort(c, 'neg'), R(R_OPEN)); break;
         case 'ammeter': stampG(netOfPort(c, 'a'), netOfPort(c, 'b'), R(R_SHORT)); break;
@@ -540,8 +726,11 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
         case 'ic': stampG(netOfPort(c, 'in'), 0, R(100000)); break; // LDO 静态电流 ~µA
         case 'module': stampG(netOfPort(c, 'vcc'), netOfPort(c, 'gnd'), R(1000)); break;
         case 'mcu': {
-          // 静态电流：current(mA) 恒流 sink vcc→gnd
-          stampI(0, netOfPort(c, 'vcc'), numParam(c, 'current', 20) / 1000);
+          // 静态电流：current(mA) 恒流 sink vcc→gnd；
+          // vcc 落在惰性网络（没接电源，无直流通路）时 MCU 未上电，不注电流（否则 20mA/GMIN 会得到天文数字电压）
+          if (!cp.anchorNets.has(netOfPort(c, 'vcc'))) {
+            stampI(0, netOfPort(c, 'vcc'), numParam(c, 'current', 20) / 1000);
+          }
           break;
         }
         case 'capacitor':
@@ -573,19 +762,22 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
           break;
         }
         case 'pot': {
+          // C2 极性修正：wiper 0 = 靠近 b 端、1 = 靠近 a 端（symbols.tsx:347 / explain.ts 口径）
+          // → R_a→w = R·(1−w)，R_w→b = R·w，于是 V_w = V_b + (V_a − V_b)·w。
           const rT = Math.max(numParam(c, ['resistance', 'r'], 10000), 1);
           const w = Math.min(Math.max(numParam(c, ['wiper', 'ratio'], 0.5), 0.001), 0.999);
-          stampG(netOfPort(c, 'a'), netOfPort(c, 'w'), R(rT * w));
-          stampG(netOfPort(c, 'w'), netOfPort(c, 'b'), R(rT * (1 - w)));
+          stampG(netOfPort(c, 'a'), netOfPort(c, 'w'), R(rT * (1 - w)));
+          stampG(netOfPort(c, 'w'), netOfPort(c, 'b'), R(rT * w));
           break;
         }
         case 'diode':
         case 'schottky':
         case 'led': {
           const vf = numParam(c, 'vf', c.type === 'led' ? 2 : c.type === 'schottky' ? 0.3 : 0.7);
-          const rOn = numParam(c, 'rOn', 5);
-          const vd = nodeV(netOfPort(c, 'a'), vPrev) - nodeV(netOfPort(c, 'k'), vPrev);
-          if (!blown && vd > vf * 0.95) {
+          const rOn = Math.max(numParam(c, 'rOn', 5), 1e-6);
+          // C1：单调分段线性模型 i = max(0, (vd − vf) / rOn)。
+          // stamp 判据与读回判据完全一致（都由 diodeOn 模式表驱动），不存在 0.95 死区。
+          if (!blown && (diodeOn.get(c.id) ?? false)) {
             stampG(netOfPort(c, 'a'), netOfPort(c, 'k'), R(rOn));
             stampI(netOfPort(c, 'a'), netOfPort(c, 'k'), vf / rOn);
           } else {
@@ -596,29 +788,49 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
         case 'zener': {
           const vf = numParam(c, 'vf', 0.7);
           const vz = numParam(c, 'vz', 5.1);
-          const rOn = numParam(c, 'rOn', 2);
-          const rz = numParam(c, 'rz', 10);
-          const vd = nodeV(netOfPort(c, 'a'), vPrev) - nodeV(netOfPort(c, 'k'), vPrev);
-          if (vd > vf * 0.95) {
+          const rOn = Math.max(numParam(c, 'rOn', 2), 1e-6);
+          const rz = Math.max(numParam(c, 'rz', 10), 1e-6);
+          const mode = zenerMode.get(c.id) ?? 'off';
+          if (mode === 'fwd') {
             stampG(netOfPort(c, 'a'), netOfPort(c, 'k'), R(rOn));
             stampI(netOfPort(c, 'a'), netOfPort(c, 'k'), vf / rOn);
-          } else if (vd < -vz * 0.98) {
+          } else if (mode === 'rev') {
+            // 反向击穿：i = (vd + vz)/rz（vd < −vz 时为负，即电流 k→a）
             stampG(netOfPort(c, 'a'), netOfPort(c, 'k'), R(rz));
             stampI(netOfPort(c, 'k'), netOfPort(c, 'a'), vz / rz);
           } else stampG(netOfPort(c, 'a'), netOfPort(c, 'k'), GMIN);
           break;
         }
         case 'npn': {
-          // 简化开关模型：Vbe>0.7 → B-E 导通（rOn 50Ω + Vf 源）且 C-E 饱和（Vce(sat)≈0.2V 等效小电阻）
+          // C3：有源区/饱和区模型（beta 真正参与计算）
+          //  · 截止：Vbe ≤ vf，两个结都断开
+          //  · 放大区：Ib = (Vbe − vf)/rbe，Ic = β·Ib（c-e 为受控电流源 gm·(Vbe − vf)，gm = β/rbe）
+          //  · 饱和区：Ic = (Vce − vceSat)/rOn（c-e 等效 rOn + vceSat 电压源）
           const vf = numParam(c, 'vf', 0.7);
-          const vbe = nodeV(netOfPort(c, 'b'), vPrev) - nodeV(netOfPort(c, 'e'), vPrev);
-          if (vbe > vf * 0.95) {
-            stampG(netOfPort(c, 'b'), netOfPort(c, 'e'), R(50));
-            stampI(netOfPort(c, 'b'), netOfPort(c, 'e'), vf / 50);
-            stampG(netOfPort(c, 'c'), netOfPort(c, 'e'), R(numParam(c, 'rOn', 2)));
-            stampI(netOfPort(c, 'c'), netOfPort(c, 'e'), numParam(c, 'vceSat', 0.2) / numParam(c, 'rOn', 2));
+          const rOn = Math.max(numParam(c, 'rOn', 2), 1e-6);
+          const beta = Math.max(numParam(c, 'beta', 100), 1);
+          const mode = npnMode.get(c.id) ?? 'off';
+          if (mode !== 'off') {
+            stampG(netOfPort(c, 'b'), netOfPort(c, 'e'), R(NPN_RBE));
+            stampI(netOfPort(c, 'b'), netOfPort(c, 'e'), vf / NPN_RBE);
           } else {
             stampG(netOfPort(c, 'b'), netOfPort(c, 'e'), GMIN);
+          }
+          if (mode === 'sat') {
+            stampG(netOfPort(c, 'c'), netOfPort(c, 'e'), R(rOn));
+            stampI(netOfPort(c, 'c'), netOfPort(c, 'e'), numParam(c, 'vceSat', 0.2) / rOn);
+          } else if (mode === 'active') {
+            const gm = beta / NPN_RBE;
+            const nc = idx(netOfPort(c, 'c')), nb = idx(netOfPort(c, 'b')), ne = idx(netOfPort(c, 'e'));
+            if (nc >= 0 && nb >= 0) A[nc][nb] += gm;
+            if (nc >= 0 && ne >= 0) A[nc][ne] -= gm;
+            if (ne >= 0 && nb >= 0) A[ne][nb] -= gm;
+            if (ne >= 0) A[ne][ne] += gm;
+            if (nc >= 0) b[nc] += gm * vf;
+            if (ne >= 0) b[ne] -= gm * vf;
+            // 有限输出电导（Early/漏电）：防止悬空集电极让矩阵奇异
+            stampG(netOfPort(c, 'c'), netOfPort(c, 'e'), GMIN);
+          } else {
             stampG(netOfPort(c, 'c'), netOfPort(c, 'e'), GMIN);
           }
           break;
@@ -636,7 +848,8 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
       }
     }
 
-    for (let n = 1; n <= N; n++) stampG(n, 0, GMIN);
+    // C4：GMIN 只补在惰性网络（无直流耦合）上，避免用它掩盖「没有接地参考」的电路
+    for (const n of cp.anchorNets) stampG(n, 0, GMIN);
 
     const solved = solveLinear(A, b);
     if (!solved) {
@@ -660,11 +873,69 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
       else if (vout < railLo - 1e-6) { opampMode.set(c.id, -1); clampChanged = true; }
     }
 
+    /* C1/C3：用刚解出的电压更新器件工作模式（互补性检查）。
+     * 模式粘滞 + 迟滞：ON 态只有算出明显负电流才回落 OFF；模式一变就必须继续迭代。 */
+    let modeChanged = false;
+    for (const c of cp.circuit.components) {
+      const blown = applyFailure && state?.blown.has(c.id);
+      if (c.type === 'diode' || c.type === 'schottky' || c.type === 'led') {
+        const vf = numParam(c, 'vf', c.type === 'led' ? 2 : c.type === 'schottky' ? 0.3 : 0.7);
+        const rOn = Math.max(numParam(c, 'rOn', 5), 1e-6);
+        const prev = diodeOn.get(c.id) ?? false;
+        const vd = nodeV(netOfPort(c, 'a'), x) - nodeV(netOfPort(c, 'k'), x);
+        let next = false;
+        if (!blown) {
+          const iF = (vd - vf) / rOn; // ON 态电流；<0 说明解落在阈值以下，不满足互补性
+          next = prev ? iF > -1e-9 : vd > vf + 1e-9;
+        }
+        if (next !== prev) modeChanged = true;
+        diodeOn.set(c.id, next);
+      } else if (c.type === 'zener') {
+        const vf = numParam(c, 'vf', 0.7);
+        const vz = numParam(c, 'vz', 5.1);
+        const rOn = Math.max(numParam(c, 'rOn', 2), 1e-6);
+        const rz = Math.max(numParam(c, 'rz', 10), 1e-6);
+        const vd = nodeV(netOfPort(c, 'a'), x) - nodeV(netOfPort(c, 'k'), x);
+        const iF = (vd - vf) / rOn;   // 正向导通电流（a→k）
+        const iR = (-vd - vz) / rz;   // 反向击穿电流大小（>0 表示击穿导通）
+        const prev = zenerMode.get(c.id) ?? 'off';
+        let next: 'off' | 'fwd' | 'rev';
+        if (prev === 'fwd' && iF > -1e-9) next = 'fwd';
+        else if (prev === 'rev' && iR > -1e-9) next = 'rev';
+        else if (iF > 0) next = 'fwd';
+        else if (iR > 0) next = 'rev';
+        else next = 'off';
+        if (next !== prev) modeChanged = true;
+        zenerMode.set(c.id, next);
+      } else if (c.type === 'npn') {
+        const vf = numParam(c, 'vf', 0.7);
+        const vceSat = numParam(c, 'vceSat', 0.2);
+        const rOn = Math.max(numParam(c, 'rOn', 2), 1e-6);
+        const beta = Math.max(numParam(c, 'beta', 100), 1);
+        const vbe = nodeV(netOfPort(c, 'b'), x) - nodeV(netOfPort(c, 'e'), x);
+        const vce = nodeV(netOfPort(c, 'c'), x) - nodeV(netOfPort(c, 'e'), x);
+        const prev = npnMode.get(c.id) ?? 'off';
+        let next: 'off' | 'active' | 'sat';
+        if (vbe < vf - 1e-9 || (prev === 'off' && vbe <= vf)) {
+          next = 'off';
+        } else {
+          const icAct = beta * Math.max(vbe - vf, 0) / NPN_RBE; // 放大区电流上限 β·Ib
+          const icSat = (vce - vceSat) / rOn;                   // 饱和区外电路决定电流
+          if (prev === 'active') next = vce >= vceSat - 1e-6 ? 'active' : 'sat';
+          else if (prev === 'sat') next = icSat > icAct + 1e-9 ? 'active' : 'sat';
+          else next = icAct <= icSat ? 'active' : 'sat';
+        }
+        if (next !== prev) modeChanged = true;
+        npnMode.set(c.id, next);
+      }
+    }
+
     let maxDelta = xPrevGlobal ? 0 : Infinity;
     if (xPrevGlobal) for (let i = 0; i < dim; i++) maxDelta = Math.max(maxDelta, Math.abs(x[i] - xPrevGlobal[i]));
+    residual = Number.isFinite(maxDelta) ? maxDelta : undefined;
     xPrevGlobal = [...x];
     vPrev = x;
-    if (maxDelta < 1e-7 && !clampChanged) break;
+    if (maxDelta < 1e-7 && !clampChanged && !modeChanged) { converged = true; break; }
   }
 
   const nodeVoltages = new Map<number, number>();
@@ -701,10 +972,12 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
       case 'speaker':
         i = (V(c, 'a') - V(c, 'b')) / passiveR(c);
         break;
-      case 'transformer':
-        // 原边励磁电流（副边电流在 "id:s" 键下，由支路未知量写入）
-        i = (V(c, 'p1') - V(c, 'p2')) / 1000;
+      case 'transformer': {
+        // C8：原边电流 = −k × 副边电流（负载反射），能量账 Ip·Vp = Is·Vs 严格成立
+        const k = numParam(c, 'ratio', 1);
+        i = -k * (branchCurrents.get(`${c.id}:s`) ?? 0);
         break;
+      }
       case 'fuse': i = blown ? 0 : (V(c, 'a') - V(c, 'b')) / 0.05; break;
       case 'voltmeter': i = (V(c, 'pos') - V(c, 'neg')) / R_OPEN; break;
       case 'ammeter': i = (V(c, 'a') - V(c, 'b')) / R_SHORT; break;
@@ -712,7 +985,10 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
         i = boolParam(c, 'closed') ? (V(c, 'a') - V(c, 'b')) / R_SHORT : 0; break;
       case 'antenna': i = V(c, 'a') / numParam(c, ['impedance', 'r'], 50); break;
       case 'module': i = (V(c, 'vcc') - V(c, 'gnd')) / 1000; break;
-      case 'mcu': i = numParam(c, 'current', 20) / 1000; break;
+      case 'mcu':
+        // vcc 未接电源（惰性网络）时 MCU 未上电，静态电流为 0
+        i = cp.anchorNets.has(netOfPort(c, 'vcc')) ? 0 : numParam(c, 'current', 20) / 1000;
+        break;
       case 'capacitor': case 'crystal': {
         if (dt > 0 && state) {
           const defC = c.type === 'crystal' ? 12e-12 : 1e-6;
@@ -731,29 +1007,42 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
         break;
       }
       case 'pot': {
+        // C2：与 stamp 同一套极性 R_a→w = R·(1−w)
         const rT = Math.max(numParam(c, ['resistance', 'r'], 10000), 1);
         const w = Math.min(Math.max(numParam(c, ['wiper', 'ratio'], 0.5), 0.001), 0.999);
-        i = (V(c, 'a') - V(c, 'w')) / Math.max(rT * w, 1e-6);
+        i = (V(c, 'a') - V(c, 'w')) / Math.max(rT * (1 - w), 1e-6);
         break;
       }
       case 'diode': case 'schottky': case 'led': {
+        // C1：读回与 stamp 共用同一模式表与同一判据 i = max(0, (vd − vf)/rOn)
         const vf = numParam(c, 'vf', c.type === 'led' ? 2 : c.type === 'schottky' ? 0.3 : 0.7);
-        const rOn = numParam(c, 'rOn', 5);
+        const rOn = Math.max(numParam(c, 'rOn', 5), 1e-6);
         const vd = V(c, 'a') - V(c, 'k');
-        i = !blown && vd > vf ? (vd - vf) / rOn : vd * GMIN;
+        i = !blown && (diodeOn.get(c.id) ?? false) ? Math.max(0, (vd - vf) / rOn) : 0;
         break;
       }
       case 'zener': {
         const vf = numParam(c, 'vf', 0.7); const vz = numParam(c, 'vz', 5.1);
+        const rOn = Math.max(numParam(c, 'rOn', 2), 1e-6);
+        const rz = Math.max(numParam(c, 'rz', 10), 1e-6);
         const vd = V(c, 'a') - V(c, 'k');
-        if (vd > vf) i = (vd - vf) / numParam(c, 'rOn', 2);
-        else if (vd < -vz) i = (vd + vz) / numParam(c, 'rz', 10);
-        else i = vd * GMIN;
+        const mode = zenerMode.get(c.id) ?? 'off';
+        if (mode === 'fwd') i = Math.max(0, (vd - vf) / rOn);
+        else if (mode === 'rev') i = Math.min(0, (vd + vz) / rz);
+        else i = 0;
         break;
       }
       case 'npn': {
-        const vbe = V(c, 'b') - V(c, 'e');
-        i = vbe > numParam(c, 'vf', 0.7) ? Math.max(V(c, 'c') - V(c, 'e') - numParam(c, 'vceSat', 0.2), 0) / numParam(c, 'rOn', 2) : 0;
+        // C3：读回工作模式对应的集电极电流（放大区 β·Ib / 饱和区 (Vce−vceSat)/rOn）
+        const vf = numParam(c, 'vf', 0.7);
+        const rOn = Math.max(numParam(c, 'rOn', 2), 1e-6);
+        const beta = Math.max(numParam(c, 'beta', 100), 1);
+        const mode = npnMode.get(c.id) ?? 'off';
+        if (mode === 'sat') {
+          i = Math.max(V(c, 'c') - V(c, 'e') - numParam(c, 'vceSat', 0.2), 0) / rOn;
+        } else if (mode === 'active') {
+          i = beta * Math.max(V(c, 'b') - V(c, 'e') - vf, 0) / NPN_RBE;
+        } else i = 0;
         break;
       }
       case 'nmos': case 'pmos': {
@@ -780,7 +1069,7 @@ export function solveCompiled(cp: Compiled, opts: SolveOptions = {}): SolveResul
     }
   }
 
-  return { ok: true, nodeVoltages, netOf: cp.netOf, branchCurrents, opampOut, iterations };
+  return { ok: true, nodeVoltages, netOf: cp.netOf, branchCurrents, opampOut, iterations, converged, residual };
 }
 
 /** 便捷 DC 求解（电容开路 / 电感短路） */
@@ -799,13 +1088,17 @@ export interface FailureEvent {
 export function updateFailures(circuit: CircuitSpec, res: SolveResult, state: DynState, dt: number): FailureEvent[] {
   const events: FailureEvent[] = [];
   if (!res.ok) return events;
+  // C7：LED 应力按「仿真时间」累加，而不是每次调用固定加 max(dt,1e-4)——
+  // 否则 0.1s 的烧毁时长会随帧率/调用次数变化。dt 缺失（DC/单次求值）时
+  // 按调用次数保守折算（1 次调用 = 0.1ms 仿真时间）。
+  const step = dt > 0 && Number.isFinite(dt) ? dt : 1e-4;
   for (const c of circuit.components) {
     if (state.blown.has(c.id)) continue;
     const i = Math.abs(res.branchCurrents.get(c.id) ?? 0);
     if (c.type === 'led') {
       const imax = numParam(c, 'imax', 0.02);
       if (i > imax * 3) {
-        const t = (state.ledStress.get(c.id) ?? 0) + Math.max(dt, 1e-4);
+        const t = (state.ledStress.get(c.id) ?? 0) + step;
         state.ledStress.set(c.id, t);
         if (t >= 0.1) {
           state.blown.add(c.id);
@@ -815,7 +1108,7 @@ export function updateFailures(circuit: CircuitSpec, res: SolveResult, state: Dy
           });
         }
       } else {
-        state.ledStress.set(c.id, Math.max(0, (state.ledStress.get(c.id) ?? 0) - Math.max(dt, 1e-4) * 2));
+        state.ledStress.set(c.id, Math.max(0, (state.ledStress.get(c.id) ?? 0) - step * 2));
       }
     } else if (c.type === 'fuse') {
       const rating = numParam(c, 'rating', 0.5);

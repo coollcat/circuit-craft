@@ -2,18 +2,29 @@
 // 编辑器 — 电路画布：节点拖拽连线 + 45° 折线布线 + 拐点手动布线 + 磁吸端口 + 电流粒子 + 故障冒烟
 // 手感是灵魂：端口 hover 放大发光、拖拽中磁吸、橡皮筋预览、网格 16px 吸附、
 // Delete 删除选中、R 旋转、Esc 取消、双击元件开参数、双击导线删除。
+// 走线治理：所有导线经 wireRoutes 的「全局串行布线」统一出路径（后画的线避让先画的线 + 元件本体），
+// 渲染 / 命中 / 粒子 / 橡皮筋预览共用同一组折线（A2/A3），预览什么样落线就什么样。
+// 防呆（poka-yoke）：B1 非法连线拦截并说明原因 · B2 可连接端口高亮/磁吸/端口名 · B3 落空/pointercancel/Esc 复位
+// · B4 Ctrl+Z / Ctrl+Shift+Z 撤销重做 · B5 元件放置避让/不出画布 · B7 悬空端口灰显 + 计数提示。
 // 拐点布线（wirefix）：单击端口起线 → 点击空白加拐点（16px 网格吸附）→ 点目标端口收线；
 // Backspace 撤销上一个拐点；Esc / 右键 / 再次点击起点端口 取消整条在画导线。
 // 四层走线（wave6 双层 → editorx7 四层板 top/in1/in2/bottom）：工具区层按钮定新导线起始层（选中导线时=改派该线层）；
 // 画线中按 V 在光标处落过孔（hole 拐点），后续段沿层序循环换层，预览与落线共用 buildWireSegments 逐段一致。
 // 画布明/暗主题：右上角太阳/月亮切换，localStorage 持久化 + 多实例事件同步（见 canvasTheme.ts）。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Layers, Moon, RotateCw, Sun } from 'lucide-react';
-import type { CircuitSpec, ComponentSpec, PortRef, ViaPoint, WireLayer, WireSpec } from '@/engine/types';
+import { AlertTriangle, Layers, Moon, Redo2, RotateCw, Sun, Undo2 } from 'lucide-react';
+import type { CircuitSpec, ComponentSpec, ComponentType, PortRef, ViaPoint, WireLayer, WireSpec } from '@/engine/types';
 import { compileCircuit, formatSI, numParam, passiveR, portKey } from '@/engine/solver';
 import { ParticleSystem, SmokeSystem, pathLength, type WireFlowState, type WirePath } from '@/engine/particles';
 import { PORT_GEOM, SymbolGlyph, compRadius, portWorldPos } from './symbols';
-import { LAYER_ORDER, buildWirePolyline, buildWireSegments, distToPolyline, ptsToPath, type Pt } from './routing';
+import {
+  LAYER_ORDER, buildWirePolyline, buildWireSegments, distToPolyline, flattenSegments, ptsToPath,
+  type Pt, type WireSegment,
+} from './routing';
+import {
+  buildCircuitWireSegments, buildWireRouteContext, clampComponentToWorkspace,
+  componentPlaceBlocked, findFreeComponentSpot,
+} from './wireRoutes';
 import { layerWireColor, useCanvasTheme } from './canvasTheme';
 import { toast } from './toast';
 import { sfxClick, sfxPop } from './sound';
@@ -60,6 +71,96 @@ export interface CircuitEditorProps {
 type Selection = { kind: 'comp' | 'wire'; id: string } | null;
 
 interface Transform { x: number; y: number; k: number }
+
+/* ---------------- B1 连线合法性判定（防呆核心；纯函数，供落线与端口高亮共用） ---------------- */
+
+const SOURCE_TYPES = new Set<ComponentType>(['battery', 'vsrc', 'funcgen']);
+
+function samePort(a: PortRef, b: PortRef): boolean {
+  return a.comp === b.comp && a.port === b.port;
+}
+
+/** 已存在「同一对端口」的导线（无向） */
+function wireBetween(wires: readonly WireSpec[], a: PortRef, b: PortRef): WireSpec | undefined {
+  return wires.find(w =>
+    (samePort(w.from, a) && samePort(w.to, b)) || (samePort(w.from, b) && samePort(w.to, a)));
+}
+
+/** 电源类元件的两个端子（正/负，函数发生器是 out/gnd） */
+function sourceTerminals(c: ComponentSpec): [string, string] {
+  return c.type === 'funcgen' ? ['out', 'gnd'] : ['pos', 'neg'];
+}
+
+/** 新连一根 na↔nb 的线是否会直接把某个电源的正负极短接 */
+function shortsSourceTerminals(compiled: ReturnType<typeof compileCircuit>, na: number | undefined, nb: number | undefined): boolean {
+  if (na === undefined || nb === undefined || na === nb) return false;
+  for (const c of compiled.circuit.components) {
+    if (!SOURCE_TYPES.has(c.type)) continue;
+    const [pos, neg] = sourceTerminals(c);
+    const np = compiled.netOf.get(`${c.id}:${pos}`);
+    const nn = compiled.netOf.get(`${c.id}:${neg}`);
+    if (np === undefined || nn === undefined) continue;
+    if ((na === np && nb === nn) || (na === nn && nb === np)) return true;
+  }
+  return false;
+}
+
+export type ConnectVerdict =
+  | { ok: true }
+  | { ok: false; kind: 'self' | 'duplicate' | 'same-net' | 'short'; msg: string };
+
+/** 落线前的完整防呆校验：自连 / 重复连 / 已同网络 / 电源短路（含经由既有支路的间接短路） */
+export function validateConnection(circuit: CircuitSpec, from: PortRef, to: PortRef): ConnectVerdict {
+  if (samePort(from, to)) {
+    return { ok: false, kind: 'self', msg: '不能把端口连到它自己：导线两端必须是两个不同的引脚。' };
+  }
+  if (wireBetween(circuit.wires, from, to)) {
+    return { ok: false, kind: 'duplicate', msg: '这两个端口之间已经有一根导线了，不用重复连。' };
+  }
+  const compiled = compileCircuit(circuit);
+  const na = compiled.netOf.get(portKey(from));
+  const nb = compiled.netOf.get(portKey(to));
+  if (na !== undefined && na === nb) {
+    return {
+      ok: false, kind: 'same-net',
+      msg: '这两点已经连通了（同一个节点），再连一根线不会改变电路。',
+    };
+  }
+  if (shortsSourceTerminals(compiled, na, nb)) {
+    return {
+      ok: false, kind: 'short',
+      msg: '这样会把电源正负极直接短接！电流会瞬间烧毁元件——中间至少要串一个用电器。',
+    };
+  }
+  // 兜底：真的把这根线加进去编译一次，拦住「经由其它支路间接短路」的边界情况
+  const probe: CircuitSpec = { ...circuit, wires: [...circuit.wires, { id: '__phantom__', from, to }] };
+  const after = compileCircuit(probe);
+  if (!compiled.error && after.error) {
+    return { ok: false, kind: 'short', msg: `${after.error}接线已取消。` };
+  }
+  return { ok: true };
+}
+
+export type PortConnectState = 'origin' | 'ok' | 'duplicate' | 'same-net' | 'short';
+
+/** 连线中每个端口的可连接状态（一次编译，供 B2 高亮/吸附/端口名使用） */
+function buildPortConnectivity(circuit: CircuitSpec, from: PortRef): Map<string, PortConnectState> {
+  const map = new Map<string, PortConnectState>();
+  const compiled = compileCircuit(circuit);
+  const netFrom = compiled.netOf.get(portKey(from));
+  for (const c of circuit.components) {
+    for (const g of PORT_GEOM[c.type]) {
+      const ref: PortRef = { comp: c.id, port: g.name };
+      const key = portKey(ref);
+      if (samePort(ref, from)) { map.set(key, 'origin'); continue; }
+      if (wireBetween(circuit.wires, ref, from)) { map.set(key, 'duplicate'); continue; }
+      const net = compiled.netOf.get(key);
+      if (net !== undefined && net === netFrom) { map.set(key, 'same-net'); continue; }
+      map.set(key, shortsSourceTerminals(compiled, netFrom, net) ? 'short' : 'ok');
+    }
+  }
+  return map;
+}
 
 export function mainParamText(c: ComponentSpec): string {
   const p = c.params ?? {};
@@ -168,15 +269,23 @@ export default function CircuitEditor({
     }
     return null;
   }, []);
-  const wirePoints = useCallback((wire: WireSpec, circ = circuitRef.current): Pt[] => {
-    const a = circ.components.find(c => c.id === wire.from.comp);
-    const b = circ.components.find(c => c.id === wire.to.comp);
+  /* ---------------- 全局串行布线（A2/A3：渲染/命中/粒子/预览同一组折线） ---------------- */
+  // 后画的线避让先画的线 + 元件本体；同一份 circuit 一定得到同一份路径（纯函数）。
+  const wireSegMap = useMemo(() => buildCircuitWireSegments(circuit), [circuit]);
+  const wireSegRef = useRef(wireSegMap);
+  wireSegRef.current = wireSegMap;
+  const ghostSegMap = useMemo(() => (ghost ? buildCircuitWireSegments(ghost) : null), [ghost]);
+  const ghostSegRef = useRef(ghostSegMap);
+  ghostSegRef.current = ghostSegMap;
+  const wirePoints = useCallback((wire: WireSpec, circ?: CircuitSpec): Pt[] => {
+    const segs = circ ? ghostSegRef.current?.get(wire.id) : wireSegRef.current.get(wire.id);
+    if (segs) return flattenSegments(segs);
+    // 兜底（极端时序：路径表还没跟上 props）：退回纯几何布线，保证不白屏
+    const source = circ ?? circuitRef.current;
+    const a = source.components.find(c => c.id === wire.from.comp);
+    const b = source.components.find(c => c.id === wire.to.comp);
     if (!a || !b) return [];
-    const pa = portWorldPos(a, wire.from.port);
-    const pb = portWorldPos(b, wire.to.port);
-    // 渲染/命中/粒子共用 buildWirePolyline（与画线预览同一套路径算法，保证逐段一致）；
-    // 无拐点时退化为 route45 自动走线（buildWirePolyline 内部处理），旧导线渲染不变。
-    return buildWirePolyline(pa, wire.via ?? [], pb);
+    return buildWirePolyline(portWorldPos(a, wire.from.port), wire.via ?? [], portWorldPos(b, wire.to.port));
   }, []);
   const hitWire = useCallback((w: Pt, tolWorld: number): WireSpec | null => {
     for (let i = circuitRef.current.wires.length - 1; i >= 0; i--) {
@@ -186,12 +295,70 @@ export default function CircuitEditor({
     return null;
   }, [wirePoints]);
 
+  /* ---------------- B4 撤销/重做（覆盖加/删元件、加/删线、改参数、移动元件） ---------------- */
+  const pastRef = useRef<CircuitSpec[]>([]);
+  const futureRef = useRef<CircuitSpec[]>([]);
+  const lastHistoryAtRef = useRef(0);
+  const prevPropRef = useRef(circuit);
+  const historySkipRef = useRef(false); // 本次 props 变化由撤销/重做引起，不要再入栈
+  const [histCounts, setHistCounts] = useState({ undo: 0, redo: 0 });
+  const syncHistCounts = useCallback(() => {
+    setHistCounts({ undo: pastRef.current.length, redo: futureRef.current.length });
+  }, []);
+  // 任何来源的电路变化（含父组件放元件 / 派生解法）都进撤销栈；650ms 内的连续变化（拖元件/拖滑杆）合并成一步
+  useEffect(() => {
+    const prev = prevPropRef.current;
+    if (prev === circuit) return;
+    prevPropRef.current = circuit;
+    if (readOnly) return;
+    if (historySkipRef.current) {
+      historySkipRef.current = false;
+      return;
+    }
+    const now = performance.now();
+    if (now - lastHistoryAtRef.current < 650 && pastRef.current.length > 0) {
+      lastHistoryAtRef.current = now;
+      return;
+    }
+    pastRef.current = [...pastRef.current.slice(-79), prev];
+    futureRef.current = [];
+    lastHistoryAtRef.current = now;
+    syncHistCounts();
+  }, [circuit, readOnly, syncHistCounts]);
+
+  /* ---------------- B7 悬空端口统计（灰显 + 计数） ---------------- */
+  const connectedPorts = useMemo(() => {
+    const set = new Set<string>();
+    for (const w of circuit.wires) {
+      set.add(portKey(w.from));
+      set.add(portKey(w.to));
+    }
+    return set;
+  }, [circuit]);
+  const danglingPorts = useMemo(() => {
+    let dangling = 0;
+    for (const c of circuit.components) {
+      for (const g of PORT_GEOM[c.type]) {
+        if (!connectedPorts.has(portKey({ comp: c.id, port: g.name }))) dangling += 1;
+      }
+    }
+    return dangling;
+  }, [circuit, connectedPorts]);
+
+  /* ---------------- B2 连线中端口可连接状态（高亮/灰显/红显 + 吸附端口名） ---------------- */
+  const portConnectivity = useMemo(
+    () => (wireFrom ? buildPortConnectivity(circuit, wireFrom) : null),
+    [wireFrom, circuit],
+  );
+
   /* ---------------- 拖拽状态 ---------------- */
   const dragRef = useRef<
     | { mode: 'pan'; startX: number; startY: number; orig: Transform }
     | { mode: 'comp'; id: string; dx: number; dy: number }
     | null
   >(null);
+  /** 本次拖拽是否撞到画布边界被钳位（松手时提示一次，不在拖动过程中刷屏） */
+  const clampedRef = useRef(false);
 
   const emitChange = useCallback((next: CircuitSpec) => {
     onInteract?.();
@@ -208,6 +375,40 @@ export default function CircuitEditor({
     setWireStartLayer('top'); // 层草稿一并复位；下次起线时会重新取当前激活层
     gestureRef.current = null;
   }, []);
+
+  /** B4 撤销：恢复到上一个电路快照（加/删元件、加/删线、改参数、移动元件都覆盖） */
+  const undo = useCallback(() => {
+    if (readOnly) return;
+    const target = pastRef.current[pastRef.current.length - 1];
+    if (!target) return;
+    pastRef.current = pastRef.current.slice(0, -1);
+    futureRef.current = [...futureRef.current, circuitRef.current];
+    historySkipRef.current = true; // 这次 props 变化是撤销本身，不要再入栈
+    lastHistoryAtRef.current = 0;
+    cancelWire();
+    setSelRaw(null);
+    onSelect?.(null);
+    onChange(target);
+    syncHistCounts();
+    toast('已撤销上一步（Ctrl+Z 继续撤销 / Ctrl+Shift+Z 重做）', 'info');
+  }, [readOnly, cancelWire, onSelect, onChange, syncHistCounts]);
+
+  /** B4 重做 */
+  const redo = useCallback(() => {
+    if (readOnly) return;
+    const target = futureRef.current[futureRef.current.length - 1];
+    if (!target) return;
+    futureRef.current = futureRef.current.slice(0, -1);
+    pastRef.current = [...pastRef.current, circuitRef.current];
+    historySkipRef.current = true;
+    lastHistoryAtRef.current = 0;
+    cancelWire();
+    setSelRaw(null);
+    onSelect?.(null);
+    onChange(target);
+    syncHistCounts();
+    toast('已重做', 'info');
+  }, [readOnly, cancelWire, onSelect, onChange, syncHistCounts]);
 
   /** 顺时针旋转元件 90°（R 键 / 悬浮旋转按钮 / 参数弹窗四朝向共用的核心逻辑；locked 元件拒绝） */
   const rotateComp = useCallback((compId: string) => {
@@ -249,10 +450,14 @@ export default function CircuitEditor({
       const p = hitPort(w, SNAP_TOL / viewRef.current.k);
       if (p) {
         if (p.comp === wireFrom.comp && p.port === wireFrom.port) {
-          cancelWire(); // 再次点击起点端口 = 取消整条在画导线
-        } else {
-          tryAddWire(wireFrom, p, viaPts);
+          // B1：自连不是「合法收线」，明确告诉玩家原因再取消
+          toast('同一端口不能自连：导线两端必须是两个不同的引脚，本次连线已取消。', 'error');
           cancelWire();
+        } else if (tryAddWire(wireFrom, p, viaPts)) {
+          cancelWire();
+        } else {
+          // B1 拦截：保留在画导线草稿，玩家可以直接改选别的端口，不用从头再来
+          gestureRef.current = null;
         }
       } else {
         // 点击空白画布：追加拐点（吸附 16px 网格，与元件拖拽同一套吸附）
@@ -280,6 +485,7 @@ export default function CircuitEditor({
       }
       setSel({ kind: 'comp', id: comp.id });
       if (!comp.locked) {
+        clampedRef.current = false;
         dragRef.current = { mode: 'comp', id: comp.id, dx: w.x - comp.x, dy: w.y - comp.y };
       }
       return;
@@ -305,12 +511,15 @@ export default function CircuitEditor({
       return;
     }
     if (d?.mode === 'comp') {
-      const nx = Math.round((w.x - d.dx) / GRID) * GRID;
-      const ny = Math.round((w.y - d.dy) / GRID) * GRID;
       const circ = circuitRef.current;
       const comp = circ.components.find(c => c.id === d.id);
-      if (comp && (comp.x !== nx || comp.y !== ny)) {
-        emitChange({ ...circ, components: circ.components.map(c => (c.id === d.id ? { ...c, x: nx, y: ny } : c)) });
+      if (!comp) return;
+      // B5 防呆：拖动时把元件中心钳位在画布可用区内（用点击半径给符号本身留空间）
+      const raw = { x: Math.round((w.x - d.dx) / GRID) * GRID, y: Math.round((w.y - d.dy) / GRID) * GRID };
+      const pos = clampComponentToWorkspace(comp, raw, compRadius(comp));
+      if (pos.x !== raw.x || pos.y !== raw.y) clampedRef.current = true;
+      if (comp.x !== pos.x || comp.y !== pos.y) {
+        emitChange({ ...circ, components: circ.components.map(c => (c.id === d.id ? { ...c, x: pos.x, y: pos.y } : c)) });
       }
       return;
     }
@@ -343,51 +552,68 @@ export default function CircuitEditor({
 
   const onPointerUp = (e: React.PointerEvent) => {
     const w = toWorld(e.clientX, e.clientY);
+    const drag = dragRef.current;
     if (wireFrom) {
       const g = gestureRef.current;
       const target = hitPort(w, SNAP_TOL / viewRef.current.k);
       const isOrigin = target !== null && target.comp === wireFrom.comp && target.port === wireFrom.port;
       if (target && !isOrigin) {
         // 松手落在目标端口：完成连线（拖拽起线与点击模式都走这里兜底）
-        tryAddWire(wireFrom, target, viaPts);
-        cancelWire();
+        if (tryAddWire(wireFrom, target, viaPts)) cancelWire();
+        else gestureRef.current = null; // 被防呆拦截：保留草稿，方便改选端口
       } else if (g?.fresh) {
-        if (!g.moved && isOrigin) {
-          // 单击起点端口：进入点击布线模式（之后可点空白加拐点、点目标端口收线）
+        if (!g.moved) {
+          // 单击起点端口（含轻微手抖）：进入点击布线模式（之后点空白加拐点、点目标端口收线）
           g.fresh = false;
-        } else {
-          // 拖拽起线后松手落空：保持旧行为，取消
+        } else if (isOrigin) {
+          // B1：拖回起点端口 = 自连，明确提示后取消
+          toast('拖回起点是自连——两端必须是不同引脚，本次连线已取消。', 'error');
           cancelWire();
+        } else {
+          // B3：拖拽起线后松手落在空白处 → 取消，绝不产生悬空导线
+          cancelWire();
+          toast('松手的位置没有端口，本次连线已取消（没有产生多余导线）。', 'info');
         }
       }
       // 点击布线模式下 pointerup 不做事：收线/取消/加点都在 pointerdown 处理
+    } else if (drag?.mode === 'comp') {
+      // B5：拖拽结束时若和别的元件叠住，自动错开到最近空位并说明
+      const circ = circuitRef.current;
+      const comp = circ.components.find(c => c.id === drag.id);
+      if (comp && !comp.locked && componentPlaceBlocked(circ, comp, { x: comp.x, y: comp.y }, comp.id)) {
+        const spot = findFreeComponentSpot(circ, comp, { x: comp.x, y: comp.y }, compRadius(comp));
+        if (spot.x !== comp.x || spot.y !== comp.y) {
+          emitChange({ ...circ, components: circ.components.map(c => (c.id === comp.id ? { ...c, x: spot.x, y: spot.y } : c)) });
+          toast(`${comp.id} 和别的元件叠住了，已自动挪到最近的空位。`, 'info');
+        }
+      } else if (clampedRef.current) {
+        toast('元件不能拖出画布可用区，已经停在边缘。', 'info');
+      }
     }
+    clampedRef.current = false;
     dragRef.current = null;
   };
 
-  const tryAddWire = (from: PortRef, to: PortRef, via?: ViaPoint[]) => {
-    const circ = circuitRef.current;
-    if (circ.wires.some(x =>
-      (portKey(x.from) === portKey(from) && portKey(x.to) === portKey(to)) ||
-      (portKey(x.from) === portKey(to) && portKey(x.to) === portKey(from)))) {
-      toast('这两个端口已经连上了。', 'info');
-      return;
+  /** B3 指针被系统取消（触控手势被抢/窗口切走）时复位所有布线草稿，避免下一条线继承脏状态 */
+  const onPointerCancel = () => {
+    dragRef.current = null;
+    gestureRef.current = null;
+    clampedRef.current = false;
+    if (wireFrom) {
+      cancelWire();
+      toast('连线手势被中断，已复位（没有产生导线）。', 'info');
     }
-    const compiled = compileCircuit(circ);
-    const na = compiled.netOf.get(portKey(from));
-    const nb = compiled.netOf.get(portKey(to));
-    if (na !== undefined && na === nb) {
-      const involvesSrc = [from, to].some(r => {
-        const t = compById.get(r.comp)?.type;
-        return t === 'battery' || t === 'vsrc' || t === 'funcgen';
-      });
-      toast(
-        involvesSrc
-          ? '这样会把电源直接短路！电流喜欢抄近路——但这条路会烧掉一切。'
-          : '这两个点已经是同一个节点了，不需要再连一根线。',
-        'error',
-      );
-      return;
+  };
+
+  /** 落线唯一入口：B1 防呆校验（自连/重复/已同网络/电源短路）不通过 → toast 说明原因且绝不产生导线。
+   *  返回是否真的落下：失败时调用方保留在画导线草稿，玩家可以直接改选别的端口。 */
+  const tryAddWire = (from: PortRef, to: PortRef, via?: ViaPoint[]): boolean => {
+    const circ = circuitRef.current;
+    const verdict = validateConnection(circ, from, to);
+    if (!verdict.ok) {
+      const soft = verdict.kind === 'duplicate' || verdict.kind === 'same-net';
+      toast(verdict.msg, soft ? 'info' : 'error');
+      return false;
     }
     const wire: WireSpec = {
       id: `W${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`,
@@ -399,6 +625,7 @@ export default function CircuitEditor({
     emitChange({ ...circ, wires: [...circ.wires, wire] });
     setSel({ kind: 'wire', id: wire.id });
     sfxClick();
+    return true;
   };
 
   const onDoubleClick = (e: React.MouseEvent) => {
@@ -413,6 +640,9 @@ export default function CircuitEditor({
     if (wire) {
       emitChange({ ...circuitRef.current, wires: circuitRef.current.wires.filter(x => x.id !== wire.id) });
       setSel(null);
+      // B4：删除必须可撤销，而且要告诉玩家有撤销这回事
+      toast('导线已删除 · Ctrl+Z（Mac ⌘Z）可撤销', 'info');
+      sfxClick();
     }
   };
 
@@ -458,18 +688,39 @@ export default function CircuitEditor({
       }
       if (readOnly) return;
       const circ = circuitRef.current;
+      // B4 撤销/重做：Ctrl+Z / Ctrl+Shift+Z（Mac 上 Cmd）；Delete 类操作之后再补 Ctrl+Y 也可重做
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if (mod && !e.altKey && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        redo();
+        return;
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
         // 若正从被删元件的端口拉线，先取消布线，避免渲染期对已删端口取坐标而崩溃
         if (wireFrom && wireFrom.comp === sel.id) cancelWire();
         if (sel.kind === 'wire') {
           emitChange({ ...circ, wires: circ.wires.filter(x => x.id !== sel.id) });
+          toast('导线已删除 · Ctrl+Z（Mac ⌘Z）可撤销', 'info');
         } else {
           const comp = circ.components.find(c => c.id === sel.id);
           if (comp && !comp.locked) {
+            const related = circ.wires.filter(x => x.from.comp === sel.id || x.to.comp === sel.id).length;
             emitChange({
               components: circ.components.filter(c => c.id !== sel.id),
               wires: circ.wires.filter(x => x.from.comp !== sel.id && x.to.comp !== sel.id),
             });
+            toast(
+              related > 0
+                ? `${comp.id} 及连带 ${related} 根导线已删除 · Ctrl+Z（Mac ⌘Z）可撤销`
+                : `${comp.id} 已删除 · Ctrl+Z（Mac ⌘Z）可撤销`,
+              'info',
+            );
           }
         }
         setSel(null);
@@ -481,13 +732,15 @@ export default function CircuitEditor({
           e.preventDefault();
           const dx = e.key === 'ArrowLeft' ? -GRID : e.key === 'ArrowRight' ? GRID : 0;
           const dy = e.key === 'ArrowUp' ? -GRID : e.key === 'ArrowDown' ? GRID : 0;
-          emitChange({ ...circ, components: circ.components.map(c => (c.id === comp.id ? { ...c, x: c.x + dx, y: c.y + dy } : c)) });
+          // B5：方向键微移同样不许把元件移出画布可用区
+          const pos = clampComponentToWorkspace(comp, { x: comp.x + dx, y: comp.y + dy }, compRadius(comp));
+          emitChange({ ...circ, components: circ.components.map(c => (c.id === comp.id ? { ...c, x: pos.x, y: pos.y } : c)) });
         }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sel, readOnly, emitChange, wireFrom, viaPts, cancelWire, wireStartLayer, rotateComp, setSel]); // 光标走 cursorRef，不进依赖：避免监听器随鼠标移动反复拆挂
+  }, [sel, readOnly, emitChange, wireFrom, viaPts, cancelWire, wireStartLayer, rotateComp, setSel, undo, redo]); // 光标走 cursorRef，不进依赖：避免监听器随鼠标移动反复拆挂
 
   /* ---------------- 粒子 / 烟雾循环 ---------------- */
   useEffect(() => {
@@ -563,8 +816,20 @@ export default function CircuitEditor({
 
   /* ---------------- 渲染 ---------------- */
   const v = visuals;
-  const wireFromPos = wireFrom ? portWorldPos(compById.get(wireFrom.comp)!, wireFrom.port) : null;
-  const rubberEnd = snapPort ? portWorldPos(compById.get(snapPort.comp)!, snapPort.port) : cursor;
+  // 起线/磁吸元件可能已被删掉（撤销、派生解法等），这里防御式取坐标，绝不因脏草稿白屏
+  const wireFromComp = wireFrom ? compById.get(wireFrom.comp) ?? null : null;
+  const snapComp = snapPort ? compById.get(snapPort.comp) ?? null : null;
+  const wireFromPos = wireFrom && wireFromComp ? portWorldPos(wireFromComp, wireFrom.port) : null;
+  const rubberEnd = snapPort && snapComp ? portWorldPos(snapComp, snapPort.port) : cursor;
+  // A2/A3：橡皮筋预览与落线共用同一实现 + 同一上下文（existing = 当前全部已布线，boxes 排除起/终点元件），
+  // 因此「悬停吸附到目标端口」时预览路径 = 松手后的落线路径，逐点一致。
+  const previewSegs: WireSegment[] = (() => {
+    if (!wireFrom || !wireFromPos) return [];
+    const exclude = [wireFrom.comp];
+    if (snapPort && snapPort.comp !== wireFrom.comp) exclude.push(snapPort.comp);
+    const ctx = buildWireRouteContext(circuit, wireSegMap, exclude);
+    return buildWireSegments(wireFromPos, viaPts, rubberEnd, wireStartLayer, ctx);
+  })();
   // 层切换按钮状态：选中导线时显示/改派该导线的起始层，否则显示/设置激活层（新导线用）
   const selWire = sel?.kind === 'wire' ? circuit.wires.find(w => w.id === sel.id) ?? null : null;
   // 选中元件（悬浮旋转按钮 + 顶部操作提示条用）
@@ -594,6 +859,7 @@ export default function CircuitEditor({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onDoubleClick={onDoubleClick}
       onWheel={onWheel}
       onContextMenu={e => e.preventDefault()}
@@ -610,7 +876,14 @@ export default function CircuitEditor({
         if (!item) return;
         e.preventDefault();
         const w = toWorld(e.clientX, e.clientY);
-        onDropItem(item, { x: Math.round(w.x / GRID) * GRID, y: Math.round(w.y / GRID) * GRID });
+        const want = { x: Math.round(w.x / GRID) * GRID, y: Math.round(w.y / GRID) * GRID };
+        // B5 元件放置防呆：落点被占用 → 自动错开到最近空位；拖到画布外 → 钳回可用区
+        const spot = findFreeComponentSpot(circuitRef.current, item, want, compRadius(item));
+        const alreadyPlaced = circuitRef.current.components.some(c => c.id === item.id);
+        if (!alreadyPlaced && (spot.x !== want.x || spot.y !== want.y)) {
+          toast(`${item.id} 的落点和别的元件重叠，已自动放到最近空位（${spot.x}, ${spot.y}）。`, 'info');
+        }
+        onDropItem(item, spot);
       }}
     >
       <svg className="absolute inset-0 h-full w-full">
@@ -643,15 +916,14 @@ export default function CircuitEditor({
             </g>
           )}
 
-          {/* 导线（按段着色：顶层铜色 / 底层蓝色，遇 hole 过孔换层） */}
+          {/* 导线（A3：渲染直接用全局布线表的同一组折线，命中测试也读同一份） */}
           {circuit.wires.map(wire => {
             const a = compById.get(wire.from.comp);
             const b = compById.get(wire.to.comp);
-            if (!a || !b) return null;
+            const segs = wireSegMap.get(wire.id);
+            if (!a || !b || !segs || segs.length === 0) return null;
             const pa = portWorldPos(a, wire.from.port);
             const pb = portWorldPos(b, wire.to.port);
-            const segs = buildWireSegments(pa, wire.via ?? [], pb, wire.layer ?? 'top');
-            if (segs.length === 0) return null;
             const selected = sel?.kind === 'wire' && sel.id === wire.id;
             const i = v?.branchCurrents ? Math.max(
               Math.abs(v.branchCurrents.get(wire.from.comp) ?? 0),
@@ -693,10 +965,11 @@ export default function CircuitEditor({
             );
           })}
 
-          {/* 橡皮筋预览：起点 → 各拐点 → 光标/磁吸端口；与落线共用 buildWireSegments 保证逐段一致，颜色随层切换 */}
+          {/* 橡皮筋预览：起点 → 各拐点 → 光标/磁吸端口；与落线共用 buildWireSegments + 同一避让上下文（A2），
+              悬停吸附到端口时预览路径即落线路径，颜色随层切换 */}
           {wireFrom && wireFromPos && (
             <g pointerEvents="none">
-              {buildWireSegments(wireFromPos, viaPts, rubberEnd, wireStartLayer).map((s, i) => (
+              {previewSegs.map((s, i) => (
                 <path
                   key={i}
                   d={ptsToPath(s.pts)} fill="none"
@@ -803,22 +1076,66 @@ export default function CircuitEditor({
                     })}
                   </g>
                 )}
-                {/* 端口 */}
+                {/* 端口（B2：连线中可连接端口绿环高亮、非法端口灰/红显；B7：未接线端口灰点 + 虚线环） */}
                 {PORT_GEOM[c.type].map(g => {
                   const isFrom = wireFrom?.comp === c.id && wireFrom?.port === g.name;
                   const isSnap = snapPort?.comp === c.id && snapPort?.port === g.name;
-                  const hovering = wireFrom && !isFrom;
+                  const key = portKey({ comp: c.id, port: g.name });
+                  const state: PortConnectState | undefined = wireFrom ? portConnectivity?.get(key) : undefined;
+                  const connected = connectedPorts.has(key);
+                  const invalid = state === 'duplicate' || state === 'same-net' || state === 'short';
+                  const fill = isSnap ? T.portSnap
+                    : isFrom ? T.rubber
+                      : state === 'short' ? T.wireOver
+                        : invalid ? T.pinOff
+                          : state === 'ok' ? T.port
+                            : connected ? T.port : T.pinOff;
+                  const r = isSnap ? 6 : isFrom ? 5.5 : state === 'ok' ? 4.5 : wireFrom ? 3.8 : connected ? 3.8 : 3;
+                  const opacity = isSnap || isFrom ? 1 : invalid ? 0.45 : wireFrom ? 0.95 : connected ? 0.8 : 0.5;
+                  const hint = state === 'origin' ? `${c.id}:${g.name} — 本次连线的起点`
+                    : state === 'duplicate' ? `${c.id}:${g.name} — 已经和起点连过了`
+                      : state === 'same-net' ? `${c.id}:${g.name} — 和起点已经是同一个节点`
+                        : state === 'short' ? `${c.id}:${g.name} — 会把电源正负极短接！`
+                          : state === 'ok' ? `${c.id}:${g.name} — 可以连` : `${c.id}:${g.name}`;
                   return (
                     <g key={g.name} transform={`rotate(${c.rotation ?? 0})`}>
+                      <title>{hint}</title>
                       <circle
-                        cx={g.x} cy={g.y}
-                        r={isSnap ? 6 : isFrom ? 5.5 : hovering ? 4.5 : 3.5}
-                        fill={isSnap ? T.portSnap : T.port}
-                        opacity={isSnap || isFrom ? 1 : wireFrom ? 0.9 : 0.65}
+                        cx={g.x} cy={g.y} r={r}
+                        fill={fill}
+                        opacity={opacity}
                         style={isSnap ? { filter: 'drop-shadow(0 0 6px rgba(67,224,138,0.9))' } : undefined}
                       />
+                      {state === 'ok' && <circle cx={g.x} cy={g.y} r={7.5} fill="none" stroke={T.portSnap} strokeWidth={1.1} opacity={0.5} />}
+                      {state === 'short' && <circle cx={g.x} cy={g.y} r={8} fill="none" stroke={T.wireOver} strokeWidth={1.3} opacity={0.85} />}
+                      {!wireFrom && !connected && <circle cx={g.x} cy={g.y} r={6} fill="none" stroke={T.pinOff} strokeWidth={1} strokeDasharray="2 2" opacity={0.5} />}
                       {isSnap && <circle cx={g.x} cy={g.y} r={10} fill="none" stroke={T.portSnap} strokeWidth={1.5} opacity={0.8} />}
                     </g>
+                  );
+                })}
+                {/* B2：连线中把端口名直接标在引脚旁，避免连错引脚 */}
+                {wireFrom && PORT_GEOM[c.type].map(g => {
+                  const p = portWorldPos(c, g.name);
+                  const dx = p.x - c.x, dy = p.y - c.y;
+                  const len = Math.hypot(dx, dy) || 1;
+                  const isSnap = snapPort?.comp === c.id && snapPort?.port === g.name;
+                  const state: PortConnectState | undefined = portConnectivity?.get(portKey({ comp: c.id, port: g.name }));
+                  const dim = state === 'duplicate' || state === 'same-net';
+                  return (
+                    <text
+                      key={`lbl-${g.name}`}
+                      x={dx + (dx / len) * 11}
+                      y={dy + (dy / len) * 11 + 2.5}
+                      textAnchor="middle"
+                      fontSize={isSnap ? 9 : 7.5}
+                      fontWeight={isSnap ? 700 : 400}
+                      fill={isSnap ? T.portSnap : dim ? T.cornerText : T.paramText}
+                      fontFamily="JetBrains Mono, monospace"
+                      pointerEvents="none"
+                      style={{ userSelect: 'none' }}
+                    >
+                      {g.name}
+                    </text>
                   );
                 })}
               </g>
@@ -826,8 +1143,8 @@ export default function CircuitEditor({
           })}
         </g>
 
-        {/* 画布角落装饰 */}
-        <text x={14} y={24} fontSize={10} fill={T.cornerText} fontFamily="JetBrains Mono, monospace" letterSpacing={2}>SCHEMATIC · REV A</text>
+        {/* 画布角落装饰（左移让位给撤销/重做按钮） */}
+        <text x={92} y={24} fontSize={10} fill={T.cornerText} fontFamily="JetBrains Mono, monospace" letterSpacing={2}>SCHEMATIC · REV A</text>
       </svg>
 
       {/* 粒子画布 */}
@@ -840,6 +1157,51 @@ export default function CircuitEditor({
           style={{ left: hoverInfo.x, top: hoverInfo.y }}
         >
           {hoverInfo.text}
+        </div>
+      )}
+
+      {/* B4 撤销/重做按钮（与 Ctrl+Z / Ctrl+Shift+Z 同一逻辑，可见入口不怕找不到） */}
+      {!readOnly && (
+        <div
+          className="absolute left-3 top-3 z-10 flex items-center gap-1 rounded-md border p-0.5 backdrop-blur"
+          style={{ background: T.btnBg, borderColor: T.btnBorder }}
+          onPointerDown={e => e.stopPropagation()}
+          onDoubleClick={e => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={undo}
+            disabled={histCounts.undo === 0}
+            title="撤销（Ctrl+Z / Mac ⌘Z）"
+            aria-label="撤销"
+            className="flex h-6 w-6 items-center justify-center rounded transition-colors disabled:opacity-30"
+            style={{ color: T.btnText }}
+          >
+            <Undo2 size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={redo}
+            disabled={histCounts.redo === 0}
+            title="重做（Ctrl+Shift+Z / Ctrl+Y）"
+            aria-label="重做"
+            className="flex h-6 w-6 items-center justify-center rounded transition-colors disabled:opacity-30"
+            style={{ color: T.btnText }}
+          >
+            <Redo2 size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* B7 悬空端口计数：只要还有引脚没接线就提醒，避免「以为连好了」 */}
+      {!readOnly && danglingPorts > 0 && (
+        <div
+          className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] backdrop-blur"
+          style={{ background: T.btnBg, borderColor: T.btnBorder, color: T.auxText }}
+          title="灰色虚线小圆点 = 还没接线的引脚；接上后会变成实心青色"
+        >
+          <AlertTriangle size={11} />
+          还有 {danglingPorts} 个引脚没接线
         </div>
       )}
 
@@ -941,19 +1303,21 @@ export default function CircuitEditor({
         >
           {selComp.locked
             ? '元件已锁定（不能旋转/移动）· 双击查看参数'
-            : 'R 旋转 · 双击调参数 · 方向键微移 · Delete 删除'}
+            : 'R 旋转 · 双击调参数 · 方向键微移 · Delete 删除（Ctrl+Z 撤销）'}
         </div>
       )}
 
-      {/* 布线中操作提示（顶部居中：避开左下 SANDBOX 水印与右下比例尺） */}
+      {/* 布线中操作提示（顶部居中：显示起点 → 吸附目标端口名，B2 防错引脚） */}
       {wireFrom && !readOnly && !probeMode && (
         <div
           className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 whitespace-nowrap font-mono text-[11px]"
           style={{ color: T.paramText }}
         >
-          {viaPts.length > 0
-            ? `拐点 ×${viaPts.length} · 点空白再加 · V 过孔换层 · Backspace 撤销 · 点目标端口收线 · Esc 取消`
-            : '点目标端口完成连线 · 点空白处加拐点 · V 过孔换层 · Esc 取消'}
+          {snapPort
+            ? `起点 ${wireFrom.comp}:${wireFrom.port} → 吸附到目标 ${snapPort.comp}:${snapPort.port} · 松手/点击完成`
+            : viaPts.length > 0
+              ? `起点 ${wireFrom.comp}:${wireFrom.port} · 拐点 ×${viaPts.length} · 点空白再加 · V 过孔换层 · Backspace 撤销 · Esc 取消`
+              : `起点 ${wireFrom.comp}:${wireFrom.port} · 绿色环=可连端口 · 点目标端口收线 · 点空白加拐点 · Esc 取消`}
         </div>
       )}
     </div>

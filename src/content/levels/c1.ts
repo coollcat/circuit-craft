@@ -41,6 +41,9 @@ export const C1_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '3 分钟内完成', check: 'time', value: 180 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['回路', '欧姆定律'],
+    formula: { expr: 'I = V / R', vars: 'I 电流(A)、V 电压(V)、R 电阻(Ω)', note: '5V ÷ 1kΩ = 5mA；串联回路里电流处处相等，路断则全停' },
     hints: [
       '电流需要一个完整的圆圈才能流动：从电池正极出发，最终回到电池负极。就像小火车需要一圈不断开的铁轨。',
       '把 BT1 的正极连到 R1 的 a 端，R1 的 b 端连到电流表，电流表再连回 BT1 负极。',
@@ -90,6 +93,9 @@ export const C1_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '3 分钟内完成', check: 'time', value: 180 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['电压测量', '并联'],
+    formula: { expr: 'U = V₊ − V₋', vars: 'V₊、V₋ 为红/黑表笔所接两点的电位(V)', note: '电压是两点之差：表笔并联跨接，电压表内阻极大、几乎不分流' },
     hints: [
       '电压是「两点之间」的差值，所以电压表必须一左一右跨搭在元件两端——这叫「并联」。',
       '把 VM1 的 pos（红表笔）接到电池正极，neg（黑表笔）接到电池负极。',
@@ -109,7 +115,7 @@ export const C1_LEVELS: LevelDef[] = [
     title: '欧姆定律：电路的万有引力',
     subtitle: 'V = I × R',
     briefing:
-      '工坊接了个小测试：用这节 5V 电池搭一条回路，让电流表读数稳定在 9~11mA。元件盒里有不同阻值的电阻（阻值就是「减速」的厉害程度，越大电流越小）——选哪颗、调多大，你自己算。提示：I = V ÷ R。',
+      '工坊接了个小测试：用这节 5V 电池搭一条回路，让电流表读数稳定在 9~11mA。料盒里那颗电阻出厂是 1kΩ，是随手放的——先别急着用：常见标准值有 470Ω / 510Ω / 680Ω 三档（阻值就是「减速」的厉害程度，越大电流越小），先算、再挑一档、把 1kΩ 改成你算出的那一档。提示：I = V ÷ R。',
     intro: [
       { speaker: 'laozhou', text: '1827 年，一个叫欧姆的德国中学老师写下了电学里最重要的一个式子：I = V / R。电压使劲推，电阻使劲拦，最后跑多快，一除就知道。' },
       { speaker: 'xiaohan', text: '像捏水管！水压（电压）不变，水管捏得越细（电阻越大），水流（电流）就越小！5V 想要 10mA？快算快算！R = V ÷ I = 5 ÷ 0.01 = 500Ω！' },
@@ -134,7 +140,7 @@ export const C1_LEVELS: LevelDef[] = [
       { kind: 'connected', a: { comp: 'RP1', port: 'a' }, b: { comp: 'BT1', port: 'pos' } },
       { kind: 'connected', a: { comp: 'RP1', port: 'b' }, b: { comp: 'AM1', port: 'a' } },
       { kind: 'connected', a: { comp: 'AM1', port: 'b' }, b: { comp: 'BT1', port: 'neg' } },
-      { kind: 'param', comp: 'RP1', param: 'resistance', min: 480, max: 520 },
+      { kind: 'param', comp: 'RP1', param: 'resistance', min: 460, max: 540 },
       { kind: 'branch-current', comp: 'AM1', min: 9, max: 11 },
     ],
     stars: [
@@ -142,16 +148,20 @@ export const C1_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '4 分钟内完成', check: 'time', value: 240 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['欧姆定律', 'E24 标准值'],
+    formula: { expr: 'R = V / I', vars: 'V 电阻两端电压(V)、I 目标电流(A)', note: '5V ÷ 10mA = 500Ω；E24 标准值 470Ω 与 510Ω 都落在 9~11mA 窗口' },
     hints: [
       '电流目标约 10mA，电源是 5V。用 I = V / R 反推 R = V / I。',
-      'R = 5V ÷ 10mA = 500Ω。把 RP1 的阻值改成 500Ω 附近，再串进回路。',
-      '把 RP1 阻值设为 500Ω，连线 BT1.pos→RP1.a→RP1.b→AM1.a→AM1.b→BT1.neg，运行读数约 10mA。',
+      'R = 5V ÷ 10mA = 500Ω。常见标准值里的 470Ω（10.6mA）和 510Ω（9.8mA）都落在窗口内；680Ω 只有 8.9mA，超窗口，不行。',
+      '把 RP1 调成你选中的那一档（470Ω 或 510Ω），连线 BT1.pos→RP1.a→RP1.b→AM1.a→AM1.b→BT1.neg，运行读数约 10mA。',
     ],
     knowledge: {
       title: '欧姆定律：I = V / R',
       body: '欧姆定律是电路里最有用的公式：电流 I = 电压 V ÷ 电阻 R。还是水管的比方：电压是水压，电阻是水管的细脖子，水流大小 = 水压 ÷ 阻碍。推力越大水越猛，脖子越细水越小——三个量知道任意两个，就能算出第三个。再送你一个「发热公式」：P = V × I，电流流过电阻会发热，功率越大越烫，所以选电阻除了看阻值还要看它扛不扛得住热（额定功率）。小提醒：欧姆定律只管电阻这类「老实」元件；LED、二极管这类「脾气怪」的元件要用另一套办法，这正是下一关的故事。',
     },
-    // 验算: 目标 I≈10mA，R=V/I=5/0.01=500Ω；R∈[480,520] → I∈[5/520, 5/480]=[9.6, 10.4]mA ⊂ [9,11]mA ✓
+    // 验算: 目标 I≈10mA，R=V/I=5/0.01=500Ω；R∈[460,540] → I∈[5/540, 5/460]=[9.3, 10.9]mA ⊂ [9,11]mA ✓
+    // P1 修复（假选择）：出厂 1kΩ ≠ 答案；briefing 给出 470/510/680 三档，只有前两档满足窗口，玩家必须先算再选
   },
   {
     id: 'c1-4',
@@ -194,6 +204,9 @@ export const C1_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['限流电阻', 'LED 极性'],
+    formula: { expr: 'R = (Vcc − Vf) / If', vars: 'Vcc 电源(V)、Vf LED 正向压降(V)、If 目标电流(A)', note: '(5 − 2) ÷ 13.6mA ≈ 220Ω；电流只能从阳极 a 流向阴极 k' },
     hints: [
       'LED 分正负极：a 是阳极（长脚，接电池正极方向），k 是阴极（短脚）。电流只能从 a 流向 k，接反了它不亮。',
       '电阻要消化 5V − 2V = 3V。想要 10~18mA，用 R = 3V ÷ I 挑个中间值算，比如 13mA。',

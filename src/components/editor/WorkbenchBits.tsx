@@ -1,5 +1,8 @@
 // 编辑器 — 工作台共享小组件：运行控制组 / 万用表读数卡 / 右栏折叠条
+import { useMemo } from 'react';
+import { Link } from 'react-router';
 import { Pause, Play, RotateCcw, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { LEVELS } from '@/content/levels';
 import PadButton from '@/components/PadButton';
 import { cn } from '@/lib/utils';
 
@@ -66,14 +69,27 @@ export function RightPanelHeader({ onCollapse, title }: { onCollapse: () => void
   );
 }
 
-export function NotesCard({ title, body }: { title: string; body: string }) {
+export function NotesCard({ title, body, codexId }: { title: string; body: string; codexId?: string }) {
+  // 「图鉴」由死文本改为真链接：优先用调用方给的 codexId（LevelPlay 传 level.codex?.[0]），
+  // 未传时按知识卡标题回查关卡定义里的 codex 条目；查不到则退回 /codex 首页，绝不出现死文本。
+  const codexTo = useMemo(() => {
+    if (codexId) return `/codex#${codexId}`;
+    const entry = LEVELS.find(l => l.knowledge?.title === title)?.codex?.[0];
+    return entry ? `/codex#${entry}` : '/codex';
+  }, [codexId, title]);
   return (
     <details className="rounded-md border border-ink-700 bg-ink-900/60 p-3" open>
       <summary className="cursor-pointer font-mono text-[10px] tracking-[0.2em] text-silk-500">
         本关笔记 · {title}
       </summary>
       <p className="mt-2 text-xs leading-relaxed text-silk-300">{body}</p>
-      <p className="mt-1 font-mono text-[10px] text-silk-700">更多见「图鉴 /codex」对应条目</p>
+      <p className="mt-1 font-mono text-[10px] text-silk-700">
+        更多见{' '}
+        <Link to={codexTo} className="text-sig-cyan underline-offset-2 hover:underline">
+          图鉴
+        </Link>{' '}
+        对应条目
+      </p>
     </details>
   );
 }

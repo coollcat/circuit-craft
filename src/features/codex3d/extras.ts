@@ -5,7 +5,7 @@
 // userData.studioMats（实例材质）由 StudioScene.disposeGroup 释放。
 import * as THREE from 'three';
 
-export type ExtraModelKind = 'relay' | 'dcmotor' | 'servo' | 'seg7' | 'ldo7805';
+export type ExtraModelKind = 'relay' | 'dcmotor' | 'servo' | 'seg7' | 'ldo7805' | 'levelshift' | 'dcdc' | 'opto';
 
 /* ---------------- 构建器：自动登记几何体与材质 ---------------- */
 class Builder {
@@ -88,7 +88,7 @@ function buildDcMotor(): THREE.Group {
   b.cylY(black, 5, 1.6, 0, 0.8, 0); // 电刷端盖
   b.cylY(silver, 5, 11.5, 0, 7.35, 0); // 冲压钢壳
   b.cylY(band, 5.06, 3.2, 0, 7.35, 0); // 印字色环
-  b.cylY(silver, 0.65, 2.8, 0, 14.5, 0); // 输出转轴 φ2mm
+  b.cylY(silver, 1.0, 2.8, 0, 14.5, 0); // 输出转轴 φ2mm（半径 1.0mm）
   for (const dx of [-2.2, 2.2]) b.box(gold, 0.75, 2.6, 0.4, dx, 1.4, 4.7); // 接线端子
   return b.finish();
 }
@@ -140,7 +140,11 @@ function buildSeg7(): THREE.Group {
     b.box(red, 0.72, 1.85, 0.18, x, y, 3.28); // f / b / e / c 竖段
   }
   b.box(red, 0.62, 0.62, 0.18, 1.75, 0.98, 3.28); // 小数点
-  for (let i = -2; i <= 2; i++) b.box(silver, 0.55, 1.0, 0.4, i * 1.3, 0.5, 2.2); // 底排引脚
+  // 上下各 5 脚（共 10 脚），与图鉴正文「上下各 5 脚」一致
+  for (let i = -2; i <= 2; i++) {
+    b.box(silver, 0.55, 1.0, 0.4, i * 1.3, 0.5, 2.2); // 下排引脚
+    b.box(silver, 0.55, 1.0, 0.4, i * 1.3, 0.5, -2.2); // 上排引脚
+  }
   return b.finish();
 }
 
@@ -158,12 +162,70 @@ function buildLdo7805(): THREE.Group {
   return b.finish();
 }
 
+/* ---------------- 光耦：DIP-4（黑体 + 两排共 4 脚 + 1 脚圆点） ---------------- */
+function buildOpto(): THREE.Group {
+  const b = new Builder();
+  const black = b.mat('#1B1E22', 0.55, 0.15);
+  const silver = b.mat('#C7CCD2', 0.3, 0.95);
+  const white = b.mat('#E8E6DF', 0.6, 0.03);
+  b.box(black, 6.4, 3, 5.2, 0, 1.7, 0); // DIP-4 本体
+  b.cylY(white, 0.6, 0.15, -2.4, 3.25, -1.6); // 1 脚圆点
+  for (const x of [-1.27, 1.27]) {
+    b.box(silver, 1.1, 0.35, 1.5, x, 0.5, 3.0); // 下排：1 脚/2 脚一侧
+    b.box(silver, 1.1, 0.35, 1.5, x, 0.5, -3.0); // 上排：4 脚/3 脚一侧
+  }
+  return b.finish();
+}
+
+/* ---------------- 电平转换：4 路双向模块小板（MOS 阵列 + 两侧上拉） ---------------- */
+function buildLevelShift(): THREE.Group {
+  const b = new Builder();
+  const pcb = b.mat('#1E5FA8', 0.6, 0.1);
+  const black = b.mat('#14171A', 0.7, 0.05);
+  const gold = b.mat('#F0C078', 0.3, 0.95);
+  const silver = b.mat('#C7CCD2', 0.3, 0.95);
+  b.box(pcb, 11, 0.7, 8, 0, 0.45, 0); // 蓝色小板
+  b.box(black, 2.2, 0.8, 2.6, 0.4, 1.2, 0); // 中间的 MOS 阵列芯片
+  for (const [dx, dz] of [[-2.6, -1.6], [2.6, -1.6], [-2.6, 1.6], [2.6, 1.6]] as Array<[number, number]>) {
+    b.box(black, 1.0, 0.5, 1.6, dx, 1.05, dz); // 上拉/限流电阻
+  }
+  for (const dz of [-2.4, 0, 2.4]) {
+    b.box(gold, 1.2, 0.3, 1.0, -5.6, 0.85, dz); // LV 侧排针
+    b.box(gold, 1.2, 0.3, 1.0, 5.6, 0.85, dz); // HV 侧排针
+  }
+  b.box(silver, 1.6, 0.35, 1.0, 0, 1.0, -3.4); // 丝印/标识块
+  return b.finish();
+}
+
+/* ---------------- DC-DC：降压模块小板（电感 + 电解电容 + 开关芯片） ---------------- */
+function buildDcdc(): THREE.Group {
+  const b = new Builder();
+  const pcb = b.mat('#1E5FA8', 0.6, 0.1);
+  const black = b.mat('#14171A', 0.7, 0.05);
+  const silver = b.mat('#C7CCD2', 0.3, 0.95);
+  const gold = b.mat('#F0C078', 0.3, 0.95);
+  const band = b.mat('#B8893E', 0.6, 0.35);
+  b.box(pcb, 14, 0.8, 10, 0, 0.5, 0); // 蓝色模块板
+  b.cylY(black, 1.8, 2.4, -3.2, 2.1, 0); // 功率电感（磁罩）
+  b.cylY(band, 1.86, 0.9, -3.2, 2.1, 0); // 电感印字环
+  b.cylY(silver, 1.3, 2.6, 2.6, 2.2, 2.4); // 输入电解电容
+  b.cylY(silver, 1.3, 2.6, 2.6, 2.2, -2.4); // 输出电解电容
+  b.box(black, 3.0, 0.9, 3.0, 3.0, 1.35, -0.2); // 开关芯片
+  for (const [dx, dz] of [[-6.2, -3.4], [-6.2, 3.4], [6.2, -3.4], [6.2, 3.4]] as Array<[number, number]>) {
+    b.box(gold, 1.4, 0.3, 1.2, dx, 0.95, dz); // IN/OUT 焊盘
+  }
+  return b.finish();
+}
+
 const BUILDERS: Record<ExtraModelKind, () => THREE.Group> = {
   relay: buildRelay,
   dcmotor: buildDcMotor,
   servo: buildServo,
   seg7: buildSeg7,
   ldo7805: buildLdo7805,
+  levelshift: buildLevelShift,
+  dcdc: buildDcdc,
+  opto: buildOpto,
 };
 
 /** 由 extra 类型 token 构建实物模型组（含 disposables / studioMats 元数据） */

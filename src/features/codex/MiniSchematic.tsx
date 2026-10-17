@@ -1,4 +1,4 @@
-﻿/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-refresh/only-export-components */
 // 图鉴「原理图看一看」——手绘风典型应用小电路
 // 风格与 codex/symbols.tsx 一致：silk-100 描边 2px、JetBrains Mono 标注、sig-cyan 节点
 // 颜色走 --col-* 主题变量（经 style 消费），明暗主题自动跟随
@@ -24,51 +24,68 @@ function Dot({ x, y }: { x: number; y: number }) {
   return <circle cx={x} cy={y} r={3} style={{ fill: CYAN }} stroke="none" />;
 }
 
-/** 电阻：中心 (x,y)，引脚水平 */
-function Res({ x, y, label }: { x: number; y: number; label?: string }) {
+/**
+ * 取向辅助：基础符号默认水平（引脚在 x±24），v=true 时整体顺时针转 90°（引脚落到 y±24），
+ * 用于竖直支路；flip=true 改为逆时针 90°，用于二极管这类有极性、需要阴极朝上的场合。
+ * 标注文字不进旋转组，始终水平可读。
+ */
+function rot(v: boolean | undefined, x: number, y: number, flip?: boolean): string | undefined {
+  return v ? `rotate(${flip ? -90 : 90} ${x} ${y})` : undefined;
+}
+
+/** 电阻：中心 (x,y)，引脚水平；v=true 竖直 */
+function Res({ x, y, label, v }: { x: number; y: number; label?: string; v?: boolean }) {
   return (
     <g>
-      <W d={`M${x - 24} ${y} H${x - 14} M${x + 14} ${y} H${x + 24}`} />
-      <rect x={x - 14} y={y - 6} width={28} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
-      {label && <T x={x} y={y - 10}>{label}</T>}
+      <g transform={rot(v, x, y)}>
+        <W d={`M${x - 24} ${y} H${x - 14} M${x + 14} ${y} H${x + 24}`} />
+        <rect x={x - 14} y={y - 6} width={28} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
+      </g>
+      {label && (v ? <T x={x + 12} y={y + 4} anchor="start">{label}</T> : <T x={x} y={y - 10}>{label}</T>)}
     </g>
   );
 }
 
-/** 电容（polar 时右极板弧线 + 号） */
-function Cap({ x, y, label, polar }: { x: number; y: number; label?: string; polar?: boolean }) {
+/** 电容（polar 时标 + 号）；v=true 竖直 */
+function Cap({ x, y, label, polar, v }: { x: number; y: number; label?: string; polar?: boolean; v?: boolean }) {
   return (
     <g>
-      <W d={`M${x - 24} ${y} H${x - 3} M${x + 3} ${y} H${x + 24}`} />
-      <W d={`M${x - 3} ${y - 10} V${y + 10} M${x + 3} ${y - 10} V${y + 10}`} />
-      {polar && <T x={x - 8} y={y - 13} c={COPPER}>+</T>}
-      {label && <T x={x} y={y + 22}>{label}</T>}
+      <g transform={rot(v, x, y)}>
+        <W d={`M${x - 24} ${y} H${x - 3} M${x + 3} ${y} H${x + 24}`} />
+        <W d={`M${x - 3} ${y - 10} V${y + 10} M${x + 3} ${y - 10} V${y + 10}`} />
+        {polar && <T x={x - 8} y={y - 13} c={COPPER}>+</T>}
+      </g>
+      {label && (v ? <T x={x + 12} y={y + 4} anchor="start">{label}</T> : <T x={x} y={y + 22}>{label}</T>)}
     </g>
   );
 }
 
-/** 电感：三段半圆 */
-function Ind({ x, y, label }: { x: number; y: number; label?: string }) {
+/** 电感：三段半圆；v=true 竖直 */
+function Ind({ x, y, label, v }: { x: number; y: number; label?: string; v?: boolean }) {
   return (
     <g>
-      <W d={`M${x - 24} ${y} H${x - 15} M${x + 15} ${y} H${x + 24}`} />
-      <W d={`M${x - 15} ${y} a5 5 0 0 1 10 0 a5 5 0 0 1 10 0 a5 5 0 0 1 10 0`} />
-      {label && <T x={x} y={y - 10}>{label}</T>}
+      <g transform={rot(v, x, y)}>
+        <W d={`M${x - 24} ${y} H${x - 15} M${x + 15} ${y} H${x + 24}`} />
+        <W d={`M${x - 15} ${y} a5 5 0 0 1 10 0 a5 5 0 0 1 10 0 a5 5 0 0 1 10 0`} />
+      </g>
+      {label && (v ? <T x={x + 14} y={y + 4} anchor="start">{label}</T> : <T x={x} y={y - 10}>{label}</T>)}
     </g>
   );
 }
 
-/** 二极管族：led 加出光箭头，zener/schottky 阴极折角 */
-function Dio({ x, y, label, led, zener, schottky }: { x: number; y: number; label?: string; led?: boolean; zener?: boolean; schottky?: boolean }) {
+/** 二极管族：led 加出光箭头，zener/schottky 阴极折角；v=true 竖直（默认阴极朝下），flip=true 阴极朝上 */
+function Dio({ x, y, label, led, zener, schottky, v, flip }: { x: number; y: number; label?: string; led?: boolean; zener?: boolean; schottky?: boolean; v?: boolean; flip?: boolean }) {
   return (
     <g>
-      <W d={`M${x - 24} ${y} H${x - 10}`} />
-      <path d={`M${x - 10} ${y - 8} L${x - 10} ${y + 8} L${x + 8} ${y} Z`} style={{ fill: SILK }} stroke="none" />
-      <W d={`M${x + 8} ${y - 8} V${y + 8} M${x + 8} ${y} H${x + 24}`} />
-      {zener && <W d={`M${x + 2} ${y - 8} H${x + 8} M${x + 8} ${y + 8} H${x + 14}`} />}
-      {schottky && <W d={`M${x + 2} ${y - 8} H${x + 8} V${y - 5} M${x + 8} ${y + 5} V${y + 8} H${x + 14}`} />}
-      {led && <W d={`M${x - 2} ${y - 12} l6 -6 m0 0 l-4 1 m4 -1 l-1 4 M${x + 4} ${y - 10} l6 -6 m0 0 l-4 1 m4 -1 l-1 4`} />}
-      {label && <T x={x} y={y + 22}>{label}</T>}
+      <g transform={rot(v, x, y, flip)}>
+        <W d={`M${x - 24} ${y} H${x - 10}`} />
+        <path d={`M${x - 10} ${y - 8} L${x - 10} ${y + 8} L${x + 8} ${y} Z`} style={{ fill: SILK }} stroke="none" />
+        <W d={`M${x + 8} ${y - 8} V${y + 8} M${x + 8} ${y} H${x + 24}`} />
+        {zener && <W d={`M${x + 2} ${y - 8} H${x + 8} M${x + 8} ${y + 8} H${x + 14}`} />}
+        {schottky && <W d={`M${x + 2} ${y - 8} H${x + 8} V${y - 5} M${x + 8} ${y + 5} V${y + 8} H${x + 14}`} />}
+        {led && <W d={`M${x - 2} ${y - 12} l6 -6 m0 0 l-4 1 m4 -1 l-1 4 M${x + 4} ${y - 10} l6 -6 m0 0 l-4 1 m4 -1 l-1 4`} />}
+      </g>
+      {label && (v ? <T x={x + 14} y={y + 4} anchor="start">{label}</T> : <T x={x} y={y + 22}>{label}</T>)}
     </g>
   );
 }
@@ -203,51 +220,61 @@ function BoxI({ x, y, w, h, label, lp, rp }: { x: number; y: number; w: number; 
   );
 }
 
-/** 电位器（电阻 + 可调箭头） */
-function Pot({ x, y, label }: { x: number; y: number; label?: string }) {
+/** 电位器（电阻 + 可调箭头）；v=true 竖直，抽头指针在右侧 */
+function Pot({ x, y, label, v }: { x: number; y: number; label?: string; v?: boolean }) {
   return (
     <g>
-      <Res x={x} y={y} label={label} />
-      <W d={`M${x + 10} ${y - 18} L${x - 4} ${y - 6}`} />
-      <path d={`M${x - 4} ${y - 6} l8 -1 l-3 -6 Z`} style={{ fill: SILK }} stroke="none" />
-      <W d={`M${x + 10} ${y - 18} V${y - 24}`} />
+      <g transform={rot(v, x, y)}>
+        <W d={`M${x - 24} ${y} H${x - 14} M${x + 14} ${y} H${x + 24}`} />
+        <rect x={x - 14} y={y - 6} width={28} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
+        <W d={`M${x + 10} ${y - 18} L${x - 4} ${y - 6}`} />
+        <path d={`M${x - 4} ${y - 6} l8 -1 l-3 -6 Z`} style={{ fill: SILK }} stroke="none" />
+        <W d={`M${x + 10} ${y - 18} V${y - 24}`} />
+      </g>
+      {label && (v ? <T x={x - 12} y={y + 4} anchor="end">{label}</T> : <T x={x} y={y - 10}>{label}</T>)}
     </g>
   );
 }
 
-/** 开关（常开拨杆） */
-function Sw({ x, y, label }: { x: number; y: number; label?: string }) {
+/** 开关（常开拨杆）；v=true 竖直 */
+function Sw({ x, y, label, v }: { x: number; y: number; label?: string; v?: boolean }) {
   return (
     <g>
-      <W d={`M${x - 24} ${y} H${x - 10} M${x + 10} ${y} H${x + 24}`} />
-      <circle cx={x - 10} cy={y} r={2} style={{ fill: SILK }} stroke="none" />
-      <circle cx={x + 10} cy={y} r={2} style={{ fill: SILK }} stroke="none" />
-      <W d={`M${x - 10} ${y} L${x + 8} ${y - 10}`} />
-      {label && <T x={x} y={y + 20}>{label}</T>}
+      <g transform={rot(v, x, y)}>
+        <W d={`M${x - 24} ${y} H${x - 10} M${x + 10} ${y} H${x + 24}`} />
+        <circle cx={x - 10} cy={y} r={2} style={{ fill: SILK }} stroke="none" />
+        <circle cx={x + 10} cy={y} r={2} style={{ fill: SILK }} stroke="none" />
+        <W d={`M${x - 10} ${y} L${x + 8} ${y - 10}`} />
+      </g>
+      {label && (v ? <T x={x + 14} y={y + 4} anchor="start">{label}</T> : <T x={x} y={y + 20}>{label}</T>)}
     </g>
   );
 }
 
-/** 晶振（两板夹矩形） */
-function Xtal({ x, y, label }: { x: number; y: number; label?: string }) {
+/** 晶振（两板夹矩形）；v=true 竖直 */
+function Xtal({ x, y, label, v }: { x: number; y: number; label?: string; v?: boolean }) {
   return (
     <g>
-      <W d={`M${x - 24} ${y} H${x - 12} M${x + 12} ${y} H${x + 24}`} />
-      <W d={`M${x - 12} ${y - 9} V${y + 9} M${x + 12} ${y - 9} V${y + 9}`} />
-      <rect x={x - 7} y={y - 6} width={14} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
-      {label && <T x={x} y={y - 13}>{label}</T>}
+      <g transform={rot(v, x, y)}>
+        <W d={`M${x - 24} ${y} H${x - 12} M${x + 12} ${y} H${x + 24}`} />
+        <W d={`M${x - 12} ${y - 9} V${y + 9} M${x + 12} ${y - 9} V${y + 9}`} />
+        <rect x={x - 7} y={y - 6} width={14} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
+      </g>
+      {label && (v ? <T x={x + 14} y={y + 4} anchor="start">{label}</T> : <T x={x} y={y - 13}>{label}</T>)}
     </g>
   );
 }
 
-/** 保险丝（穿盒斜线） */
-function Fuse({ x, y, label }: { x: number; y: number; label?: string }) {
+/** 保险丝（穿盒斜线）；v=true 竖直 */
+function Fuse({ x, y, label, v }: { x: number; y: number; label?: string; v?: boolean }) {
   return (
     <g>
-      <W d={`M${x - 24} ${y} H${x - 12} M${x + 12} ${y} H${x + 24}`} />
-      <rect x={x - 12} y={y - 6} width={24} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
-      <W d={`M${x - 12} ${y} H${x + 12}`} />
-      {label && <T x={x} y={y - 10}>{label}</T>}
+      <g transform={rot(v, x, y)}>
+        <W d={`M${x - 24} ${y} H${x - 12} M${x + 12} ${y} H${x + 24}`} />
+        <rect x={x - 12} y={y - 6} width={24} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
+        <W d={`M${x - 12} ${y} H${x + 12}`} />
+      </g>
+      {label && (v ? <T x={x + 12} y={y + 4} anchor="start">{label}</T> : <T x={x} y={y - 10}>{label}</T>)}
     </g>
   );
 }
@@ -323,14 +350,17 @@ function Xfmr({ x, y, label }: { x: number; y: number; label?: string }) {
   );
 }
 
-/** 可变电阻（传感器本体：电阻 + 斜箭头） */
-function VarRes({ x, y, label }: { x: number; y: number; label?: string }) {
+/** 可变电阻（传感器本体：电阻 + 斜箭头）；v=true 竖直 */
+function VarRes({ x, y, label, v }: { x: number; y: number; label?: string; v?: boolean }) {
   return (
     <g>
-      <Res x={x} y={y} />
-      <W d={`M${x - 12} ${y + 12} L${x + 12} ${y - 12}`} />
-      <path d={`M${x + 12} ${y - 12} l-8 1 l3 6 Z`} style={{ fill: SILK }} stroke="none" />
-      {label && <T x={x} y={y - 11}>{label}</T>}
+      <g transform={rot(v, x, y)}>
+        <W d={`M${x - 24} ${y} H${x - 14} M${x + 14} ${y} H${x + 24}`} />
+        <rect x={x - 14} y={y - 6} width={28} height={12} fill="none" style={{ stroke: SILK }} strokeWidth={2} />
+        <W d={`M${x - 12} ${y + 12} L${x + 12} ${y - 12}`} />
+        <path d={`M${x + 12} ${y - 12} l-8 1 l3 6 Z`} style={{ fill: SILK }} stroke="none" />
+      </g>
+      {label && (v ? <T x={x + 12} y={y + 4} anchor="start">{label}</T> : <T x={x} y={y - 11}>{label}</T>)}
     </g>
   );
 }
@@ -348,21 +378,21 @@ function Seg7({ x, y }: { x: number; y: number }) {
 
 /* ---------------- 内置小电路 ---------------- */
 
-/** 分压：VIN → R1 → 中点输出 → R2 → GND */
+/** 分压：VIN → R1 → 中点输出 → R2 → GND（R1/R2 在竖直支路上，用 v 取向让引脚与走线相接） */
 const FigDivider = () => (
   <>
     <Rail x={60} y={30} label="VIN" />
-    <W d="M60 40 V60" />
-    <Res x={60} y={78} label="R1" />
-    <W d="M60 96 V110 M60 110 H120 M120 110 V120" />
+    <W d="M60 40 V54" />
+    <Res x={60} y={78} v label="R1" />
+    <W d="M60 102 V110 M60 110 H120 M120 110 V120" />
     <Dot x={60} y={110} />
-    <Res x={60} y={128} label="R2" />
-    <W d="M60 146 V160" />
+    <Res x={60} y={134} v label="R2" />
+    <W d="M60 158 V160" />
     <Gnd x={60} y={160} />
     <W d="M120 120 H160" />
     <T x={166} y={114} c={CYAN} anchor="start">OUT</T>
-    <T x={200} y={70} anchor="start">中点电压</T>
-    <T x={200} y={86} c={COPPER} anchor="start">V×R2/(R1+R2)</T>
+    <T x={104} y={72} anchor="start">中点电压</T>
+    <T x={104} y={88} c={COPPER} anchor="start">V×R2/(R1+R2)</T>
   </>
 );
 
@@ -370,17 +400,18 @@ const FigDivider = () => (
 const FigRc = () => (
   <>
     <Rail x={50} y={30} label="VIN" />
-    <W d="M50 40 V60" />
-    <Sw x={50} y={72} label="S1" />
+    <W d="M50 40 V48" />
+    <Sw x={50} y={72} v label="S1" />
     <W d="M50 96 V100 H70" />
     <Res x={94} y={100} label="R" />
-    <W d="M118 100 H150 M150 100 V80" />
+    <W d="M118 100 H150" />
     <Dot x={150} y={100} />
-    <Cap x={150} y={130} label="C" />
-    <W d="M150 152 V168" />
+    <W d="M150 100 V106" />
+    <Cap x={150} y={130} v label="C" />
+    <W d="M150 154 V168" />
     <Gnd x={150} y={168} />
-    <W d="M150 80 H196" />
-    <T x={202} y={84} c={CYAN} anchor="start">OUT</T>
+    <W d="M150 100 H196" />
+    <T x={202} y={104} c={CYAN} anchor="start">OUT</T>
     <T x={220} y={130} anchor="start">τ = R×C</T>
     <T x={220} y={146} anchor="start">充到 63%</T>
   </>
@@ -394,9 +425,9 @@ const FigLc = () => (
     <Ind x={94} y={100} label="L" />
     <W d="M118 100 H180" />
     <Dot x={150} y={100} />
-    <W d="M150 100 V120" />
-    <Cap x={150} y={140} label="C" />
-    <W d="M150 162 V172" />
+    <W d="M150 100 V116" />
+    <Cap x={150} y={140} v label="C" />
+    <W d="M150 164 V172" />
     <Gnd x={150} y={172} />
     <T x={186} y={104} c={CYAN} anchor="start">OUT</T>
     <T x={210} y={140} anchor="start">高频被电感挡、</T>
@@ -404,23 +435,24 @@ const FigLc = () => (
   </>
 );
 
-/** MCU 晶振：XTAL 两脚 + 两颗负载电容到地 */
+/** MCU 晶振：XTAL 两脚 + 两颗负载电容到地（每段走线都落在符号引脚端点上） */
 const FigXtalMcu = () => (
   <>
-    <BoxI x={70} y={100} w={56} h={60} label="MCU" rp={['X1', 'X2']} />
-    <W d="M98 80 H130 M98 100 H130" />
-    <Xtal x={160} y={90} label="XTAL" />
-    <W d="M130 80 V90 M130 100 V90" />
-    <Dot x={130} y={90} />
-    <W d="M184 80 H196 V120 H184 M184 100 V120" />
-    <Cap x={130} y={140} label="C1" />
-    <Cap x={196} y={140} label="C2" />
-    <W d="M130 118 V128 M196 118 V128" />
-    <W d="M130 162 V172 M196 162 V172" />
-    <Gnd x={130} y={172} />
-    <Gnd x={196} y={172} />
-    <T x={230} y={80} anchor="start">C1=C2</T>
-    <T x={230} y={96} c={COPPER} anchor="start">≈18pF</T>
+    <BoxI x={64} y={100} w={56} h={60} label="MCU" rp={['X1', 'X2']} />
+    <W d="M104 80 H140 V66 H170" />
+    <W d="M104 100 H140 V114 H170" />
+    <Xtal x={170} y={90} v label="XTAL" />
+    <W d="M170 66 H250 V116" />
+    <Cap x={250} y={140} v label="C1" />
+    <W d="M250 164 V172" />
+    <Gnd x={250} y={172} />
+    <W d="M170 114 H205 V116" />
+    <Cap x={205} y={140} v label="C2" />
+    <W d="M205 164 V172" />
+    <Gnd x={205} y={172} />
+    <T x={196} y={26} c={COPPER} anchor="start">C1=C2=2×(CL−Cstray)</T>
+    <T x={196} y={42} anchor="start">CL=12.5pF→15~18pF</T>
+    <T x={196} y={56} anchor="start">CL=18pF→26~27pF</T>
   </>
 );
 
@@ -430,8 +462,8 @@ const FigDiodeWay = () => (
     <Rail x={50} y={30} label="VIN" />
     <W d="M50 40 V70 H70" />
     <Dio x={96} y={70} label="D" />
-    <W d="M120 70 H150 M150 70 V90" />
-    <Res x={150} y={112} label="负载" />
+    <W d="M120 70 H150 M150 70 V88" />
+    <Res x={150} y={112} v label="负载" />
     <W d="M150 136 V160" />
     <Gnd x={150} y={160} />
     <T x={200} y={66} anchor="start">正接导通（≈0.7V）</T>
@@ -443,27 +475,28 @@ const FigDiodeWay = () => (
 const FigLedLimit = () => (
   <>
     <Rail x={70} y={26} label="VCC" />
-    <W d="M70 36 V56" />
-    <Res x={70} y={74} label="R" />
-    <W d="M70 96 V104" />
-    <Dio x={70} y={126} label="LED" led />
-    <W d="M70 148 V164" />
+    <W d="M70 36 V50" />
+    <Res x={70} y={74} v label="R" />
+    <W d="M70 98 V102" />
+    <Dio x={70} y={126} v label="LED" led />
+    <W d="M70 150 V164" />
     <Gnd x={70} y={164} />
     <T x={150} y={70} anchor="start">R = (VCC−Vf)/I</T>
     <T x={150} y={88} c={COPPER} anchor="start">例：(5−2)V/10mA=300Ω</T>
   </>
 );
 
-/** 稳压管：VIN → R → OUT（稳压管到地） */
+/** 稳压管：VIN → R → OUT（稳压管到地，阴极朝上接输出节点） */
 const FigZenerReg = () => (
   <>
     <Rail x={50} y={26} label="VIN" />
     <W d="M50 36 V60 H70" />
     <Res x={94} y={60} label="R" />
-    <W d="M118 60 H160 M160 60 V80" />
+    <W d="M118 60 H160" />
     <Dot x={160} y={60} />
-    <Dio x={160} y={102} label="DZ" zener />
-    <W d="M160 124 V150" />
+    <W d="M160 60 V78" />
+    <Dio x={160} y={102} v flip label="DZ" zener />
+    <W d="M160 126 V150" />
     <Gnd x={160} y={150} />
     <T x={166} y={64} c={CYAN} anchor="start">OUT=Uz</T>
     <T x={210} y={100} anchor="start">R 吃掉多余电压</T>
@@ -474,18 +507,17 @@ const FigZenerReg = () => (
 const FigNpnLed = () => (
   <>
     <Rail x={150} y={24} label="VCC" />
-    <W d="M150 34 V46" />
-    <Res x={150} y={62} label="R" />
-    <W d="M150 84 V92" />
-    <Dio x={150} y={112} label="LED" led />
-    <W d="M150 134 V140 H160" />
-    <Npn x={170} y={152} label="Q1" />
-    <W d="M160 140 V152 M170 176 V186" />
-    <Gnd x={170} y={186} />
+    <W d="M150 34 V38" />
+    <Res x={150} y={62} v label="R" />
+    <W d="M150 86 V88" />
+    <Dio x={150} y={112} v label="LED" led />
+    <W d="M150 136 V128 H160" />
+    <Npn x={150} y={152} label="Q1" />
+    <W d="M160 176 V186" />
+    <Gnd x={160} y={186} />
     <T x={24} y={156} c={CYAN} anchor="start">GPIO</T>
-    <W d="M56 152 H120" />
-    <Res x={122} y={152} label="Rb" />
-    <W d="M146 152 H146" />
+    <W d="M56 152 H86" />
+    <Res x={110} y={152} label="Rb" />
   </>
 );
 
@@ -493,36 +525,37 @@ const FigNpnLed = () => (
 const FigNmosLoad = () => (
   <>
     <Rail x={160} y={24} label="VCC" />
-    <W d="M160 34 V60" />
-    <Res x={160} y={80} label="负载" />
-    <W d="M160 104 V116" />
+    <W d="M160 34 V56" />
+    <Res x={160} y={80} v label="负载" />
+    <W d="M160 104 V116 H170" />
     <Nmos x={160} y={140} label="Q1" />
-    <W d="M160 164 V180" />
-    <Gnd x={160} y={180} />
+    <W d="M170 164 V180" />
+    <Gnd x={170} y={180} />
     <T x={28} y={144} c={CYAN} anchor="start">GPIO</T>
     <W d="M60 140 H136" />
-    <T x={220} y={120} anchor="start">栅压到位即导通</T>
-    <T x={220} y={136} anchor="start">几乎不吃电流</T>
+    <T x={210} y={120} anchor="start">栅压到位即导通</T>
+    <T x={210} y={136} anchor="start">几乎不吃电流</T>
   </>
 );
 
-/** PMOS 高边开关 */
+/** PMOS 高边开关（源极在上、栅极经上拉电阻回源极） */
 const FigPmosHigh = () => (
   <>
-    <Rail x={160} y={24} label="VCC" />
-    <W d="M160 34 V60" />
+    <Rail x={160} y={20} label="VCC" />
+    <W d="M160 30 V60 H170" />
     <Pmos x={160} y={84} label="Q1" />
-    <W d="M160 108 V116" />
-    <Res x={160} y={138} label="负载" />
+    <W d="M170 108 V114 H160" />
+    <Res x={160} y={138} v label="负载" />
     <W d="M160 162 V176" />
     <Gnd x={160} y={176} />
-    <W d="M136 84 H100 V56" />
-    <Res x={100} y={70} label="R上拉" />
-    <W d="M100 56 H100" />
-    <T x={28} y={148} c={CYAN} anchor="start">GPIO</T>
-    <W d="M60 144 H100 V92" />
-    <Dot x={100} y={92} />
-    <T x={216} y={90} anchor="start">栅极拉低才导通</T>
+    <W d="M136 84 H100" />
+    <Res x={100} y={60} v label="R上拉" />
+    <W d="M100 36 V30 H160" />
+    <Dot x={100} y={84} />
+    <T x={24} y={88} c={CYAN} anchor="start">GPIO</T>
+    <W d="M56 84 H100" />
+    <T x={212} y={80} anchor="start">栅极拉低才导通</T>
+    <T x={212} y={96} anchor="start">上拉保证默认关断</T>
   </>
 );
 
@@ -544,25 +577,25 @@ const FigOpampInv = () => (
   </>
 );
 
-/** ESP32 最小系统 */
+/** ESP32 最小系统：EN 上拉 + 复位键 + 3V3 去耦 */
 const FigMcuMin = () => (
   <>
     <BoxI x={130} y={96} w={72} h={88} label="ESP32" lp={['EN', '3V3', 'GND', 'IO0']} />
-    <Rail x={50} y={20} label="3V3" />
-    <W d="M50 30 V44 M94 44 H50" />
-    <W d="M94 44 H94" />
-    <Res x={76} y={44} label="10k" />
-    <W d="M94 62 H74 V44" />
-    <Dot x={74} y={44} />
-    <W d="M94 80 H60 V64" />
-    <W d="M94 98 H80 V130" />
-    <Gnd x={80} y={130} />
-    <Sw x={40} y={64} label="RST" />
-    <W d="M40 76 V120 H64" />
-    <Gnd x={64} y={120} />
+    <Rail x={40} y={20} label="3V3" />
+    <W d="M40 30 H60" />
+    <Dot x={60} y={30} />
+    <Res x={60} y={52} v label="10k" />
+    <W d="M82 62 H86 V76 H60" />
+    <Dot x={60} y={76} />
+    <Sw x={36} y={76} label="RST" />
+    <W d="M12 76 V120" />
+    <Gnd x={12} y={120} />
+    <W d="M82 74 H78 V30 H60" />
+    <W d="M82 86 H70 V120" />
+    <Gnd x={70} y={120} />
     <T x={200} y={60} anchor="start">EN 上拉 + 复位键</T>
     <T x={200} y={76} anchor="start">3V3 就近 0.1µF</T>
-    <T x={200} y={92} c={COPPER} anchor="start">去耦电容不能省</T>
+    <T x={200} y={92} c={COPPER} anchor="start">IO0 拉低 = 下载模式</T>
   </>
 );
 
@@ -570,11 +603,11 @@ const FigMcuMin = () => (
 const FigSwPullup = () => (
   <>
     <Rail x={80} y={24} label="VCC" />
-    <W d="M80 34 V50" />
-    <Res x={80} y={70} label="R上拉" />
+    <W d="M80 34 V46" />
+    <Res x={80} y={70} v label="R上拉" />
     <W d="M80 94 V100 M80 100 H140" />
     <Dot x={80} y={100} />
-    <Sw x={80} y={120} label="按键" />
+    <Sw x={80} y={120} v label="按键" />
     <W d="M80 144 V160" />
     <Gnd x={80} y={160} />
     <T x={146} y={104} c={CYAN} anchor="start">→ GPIO</T>
@@ -587,14 +620,14 @@ const FigSwPullup = () => (
 const FigPotDiv = () => (
   <>
     <Rail x={80} y={24} label="VCC" />
-    <W d="M80 34 V56" />
-    <Pot x={80} y={88} label="RP" />
+    <W d="M80 34 V64" />
+    <Pot x={80} y={88} v label="RP" />
     <W d="M80 112 V140" />
     <Gnd x={80} y={140} />
-    <W d="M90 64 H140" />
-    <T x={146} y={60} c={CYAN} anchor="start">抽头 → ADC</T>
-    <T x={170} y={100} anchor="start">拧一拧</T>
-    <T x={170} y={116} anchor="start">0~VCC 连续变</T>
+    <W d="M104 98 H140" />
+    <T x={146} y={94} c={CYAN} anchor="start">抽头 → ADC</T>
+    <T x={170} y={120} anchor="start">拧一拧</T>
+    <T x={170} y={136} anchor="start">0~VCC 连续变</T>
   </>
 );
 
@@ -607,7 +640,7 @@ const FigFuseLine = () => (
     <W d="M148 100 H180" />
     <BoxI x={216} y={100} w={56} h={44} label="后级电路" />
     <T x={120} y={140}>过流先烧它</T>
-    <T x={120} y={156} c={COPPER}>额定留 1.5 倍余量</T>
+    <T x={120} y={156} c={COPPER}>额定 ≥ 工作电流÷0.75</T>
   </>
 );
 
@@ -622,13 +655,13 @@ const FigAntPi = () => (
     <Dot x={176} y={84} />
     <Ant x={206} y={62} />
     <W d="M190 84 H206 V74" />
-    <W d="M110 84 V110" />
-    <Cap x={110} y={128} label="C1" />
-    <W d="M110 150 V160" />
+    <W d="M110 84 V104" />
+    <Cap x={110} y={128} v label="C1" />
+    <W d="M110 152 V160" />
     <Gnd x={110} y={160} />
-    <W d="M176 84 V110" />
-    <Cap x={176} y={128} label="C2" />
-    <W d="M176 150 V160" />
+    <W d="M176 84 V104" />
+    <Cap x={176} y={128} v label="C2" />
+    <W d="M176 152 V160" />
     <Gnd x={176} y={160} />
     <T x={240} y={130} anchor="start">50Ω 阻抗匹配</T>
   </>
@@ -640,7 +673,7 @@ const FigSrcLoad = () => (
     <Src x={60} y={90} label="V" />
     <W d="M36 90 H30 V50 H150" />
     <W d="M84 90 H150" />
-    <Res x={150} y={76} label="负载 R" />
+    <Res x={150} y={76} v label="负载 R" />
     <W d="M150 50 V52 M150 100 V130 H30 V90" />
     <T x={200} y={80} anchor="start">电流兜一圈</T>
     <T x={200} y={96} anchor="start">必须回到电源</T>
@@ -652,7 +685,7 @@ const FigBattLoad = () => (
   <>
     <Batt x={60} y={90} label="3.7V" />
     <W d="M36 90 H30 V50 H150 M84 90 H150" />
-    <Res x={150} y={76} label="负载" />
+    <Res x={150} y={76} v label="负载" />
     <W d="M150 50 V52 M150 100 V130 H30 V90" />
     <T x={200} y={80} anchor="start">电量会掉</T>
     <T x={200} y={96} c={COPPER} anchor="start">留意截止电压</T>
@@ -680,7 +713,7 @@ const FigMeterV = () => (
   <>
     <Batt x={50} y={90} label="V" />
     <W d="M26 90 H20 V50 H120 M74 90 H120" />
-    <Res x={120} y={76} label="R" />
+    <Res x={120} y={76} v label="R" />
     <W d="M120 50 V52 M120 100 V130 H20 V90" />
     <W d="M120 60 H170 V80 M120 96 H160" />
     <Dot x={120} y={60} />
@@ -699,7 +732,7 @@ const FigMeterA = () => (
     <W d="M26 90 H20 V50 H90" />
     <Meter x={110} y={50} ch="A" />
     <W d="M90 50 H99 M121 50 H170" />
-    <Res x={170} y={76} label="R" />
+    <Res x={170} y={76} v label="R" />
     <W d="M170 50 V52 M170 100 V130 H20 V90 M74 90 H170" />
     <T x={210} y={50} anchor="start">串联：把回路</T>
     <T x={210} y={66} anchor="start">断开接进去</T>
@@ -716,8 +749,9 @@ const FigFgRc = () => (
     <Res x={104} y={60} label="R" />
     <W d="M128 60 H170" />
     <Dot x={170} y={60} />
-    <Cap x={170} y={90} label="C" />
-    <W d="M170 60 V68 M170 112 V130" />
+    <W d="M170 60 V66" />
+    <Cap x={170} y={90} v label="C" />
+    <W d="M170 114 V130" />
     <Gnd x={170} y={130} />
     <Meter x={216} y={60} ch="V" />
     <W d="M170 60 H205 M216 71 V120 H170" />
@@ -730,11 +764,11 @@ const FigFgRc = () => (
 const FigSensorDiv = () => (
   <>
     <Rail x={80} y={24} label="VCC" />
-    <W d="M80 34 V50" />
-    <Res x={80} y={70} label="R固定" />
+    <W d="M80 34 V46" />
+    <Res x={80} y={70} v label="R固定" />
     <W d="M80 94 V100 M80 100 H140" />
     <Dot x={80} y={100} />
-    <VarRes x={80} y={124} label="传感器" />
+    <VarRes x={80} y={124} v label="传感器" />
     <W d="M80 148 V164" />
     <Gnd x={80} y={164} />
     <T x={146} y={104} c={CYAN} anchor="start">→ ADC</T>
@@ -749,9 +783,9 @@ const FigMcuLed = () => (
     <BoxI x={70} y={90} w={56} h={56} label="MCU" rp={['GPIO']} />
     <W d="M98 80 H120" />
     <Res x={144} y={80} label="R" />
-    <W d="M168 80 H180 M180 80 V92" />
-    <Dio x={180} y={114} label="LED" led />
-    <W d="M180 136 V152" />
+    <W d="M168 80 H180 M180 80 V90" />
+    <Dio x={180} y={114} v label="LED" led />
+    <W d="M180 138 V152" />
     <Gnd x={180} y={152} />
     <T x={220} y={76} anchor="start">高电平点亮</T>
     <T x={220} y={92} c={COPPER} anchor="start">R 别省：限流！</T>
@@ -767,9 +801,10 @@ const FigDecap = () => (
     <Dot x={76} y={44} />
     <W d="M98 106 H80 V136" />
     <Gnd x={80} y={136} />
-    <W d="M76 44 V70" />
-    <Cap x={76} y={88} label="0.1µF" />
-    <W d="M76 110 V136" />
+    <W d="M76 44 V64" />
+    <Cap x={76} y={88} v />
+    <T x={62} y={92} anchor="end">0.1µF</T>
+    <W d="M76 112 V136" />
     <Gnd x={76} y={136} />
     <T x={200} y={70} anchor="start">紧贴 VCC 引脚放</T>
     <T x={200} y={86} c={COPPER} anchor="start">越近越管用</T>
@@ -781,16 +816,17 @@ const FigModulePins = () => (
   <>
     <BoxI x={140} y={90} w={72} h={72} label="模组" lp={['VCC', 'GND', 'SDA', 'SCL']} />
     <Rail x={60} y={20} label="3V3" />
-    <W d="M60 30 V36 H104 V56" />
-    <W d="M104 74 H84 V130" />
+    <Dot x={60} y={30} />
+    <W d="M60 30 V64 H92" />
+    <W d="M92 76 H84 V130" />
     <Gnd x={84} y={130} />
-    <W d="M104 92 H70 V64" />
-    <W d="M104 110 H86 V80" />
-    <Res x={70} y={56} label="4.7k" />
-    <Res x={86} y={72} label="4.7k" />
-    <W d="M70 44 V40 H60 M86 60 V44" />
-    <Dot x={70} y={44} />
-    <Dot x={86} y={44} />
+    <W d="M92 88 H74" />
+    <Dot x={74} y={88} />
+    <Res x={74} y={64} v label="4.7k" />
+    <W d="M74 40 V30" />
+    <W d="M92 100 H40" />
+    <Res x={40} y={76} v label="4.7k" />
+    <W d="M40 52 V30 H60" />
     <T x={216} y={80} anchor="start">I²C 两根都要上拉</T>
     <T x={216} y={96} c={COPPER} anchor="start">电平看 3V3 还是 5V</T>
   </>
@@ -800,36 +836,35 @@ const FigModulePins = () => (
 const FigNpnBuzz = () => (
   <>
     <Rail x={160} y={24} label="VCC" />
-    <W d="M160 34 V100" />
+    <W d="M160 34 V88" />
     <Buzz x={160} y={112} label="BZ" />
-    <W d="M160 136 V140" />
-    <Npn x={170} y={152} label="Q1" />
-    <W d="M170 176 V186" />
-    <Gnd x={170} y={186} />
+    <Npn x={150} y={152} label="Q1" />
+    <W d="M160 176 V186" />
+    <Gnd x={160} y={186} />
     <T x={24} y={156} c={CYAN} anchor="start">GPIO</T>
-    <W d="M56 152 H120" />
-    <Res x={122} y={152} label="Rb" />
+    <W d="M56 152 H86" />
+    <Res x={110} y={152} label="Rb" />
     <T x={216} y={110} anchor="start">无源蜂鸣器给方波</T>
     <T x={216} y={126} c={COPPER} anchor="start">有源的给电就响</T>
   </>
 );
 
-/** 继电器驱动（含续流二极管） */
+/** 继电器驱动（含续流二极管，阴极朝 VCC） */
 const FigRelayDrive = () => (
   <>
     <Rail x={160} y={24} label="VCC" />
     <W d="M160 34 V70" />
     <RelayCoil x={160} y={94} label="J" />
-    <W d="M160 118 V130" />
-    <Npn x={170} y={142} label="Q1" />
-    <W d="M170 166 V180" />
-    <Gnd x={170} y={180} />
+    <Npn x={150} y={142} label="Q1" />
+    <W d="M160 166 V180" />
+    <Gnd x={160} y={180} />
     <T x={24} y={146} c={CYAN} anchor="start">GPIO</T>
-    <W d="M56 142 H120" />
-    <Res x={122} y={142} label="Rb" />
-    <Dio x={196} y={94} label="D" />
-    <W d="M196 72 V34 H172 M196 116 V130 H182" />
-    <Dot x={172} y={34} />
+    <W d="M56 142 H86" />
+    <Res x={110} y={142} label="Rb" />
+    <Dio x={196} y={94} v flip label="D" />
+    <W d="M196 70 V34 H160" />
+    <W d="M196 118 H160" />
+    <Dot x={160} y={34} />
     <T x={230} y={90} anchor="start">断电瞬间线圈反压</T>
     <T x={230} y={106} c={COPPER} anchor="start">靠 D 泄放保命</T>
   </>
@@ -839,32 +874,33 @@ const FigRelayDrive = () => (
 const FigNmosMotor = () => (
   <>
     <Rail x={150} y={24} label="VCC" />
-    <W d="M150 34 V70" />
+    <W d="M150 34 V62" />
     <Motor x={150} y={86} label="M" />
-    <W d="M150 110 V116" />
-    <Nmos x={160} y={140} label="Q1" />
+    <W d="M150 110 V116 H160" />
+    <Nmos x={150} y={140} label="Q1" />
     <W d="M160 164 V180" />
     <Gnd x={160} y={180} />
     <T x={24} y={144} c={CYAN} anchor="start">PWM</T>
-    <W d="M56 140 H136" />
-    <Dio x={196} y={90} label="D" />
-    <W d="M196 68 V34 H162 M196 112 V126 H172" />
-    <Dot x={162} y={34} />
+    <W d="M56 140 H126" />
+    <Dio x={196} y={90} v flip label="D" />
+    <W d="M196 66 V34 H150" />
+    <W d="M196 114 V116 H160" />
+    <Dot x={150} y={34} />
     <T x={230} y={86} anchor="start">PWM 调速</T>
     <T x={230} y={102} c={COPPER} anchor="start">续流二极管必备</T>
   </>
 );
 
-/** 舵机三线 */
+/** 舵机三线：信号在左，5V/GND 在右 */
 const FigServo3w = () => (
   <>
     <BoxI x={80} y={90} w={56} h={56} label="MCU" rp={['PWM']} />
-    <BoxI x={210} y={90} w={64} h={64} label="舵机" lp={['信号', '5V', 'GND']} />
-    <W d="M108 82 H150 V64 H178" />
-    <Rail x={140} y={18} label="5V" />
-    <W d="M140 28 V40 H178 V84" />
-    <W d="M178 100 H150 V140 H90" />
-    <Gnd x={90} y={140} />
+    <BoxI x={210} y={90} w={64} h={64} label="舵机" lp={['信号']} rp={['5V', 'GND']} />
+    <W d="M120 72 H140 V68 H166" />
+    <Rail x={280} y={40} label="5V" />
+    <W d="M280 50 V68 H254" />
+    <W d="M254 80 H270 V130" />
+    <Gnd x={270} y={130} />
     <T x={130} y={160}>50Hz 脉冲 0.5~2.5ms</T>
     <T x={130} y={176} c={COPPER}>脉宽定角度</T>
   </>
@@ -874,14 +910,13 @@ const FigServo3w = () => (
 const FigSeg7Drive = () => (
   <>
     <BoxI x={70} y={90} w={56} h={72} label="MCU" rp={['a', 'b', 'com']} />
-    <W d="M98 70 H120" />
-    <Res x={144} y={70} label="R" />
-    <W d="M168 70 H190 V78" />
+    <W d="M110 64 H120" />
+    <Res x={144} y={64} label="R" />
+    <W d="M168 64 H190 V78 H200" />
     <Seg7 x={210} y={92} />
-    <W d="M98 86 H130 V92 H190" />
-    <W d="M98 102 H160 V120 H200" />
-    <W d="M200 108 V140" />
-    <Gnd x={200} y={140} />
+    <W d="M110 76 H130 V92 H200" />
+    <W d="M110 88 H150 V130" />
+    <Gnd x={150} y={130} />
     <T x={240} y={76} anchor="start">每段串限流电阻</T>
     <T x={240} y={92} c={COPPER} anchor="start">共阴 com 接地</T>
   </>
@@ -891,11 +926,12 @@ const FigSeg7Drive = () => (
 const FigDiodeOr = () => (
   <>
     <Rail x={70} y={24} label="USB 5V" />
-    <Rail x={70} y={104} label="电池" />
-    <W d="M70 34 V50 M70 94 V70" />
+    <Rail x={40} y={110} label="电池" />
+    <W d="M70 34 V50 H96" />
+    <W d="M40 110 H96" />
     <Dio x={120} y={50} label="D1" schottky />
     <Dio x={120} y={110} label="D2" schottky />
-    <W d="M70 50 H96 M70 110 H96 M144 50 H180 M144 110 H180" />
+    <W d="M144 50 H180 M144 110 H180" />
     <W d="M180 50 V80 M180 110 V80" />
     <Dot x={180} y={80} />
     <T x={186} y={84} c={CYAN} anchor="start">→ 系统</T>
@@ -904,46 +940,50 @@ const FigDiodeOr = () => (
   </>
 );
 
-/** 7805 稳压 */
+/** 7805 稳压（IN/GND 在左、OUT 在右，电容走竖直支路） */
 const FigLdo7805 = () => (
   <>
     <Rail x={50} y={24} label="7~12V" />
-    <W d="M50 34 V70 H70" />
+    <W d="M50 34 V66 H72" />
     <BoxI x={110} y={80} w={52} h={48} label="7805" lp={['IN', 'GND']} rp={['OUT']} />
-    <W d="M136 74 H170 M170 74 V56" />
+    <Dot x={76} y={66} />
+    <W d="M76 66 V82" />
+    <Cap x={76} y={106} v label="Cin" />
+    <W d="M76 130 V140" />
+    <W d="M72 78 H60 V140" />
+    <W d="M60 140 H170" />
+    <Gnd x={110} y={140} />
+    <W d="M148 66 H170" />
+    <Dot x={170} y={66} />
     <Rail x={170} y={30} label="5V" />
-    <Dot x={84} y={74} />
-    <Dot x={170} y={74} />
-    <Cap x={84} y={106} label="Cin" />
-    <Cap x={170} y={106} label="Cout" />
-    <W d="M84 74 V84 M170 74 V84 M84 128 V140 M170 128 V140" />
-    <W d="M84 140 H170 M110 140 V96" />
-    <W d="M110 96 H98 V92" />
-    <Gnd x={127} y={140} />
+    <W d="M170 66 V40" />
+    <W d="M170 66 V82" />
+    <Cap x={170} y={106} v label="Cout" />
+    <W d="M170 130 V140" />
     <T x={210} y={110} anchor="start">压差变热</T>
     <T x={210} y={126} c={COPPER} anchor="start">大电流要散热片</T>
   </>
 );
 
-/** 555 无稳态振荡 */
+/** 555 无稳态振荡（THR/TRG/DIS 三脚按 BoxI 引脚的 y 坐标接线） */
 const Fig555 = () => (
   <>
     <Rail x={60} y={20} label="VCC" />
-    <W d="M60 30 V40" />
-    <Res x={60} y={58} label="RA" />
-    <W d="M60 82 V86" />
-    <Res x={60} y={104} label="RB" />
-    <W d="M60 128 V132" />
-    <Cap x={60} y={150} label="C" />
-    <W d="M60 172 V176" />
-    <Gnd x={60} y={176} />
+    <W d="M60 30 V34" />
+    <Res x={60} y={58} v label="RA" />
     <Dot x={60} y={86} />
+    <Res x={60} y={104} v label="RB" />
+    <Cap x={60} y={150} v label="C" />
+    <W d="M60 174 V176" />
+    <Gnd x={60} y={176} />
     <BoxI x={160} y={90} w={64} h={80} label="555" lp={['THR', 'TRG', 'DIS']} rp={['OUT']} />
-    <W d="M60 86 H92 V70 H128 M60 128 H100 V94 H128" />
-    <W d="M60 40 H86 V118 H128" />
-    <Dot x={86} y={118} />
-    <T x={198} y={94} c={CYAN} anchor="start">方波输出</T>
-    <T x={198} y={130} anchor="start">f≈1.44/((RA+2RB)C)</T>
+    <W d="M60 86 H92 V84 H116" />
+    <W d="M60 126 H100 V60 H116" />
+    <W d="M100 72 H116" />
+    <Dot x={100} y={72} />
+    <W d="M204 60 H230" />
+    <T x={236} y={64} c={CYAN} anchor="start">方波</T>
+    <T x={198} y={140} anchor="start">f≈1.44/((RA+2RB)C)</T>
   </>
 );
 
@@ -956,10 +996,11 @@ const FigXfmrBridge = () => (
     <BoxI x={190} y={80} w={48} h={40} label="整流桥" lp={['~', '~']} rp={['+', '−']} />
     <W d="M154 74 H166 M154 86 H166" />
     <W d="M214 70 H236 M214 90 H236" />
-    <Cap x={246} y={104} label="C" polar />
-    <W d="M236 70 H246 V82 M236 90 H246" />
+    <Cap x={246} y={100} v label="C" polar />
+    <W d="M236 70 H246 V76" />
+    <W d="M236 90 H246 V114" />
     <Dot x={246} y={70} />
-    <W d="M246 126 V140" />
+    <W d="M246 124 V140" />
     <Gnd x={246} y={140} />
     <T x={262} y={60} c={CYAN} anchor="start">直流</T>
   </>
@@ -969,14 +1010,109 @@ const FigXfmrBridge = () => (
 const FigSpkCap = () => (
   <>
     <BoxI x={70} y={90} w={56} h={48} label="功放" rp={['OUT']} />
-    <W d="M98 86 H120" />
+    <W d="M110 76 H122 V86" />
     <Cap x={146} y={86} label="C" polar />
-    <W d="M170 86 H186 M186 86 V78" />
+    <W d="M170 86 H176 V92" />
     <Spk x={196} y={92} />
-    <W d="M196 104 V140 H120" />
+    <W d="M200 104 V140 H120" />
     <Gnd x={120} y={140} />
     <T x={220} y={130} anchor="start">电容隔直流通交流</T>
     <T x={220} y={146} c={COPPER} anchor="start">喇叭只认 8Ω/4Ω</T>
+  </>
+);
+
+/** 比较器迟滞（施密特）：输入走反相端，Rf/Rth 组成正反馈分压 */
+const FigCmpSchmitt = () => (
+  <>
+    <T x={14} y={92} c={CYAN} anchor="start">IN</T>
+    <W d="M40 88 H80" />
+    <OpAmp x={110} y={96} />
+    <Rail x={60} y={40} label="Vref" />
+    <Res x={60} y={74} v label="Rth" />
+    <W d="M60 98 V104 H80" />
+    <Dot x={60} y={104} />
+    <W d="M140 96 H190" />
+    <Dot x={160} y={96} />
+    <Rail x={160} y={26} label="VCC" />
+    <Res x={160} y={60} v label="Rpull" />
+    <W d="M160 84 V96" />
+    <W d="M190 96 V150 H114" />
+    <Res x={90} y={150} label="Rf" />
+    <W d="M66 150 H40 V104 H80" />
+    <T x={196} y={100} c={CYAN} anchor="start">OUT</T>
+    <T x={206} y={150} anchor="start">Vhyst=Vout_pp·</T>
+    <T x={206} y={164} anchor="start">Rth/(Rth+Rf)</T>
+  </>
+);
+
+/** 双向 MOS 电平转换（I²C / 1-Wire） */
+const FigLevelShift = () => (
+  <>
+    <Rail x={40} y={30} label="3V3" />
+    <Dot x={40} y={40} />
+    <Res x={40} y={64} v label="4.7k" />
+    <W d="M40 88 V134" />
+    <Dot x={40} y={134} />
+    <W d="M40 134 H170" />
+    <Rail x={280} y={30} label="5V" />
+    <Res x={280} y={64} v label="4.7k" />
+    <W d="M280 88 V86" />
+    <Dot x={280} y={86} />
+    <W d="M280 86 H170" />
+    <Nmos x={160} y={110} label="Q1" />
+    <W d="M160 86 H170" />
+    <W d="M136 110 H80 V40 H40" />
+    <T x={40} y={154} c={CYAN}>3.3V 侧</T>
+    <T x={280} y={154} c={CYAN}>5V 侧</T>
+    <T x={196} y={130} anchor="start">两侧各自上拉</T>
+    <T x={196} y={146} anchor="start">栅极接低压侧电源</T>
+  </>
+);
+
+/** Buck 降压模块接线（输入输出电容就近放） */
+const FigBuckModule = () => (
+  <>
+    <Rail x={40} y={24} label="VIN" />
+    <W d="M40 34 V66 H93" />
+    <Dot x={40} y={66} />
+    <W d="M40 66 V116" />
+    <Cap x={40} y={140} v label="Cin" />
+    <W d="M40 164 V176 H56" />
+    <W d="M93 78 H56 V176" />
+    <Gnd x={56} y={176} />
+    <BoxI x={160} y={96} w={110} h={80} label="DC-DC 模块" lp={['IN+', 'IN−']} rp={['OUT+', 'OUT−']} />
+    <W d="M227 66 H280" />
+    <Dot x={250} y={66} />
+    <W d="M250 66 V116" />
+    <Cap x={250} y={140} v label="Cout" />
+    <W d="M250 164 V176 H240" />
+    <W d="M227 78 H240 V176" />
+    <Gnd x={240} y={176} />
+    <T x={286} y={70} c={CYAN} anchor="start">5V</T>
+    <T x={160} y={150}>热回路要小</T>
+    <T x={160} y={166} c={COPPER}>Cin 贴着 IN 脚放</T>
+  </>
+);
+
+/** 光耦隔离输入（两侧地分开） */
+const FigOptoIso = () => (
+  <>
+    <T x={14} y={78} c={CYAN} anchor="start">IN</T>
+    <W d="M40 74 H64" />
+    <Res x={88} y={74} label="R" />
+    <BoxI x={160} y={96} w={72} h={64} label="PC817" lp={['1 A', '2 K']} rp={['4 C', '3 E']} />
+    <W d="M112 86 H80 V140" />
+    <Gnd x={80} y={140} />
+    <W d="M208 74 H280" />
+    <Dot x={250} y={74} />
+    <Rail x={250} y={30} label="VCC2" />
+    <Res x={250} y={64} v label="4.7k" />
+    <W d="M250 88 V74" />
+    <W d="M208 86 H230 V140" />
+    <Gnd x={230} y={140} />
+    <T x={286} y={78} c={CYAN} anchor="start">OUT</T>
+    <T x={160} y={164} c={COPPER}>隔离带：两侧地不相连</T>
+    <T x={160} y={180}>电流→光→电流</T>
   </>
 );
 
@@ -988,7 +1124,8 @@ export type SchematicFig =
   | 'pot-div' | 'fuse-line' | 'ant-pi' | 'src-load' | 'batt-load' | 'star-gnd'
   | 'meter-v' | 'meter-a' | 'fg-rc' | 'sensor-div' | 'mcu-led' | 'decap' | 'module-pins'
   | 'npn-buzz' | 'relay-drive' | 'nmos-motor' | 'servo-3w' | 'seg7-drive' | 'diode-or'
-  | 'ldo-7805' | 'a555' | 'xfmr-bridge' | 'spk-cap';
+  | 'ldo-7805' | 'a555' | 'xfmr-bridge' | 'spk-cap'
+  | 'cmp-schmitt' | 'level-shift' | 'buck-module' | 'opto-iso';
 
 const FIGURES: Record<SchematicFig, () => JSX.Element> = {
   'divider': FigDivider,
@@ -1027,6 +1164,10 @@ const FIGURES: Record<SchematicFig, () => JSX.Element> = {
   'a555': Fig555,
   'xfmr-bridge': FigXfmrBridge,
   'spk-cap': FigSpkCap,
+  'cmp-schmitt': FigCmpSchmitt,
+  'level-shift': FigLevelShift,
+  'buck-module': FigBuckModule,
+  'opto-iso': FigOptoIso,
 };
 
 /** 条目「原理图看一看」小电路插图（fig 不存在时静默不渲染） */

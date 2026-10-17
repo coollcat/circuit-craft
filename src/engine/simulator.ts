@@ -1,9 +1,10 @@
 // 回路工坊 — 时域步进仿真器：梯形法伴随模型 + 环形缓冲历史（供示波器）
-// 默认 dt=1e-5s；存在 funcgen 时自适应 dt = min(1e-5, 1/(200·fmax))。
+// 默认 dt=1e-5s；存在 funcgen 或带噪声的 sensor 时自适应 dt = min(1e-5, 1/(200·fmax))。
+// C9：sensor 的 noiseFreq（如 sb-7 的 159kHz）过去不在步长决策里，会被 1e-5s 步长混叠成数值假象。
 // 崩溃保护：求解失败自动降步长重试 2 次，仍失败则置 error 并暂停（绝不白屏）。
 import type { CircuitSpec, ComponentSpec, PortRef } from './types';
 import {
-  compileCircuit, maxFuncgenFreq, newDynState, numParam, portKey, solveCompiled,
+  compileCircuit, maxSignalFreq, newDynState, numParam, portKey, solveCompiled,
   updateFailures, type Compiled, type DynState, type FailureEvent, type SolveResult,
 } from './solver';
 
@@ -71,9 +72,14 @@ export class CircuitSimulator {
     this.circuit = this.prepareCircuit(circuit);
     this.compiled = compileCircuit(this.circuit);
     this.state = newDynState();
-    const fmax = maxFuncgenFreq(this.circuit);
-    this.dt = dt ?? (fmax > 0 ? Math.min(1e-5, 1 / (200 * fmax)) : 1e-5);
+    this.dt = dt ?? CircuitSimulator.autoDt(this.circuit);
     if (this.compiled.error) this.error = this.compiled.error;
+  }
+
+  /** 自适应步长：最快信号（funcgen 频率 ∪ sensor 噪声频率）每周期 ≥200 个采样点，上限 1e-5s */
+  static autoDt(circuit: CircuitSpec): number {
+    const fmax = maxSignalFreq(circuit);
+    return fmax > 0 ? Math.min(1e-5, 1 / (200 * fmax)) : 1e-5;
   }
 
   /** 找出带噪声的传感器并换成私有克隆（避免污染关卡定义/编辑器电路） */
@@ -179,8 +185,7 @@ export class CircuitSimulator {
     if (circuit && circuit !== this.circuit) {
       this.circuit = this.prepareCircuit(circuit);
       this.compiled = compileCircuit(this.circuit);
-      const fmax = maxFuncgenFreq(this.circuit);
-      this.dt = fmax > 0 ? Math.min(1e-5, 1 / (200 * fmax)) : 1e-5;
+      this.dt = CircuitSimulator.autoDt(this.circuit);
     }
     this.state = newDynState();
     this.time = 0;

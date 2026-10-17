@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Lock, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
 import type { ComponentSpec, ComponentType } from '@/engine/types';
-import { COMP_META, DEFAULT_PARAMS } from '@/engine/solver';
+import { COMP_META, DEFAULT_PARAMS, formatSI } from '@/engine/solver';
 import { SymbolGlyph } from './symbols';
 import { cn } from '@/lib/utils';
 
@@ -113,12 +113,30 @@ export default function PalettePanel({
   );
 }
 
+/**
+ * 元件盒芯片上显示的那个「关键参数」。
+ * 必须优先取关卡作者写在 palette 里的值：那是玩家做选型决策的依据
+ * （旧实现读 DEFAULT_PARAMS，导致 c1-3 发的是 1000Ω 却显示 220，属"决策点上给错信息"）。
+ */
+const PREVIEW_KEYS: [string, string][] = [
+  ['resistance', 'Ω'], ['r25', 'Ω'], ['impedance', 'Ω'], ['voltage', 'V'], ['vout', 'V'],
+  ['capacitance', 'F'], ['inductance', 'H'], ['ratio', ''], ['light', 'lx'], ['temp', '°C'],
+  ['current', 'mA'], ['rating', 'A'], ['fs', 'Hz'],
+];
+
+function previewParam(item: ComponentSpec): string | null {
+  const source: Record<string, unknown> = { ...DEFAULT_PARAMS[item.type], ...(item.params ?? {}) };
+  for (const [key, unit] of PREVIEW_KEYS) {
+    const v = source[key];
+    if (typeof v === 'number' && Number.isFinite(v)) return formatSI(v, unit);
+  }
+  return null;
+}
+
 function PaletteChip({ item, used, locked, onAdd }: { item: ComponentSpec; used?: boolean; locked?: boolean; onAdd: () => void }) {
   const meta = COMP_META[item.type];
   const disabled = used || locked;
-  const mainParam = Object.entries(DEFAULT_PARAMS[item.type])
-    .filter(([k]) => ['resistance', 'capacitance', 'inductance', 'voltage', 'vout', 'impedance', 'ratio', 'light', 'temp', 'r25'].includes(k))
-    .map(([, v]) => v)[0];
+  const mainParam = previewParam(item);
   return (
     <button
       draggable={!disabled}
@@ -143,7 +161,7 @@ function PaletteChip({ item, used, locked, onAdd }: { item: ComponentSpec; used?
       </div>
       <span className="text-[11px] leading-tight text-silk-300">{meta.name}</span>
       <span className="font-mono text-[10px] leading-none text-sig-cyan">
-        {item.id}{typeof mainParam === 'number' ? ` · ${mainParam}` : ''}
+        {item.id}{mainParam ? ` · ${mainParam}` : ''}
       </span>
     </button>
   );

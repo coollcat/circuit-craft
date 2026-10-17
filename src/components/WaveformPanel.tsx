@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 // 示波器面板（design.md 6.10 / level.md S4.1）：3 通道 cyan/magenta/amber、
 // 时基与 V/DIV 旋钮（± 步进）、暂停态十字游标测量、大读数行、CSV 导出（沙盒）。
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Crosshair, Download, Minus, Plus, X } from 'lucide-react';
 import type { PortRef } from '@/engine/types';
 import { formatSI } from '@/engine/solver';
@@ -51,9 +51,27 @@ export default function WaveformPanel({
   const [stats, setStats] = useState<{ vpp: number; vavg: number; freq: number; duty: number }[]>([]);
   const pausedOffset = useRef(0); // 暂停回看偏移（采样数）
   const dragStart = useRef<{ x: number; offset: number } | null>(null);
+  // 容器尺寸走 ResizeObserver 缓存：原先每帧 getBoundingClientRect() 会强制布局，
+  // 暂停、甚至一个探头都没接时也照跑 rAF
+  const rectRef = useRef({ width: 0, height: 0 });
+  const dirtyRef = useRef(true);
+  const frameRef = useRef(0);
+  const drawRef = useRef<() => void>(() => {});
 
   const propsRef = useRef({ channels, running, timebase, voltsPerDiv, cursorX });
   propsRef.current = { channels, running, timebase, voltsPerDiv, cursorX };
+
+  /** 请求重绘一帧（合并同一帧内的多次请求；未接探头/暂停时不再空转 rAF） */
+  const requestDraw = useCallback(() => {
+    dirtyRef.current = true;
+    if (frameRef.current !== 0) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = 0;
+      if (!dirtyRef.current) return;
+      dirtyRef.current = false;
+      drawRef.current();
+    });
+  }, []);
 
   /* ---------- 读数刷新（200ms 节流） ---------- */
   useEffect(() => {
@@ -69,85 +87,116 @@ export default function WaveformPanel({
     return () => window.clearInterval(id);
   }, [channels, timebase, simRef]);
 
-  /* ---------- Canvas 绘制循环 ---------- */
+  /* ---------- 容器尺寸缓存（不再每帧 getBoundingClientRect） ---------- */
   useEffect(() => {
-    let raf = 0;
-    const draw = () => {
-      raf = requestAnimationFrame(draw);
-      const canvas = canvasRef.current;
-      const wrap = wrapRef.current;
-      if (!canvas || !wrap) return;
-      const rect = wrap.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-      }
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const W = rect.width, H = rect.height;
-      const { channels: chs, running: run, timebase: tb, voltsPerDiv: vdiv, cursorX: cx } = propsRef.current;
-      const sim = simRef.current;
-
-      // CRT 底 + 网格 8×10
-      ctx.fillStyle = '#060A08';
-      ctx.fillRect(0, 0, W, H);
-      ctx.strokeStyle = 'rgba(46,158,99,0.18)';
-      ctx.lineWidth = 1;
-      for (let i = 1; i < 10; i++) {
-        ctx.beginPath(); ctx.moveTo((W / 10) * i, 0); ctx.lineTo((W / 10) * i, H); ctx.stroke();
-      }
-      for (let i = 1; i < 8; i++) {
-        ctx.beginPath(); ctx.moveTo(0, (H / 8) * i); ctx.lineTo(W, (H / 8) * i); ctx.stroke();
-      }
-      // 中轴
-      ctx.strokeStyle = 'rgba(46,158,99,0.35)';
-      ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
-
-      const windowSec = tb * 10;
-      const nTotal = Math.min(
-        Math.floor(windowSec / sim.dt),
-        sim.timeHist.size,
-      );
-      const stride = Math.max(1, Math.floor(nTotal / W));
-      const offset = run ? 0 : pausedOffset.current;
-
-      chs.forEach((ch, ci) => {
-        if (!ch.probe) return;
-        const series: RingBuffer | undefined = sim.nodeSeries(ch.probe);
-        if (!series || series.size < 2) return;
-        ctx.strokeStyle = CH_COLORS[ci];
-        ctx.lineWidth = 2;
-        ctx.shadowColor = CH_COLORS[ci];
-        ctx.shadowBlur = 4;
-        ctx.beginPath();
-        let started = false;
-        for (let x = W - 1; x >= 0; x--) {
-          const back = offset + Math.floor((W - 1 - x) * stride);
-          if (back >= series.size) break;
-          const v = series.at(back);
-          const y = H / 2 - (v / (vdiv * 4)) * (H / 2);
-          const cy = Math.max(-20, Math.min(H + 20, y));
-          if (!started) { ctx.moveTo(x, cy); started = true; }
-          else ctx.lineTo(x, cy);
-        }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      });
-
-      // 暂停态十字游标
-      if (!run && cx !== null) {
-        const px = cx * W;
-        ctx.strokeStyle = 'rgba(242,239,227,0.5)';
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
-        ctx.setLineDash([]);
-      }
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const measure = () => {
+      const r = wrap.getBoundingClientRect();
+      if (r.width === rectRef.current.width && r.height === rectRef.current.height) return;
+      rectRef.current = { width: r.width, height: r.height };
+      requestDraw();
     };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    const ro = new ResizeObserver(measure);
+    ro.observe(wrap);
+    measure();
+    return () => ro.disconnect();
+  }, [requestDraw]);
+
+  /* ---------- 绘制实现（只读缓存的尺寸） ---------- */
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const { width: W, height: H } = rectRef.current;
+    if (!canvas || W <= 0 || H <= 0) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { channels: chs, running: run, timebase: tb, voltsPerDiv: vdiv, cursorX: cx } = propsRef.current;
+    const sim = simRef.current;
+
+    // CRT 底 + 网格 8×10
+    ctx.fillStyle = '#060A08';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(46,158,99,0.18)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 10; i++) {
+      ctx.beginPath(); ctx.moveTo((W / 10) * i, 0); ctx.lineTo((W / 10) * i, H); ctx.stroke();
+    }
+    for (let i = 1; i < 8; i++) {
+      ctx.beginPath(); ctx.moveTo(0, (H / 8) * i); ctx.lineTo(W, (H / 8) * i); ctx.stroke();
+    }
+    // 中轴
+    ctx.strokeStyle = 'rgba(46,158,99,0.35)';
+    ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+
+    const windowSec = tb * 10;
+    const nTotal = Math.min(
+      Math.floor(windowSec / sim.dt),
+      sim.timeHist.size,
+    );
+    const stride = Math.max(1, Math.floor(nTotal / W));
+    const offset = run ? 0 : pausedOffset.current;
+
+    chs.forEach((ch, ci) => {
+      if (!ch.probe) return;
+      const series: RingBuffer | undefined = sim.nodeSeries(ch.probe);
+      if (!series || series.size < 2) return;
+      ctx.strokeStyle = CH_COLORS[ci];
+      ctx.lineWidth = 2;
+      ctx.shadowColor = CH_COLORS[ci];
+      ctx.shadowBlur = 4;
+      ctx.beginPath();
+      let started = false;
+      for (let x = W - 1; x >= 0; x--) {
+        const back = offset + Math.floor((W - 1 - x) * stride);
+        if (back >= series.size) break;
+        const v = series.at(back);
+        const y = H / 2 - (v / (vdiv * 4)) * (H / 2);
+        const cy = Math.max(-20, Math.min(H + 20, y));
+        if (!started) { ctx.moveTo(x, cy); started = true; }
+        else ctx.lineTo(x, cy);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    });
+
+    // 暂停态十字游标
+    if (!run && cx !== null) {
+      const px = cx * W;
+      ctx.strokeStyle = 'rgba(242,239,227,0.5)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }, [simRef]);
+  drawRef.current = draw;
+
+  /* ---------- 绘制调度：运行时（且接了探头）才持续刷新，其余情况按需重绘 ---------- */
+  const live = running && channels.some(c => c.probe);
+  useEffect(() => {
+    if (!live) {
+      requestDraw();
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      dirtyRef.current = false;
+      drawRef.current();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [live, requestDraw]);
+
+  // 参数/游标/通道变化 → 画一帧（暂停态回看也走这里）
+  useEffect(() => {
+    requestDraw();
+  }, [timebase, voltsPerDiv, cursorX, channels, running, requestDraw]);
 
   /* ---------- 游标读数 ---------- */
   const cursorReadout = (() => {
@@ -176,6 +225,7 @@ export default function WaveformPanel({
           const r = e.currentTarget.getBoundingClientRect();
           dragStart.current = { x: e.clientX, offset: pausedOffset.current };
           setCursorX((e.clientX - r.left) / r.width);
+          requestDraw();
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         }}
         onPointerMove={e => {
@@ -187,6 +237,8 @@ export default function WaveformPanel({
             pausedOffset.current = Math.max(0, dragStart.current.offset + dSamples);
           }
           setCursorX(Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1));
+          // 游标被 clamp 住时 state 不变，这里显式请求一帧，回看拖动才跟手
+          requestDraw();
         }}
         onPointerUp={() => { dragStart.current = null; }}
       >
@@ -220,7 +272,12 @@ export default function WaveformPanel({
               {probingChannel === i ? '点画布接探头…' : ch.probe ? `${ch.probe.comp}:${ch.probe.port}` : `${CH_NAMES[i]} 未接`}
             </button>
             {ch.probe && onClearProbe && (
-              <button onClick={() => onClearProbe(i)} className="text-silk-700 hover:text-silk-300">
+              <button
+                onClick={() => onClearProbe(i)}
+                className="text-silk-700 hover:text-silk-300"
+                title={`拔掉 ${CH_NAMES[i]} 探头`}
+                aria-label={`拔掉 ${CH_NAMES[i]} 探头`}
+              >
                 <X className="h-3 w-3" />
               </button>
             )}

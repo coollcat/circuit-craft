@@ -140,7 +140,9 @@ export default function Graduation() {
               : STEP6_LINES;
 
   return (
-    <div className="flex min-h-[100dvh] flex-col">
+    // 与 LevelPlay / Sandbox 统一：页面高度 = 视口 − 64px 导航，底部 DialogueBar 恒定在首屏内；
+    // 步骤内容改在内部滚动容器里滚，文档整体不再恒高 64px。
+    <div className="flex h-[calc(100dvh-64px)] flex-col">
       <StepTrace step={step} maxReached={maxReached} onJump={goStep} visitor={visitor} />
 
       {visitor && (
@@ -152,7 +154,7 @@ export default function Graduation() {
         </div>
       )}
 
-      <div className="flex-1 overflow-x-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <StepPanel key={visitor ? `v${step}` : step}>
           {step === 0 && <OrderSlip visitor={visitor} onComplete={next} />}
           {step === 1 && <SchematicReview visitor={visitor} onComplete={next} />}

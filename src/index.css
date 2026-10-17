@@ -308,6 +308,19 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /* 站内「动效」开关关闭（Navbar 写入 <html data-motion="off">）：与系统级降级同策略，
+     覆盖 CSS 动画（焊盘脉冲/流光/打字光标等）与过渡；framer-motion 侧由 main.tsx 的
+     MotionConfig reducedMotion="always" 负责。 */
+  html[data-motion='off'],
+  html[data-motion='off'] *,
+  html[data-motion='off'] *::before,
+  html[data-motion='off'] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer components {

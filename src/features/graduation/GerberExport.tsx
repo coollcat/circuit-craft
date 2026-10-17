@@ -176,8 +176,12 @@ export default function GerberExport({ visitor, onComplete }: { visitor: boolean
     const a = document.createElement('a');
     a.href = url;
     a.download = 'ESP32-min-gerber.zip';
+    a.style.display = 'none';
+    // 先进 DOM 再 click（Firefox/Safari 对游离节点会取消下载），revoke 延后（立即 revoke 会掐断下载流）
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
     setDownloaded(true);
     push('ok', 'zip 已下载——这是真的可以发给板厂的文件');
   };

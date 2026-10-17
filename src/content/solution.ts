@@ -8,6 +8,25 @@ import type { CircuitSpec, ComponentSpec, GoalCheck, LevelDef, PortRef, WireSpec
 export const LEVEL_SOLUTION_PARAMS: Record<string, Record<string, Record<string, number | string | boolean>>> = {
   // c1-4 只给了 branch-current [10,18]mA，未给 param 区间；按提示 R = (5−2)/13.6mA ≈ 220Ω
   'c1-4': { RP1: { resistance: 220 } },
+  // c3-5 参考解法必须真的按下按键：NPN 开关关没有基极电流，主通道就是断的
+  'c3-5': { SW1: { closed: true } },
+  /* ---------- P1「防免费绿灯」修复后的补值 ----------
+     这些关卡的 palette 出厂参数被刻意改成「不等于答案」，param 目标能自动推导的仍走推导；
+     下面只补「没有 param 目标、只能由提示给值」的元件（口径与各关 hints 一致）。 */
+  'c2-2': { RP1: { resistance: 470 } }, // 提示的 E24 标准值（区间中点 440Ω 也能过）
+  'c3-2': { RP1: { resistance: 220 }, RP2: { resistance: 220 } },
+  'c4-1': { RP1: { resistance: 220 } },
+  'c4-2': { RP1: { resistance: 220 } },
+  'c4-4': { RP1: { resistance: 220 }, RP2: { resistance: 220 } },
+  'c4-5': { RP1: { resistance: 100 } }, // 功率目标 min=1 由 param 推导自动取 1W
+  'c6-4': { RP1: { resistance: 220 } },
+  'c7-2': { U1: { imax: 0.15 }, RP1: { resistance: 33 } },
+  'c7-4': { RP1: { resistance: 150 } },
+  'sa-1': { RP1: { resistance: 220 } },
+  'sa-6': { RP1: { resistance: 220 } },
+  'sb-6': { RS1: { resistance: 17.5 }, RP1: { resistance: 292 }, RP2: { resistance: 292 } },
+  'sb-7': { LD1: { inductance: 10e-6 }, CP1: { capacitance: 100e-9 } },
+  'sb-8': { CP1: { capacitance: 10e-9 }, RL1: { resistance: 100000 } },
 };
 
 const PIN_KEYS = ['p0', 'p1', 'p2', 'p3'] as const;
@@ -117,12 +136,26 @@ function freeSlot(components: ComponentSpec[], index: number): { x: number; y: n
   return { x: 96, y: 480 };
 }
 
+export interface BuildSolutionOptions {
+  /**
+   * 是否把「目标区间推导值 / LEVEL_SOLUTION_PARAMS 补值」写进元件参数。
+   * 默认 true（L4 照抄解法 / 可通关性测试）。
+   * 内容审计传 false：保留 palette/preset 出厂参数，用于检查「不动手就绿」的免费绿灯。
+   */
+  applyGoalParams?: boolean;
+}
+
 /**
  * 组装「照抄解法」电路。
  * base 省略时从关卡 preset 出发（审查测试用）；传入玩家当前电路时保留已放元件及其位置，
  * 只补缺失的元件与连线 —— 运行时 L4「一键照抄」用。
  */
-export function buildSolutionCircuit(level: LevelDef, base?: CircuitSpec): CircuitSpec {
+export function buildSolutionCircuit(
+  level: LevelDef,
+  base?: CircuitSpec,
+  opts: BuildSolutionOptions = {},
+): CircuitSpec {
+  const { applyGoalParams = true } = opts;
   const src: CircuitSpec = base ?? level.preset;
   const components: ComponentSpec[] = src.components.map(c => ({ ...c, params: { ...(c.params ?? {}) } }));
   const wires: WireSpec[] = src.wires.map(w => ({ id: w.id, from: { ...w.from }, to: { ...w.to } }));
@@ -146,16 +179,20 @@ export function buildSolutionCircuit(level: LevelDef, base?: CircuitSpec): Circu
     byId.set(comp.id, comp);
   }
 
-  /* 2) 参数：param 目标区间 → 覆盖表 → GPIO 置高（后者优先级最低、互不冲突） */
-  for (const g of level.goals) {
-    if (g.kind !== 'param') continue;
-    const v = paramTargetValue(g);
-    if (v !== undefined && Number.isFinite(v)) setParam(g.comp, g.param, v);
-  }
-  const overrides = LEVEL_SOLUTION_PARAMS[level.id];
-  if (overrides) {
-    for (const [compId, kv] of Object.entries(overrides)) {
-      for (const [k, v] of Object.entries(kv)) setParam(compId, k, v);
+  /* 2) 参数：param 目标区间 → 覆盖表 → GPIO 置高（后者优先级最低、互不冲突）
+        applyGoalParams=false 时跳过前两步：保留出厂参数，只做「玩家机械动作」
+        （放件 / 接线 / IO 置高），供内容审计检查数值目标是否被出厂值提前满足 */
+  if (applyGoalParams) {
+    for (const g of level.goals) {
+      if (g.kind !== 'param') continue;
+      const v = paramTargetValue(g);
+      if (v !== undefined && Number.isFinite(v)) setParam(g.comp, g.param, v);
+    }
+    const overrides = LEVEL_SOLUTION_PARAMS[level.id];
+    if (overrides) {
+      for (const [compId, kv] of Object.entries(overrides)) {
+        for (const [k, v] of Object.entries(kv)) setParam(compId, k, v);
+      }
     }
   }
   const highPins = deriveHighPins(level);
@@ -193,6 +230,15 @@ export function buildSolutionCircuit(level: LevelDef, base?: CircuitSpec): Circu
   }
 
   return { components, wires };
+}
+
+/**
+ * 「出厂电路」：把玩家不需要计算的动作都做完（放件 / 按目标接线 / GPIO 置高），
+ * 但**保留 preset 与 palette 的出厂参数**。
+ * 内容审计用它检查数值目标（param / node-voltage / branch-current）会不会「不动手就绿」。
+ */
+export function buildFactoryCircuit(level: LevelDef): CircuitSpec {
+  return buildSolutionCircuit(level, undefined, { applyGoalParams: false });
 }
 
 export interface SolutionStep { kind: 'place' | 'param' | 'pin' | 'wire'; text: string }

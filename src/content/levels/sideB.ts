@@ -22,7 +22,8 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：脑电（EEG）信号只有几十微伏，医疗设备能测到它，靠的是仪表放大器 + 右腿驱动 + 层层屏蔽。毫伏之下，还有整个微伏宇宙。' },
     ],
     palette: [
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 99000 } },
+      // P1 修复：出厂 1kΩ 只有 2 倍增益（10mV）；99kΩ 要自己算
+      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -49,6 +50,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['同相放大', '微弱信号'],
+    formula: { expr: 'G = 1 + R2 / R1', vars: 'R1 接地电阻(Ω)、R2 反馈电阻(Ω)', note: '要 100 倍：R2 = 99kΩ，5mV × 100 = 0.5V；误差与噪声同样被放大 100 倍' },
     hints: [
       '同相放大结构，和主线 c5-1/c5-4 相同，只是增益上到 100。',
       'R2 = (100−1) × 1k = 99kΩ。输出 = 5mV × 100 = 0.5V。',
@@ -79,7 +83,8 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：收音机调台时的「沙沙」声有一部分来自宇宙微波背景辐射——137 亿年前大爆炸的余温。你滤掉的是电路噪声，滤不掉的可能是宇宙的历史。' },
     ],
     palette: [
-      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 100e-9 } },
+      // P1 修复：出厂 1nF（fc≈16kHz）拦不住 10kHz 噪声；100nF 要自己算
+      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 1e-9 } },
     ],
     preset: {
       components: [
@@ -103,6 +108,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['RC 低通', '信噪比'],
+    formula: { expr: 'fc = 1 / (2πRC)', vars: 'R 电阻(Ω)、C 电容(F)', note: 'fc ≈ 159Hz：对 10kHz 噪声衰减约 36dB，直流 0.5V 无损通过' },
     hints: [
       '低通结构：信号 → R → 输出节点，C 从输出节点到地。直流信号频率是 0，畅行无阻；高频噪声被拦。',
       'fc = 1/(2πRC)。R 已定 10kΩ，C 用 100nF → fc ≈ 159Hz，远低于 10kHz 噪声。',
@@ -154,6 +162,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '4 分钟内完成', check: 'time', value: 240 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['奈奎斯特', '混叠'],
+    formula: { expr: 'fs > 2 × fmax', vars: 'fs 采样率(Hz)、fmax 信号最高频率(Hz)', note: '1kHz 正弦至少 2kHz 采样；工程留裕量取 2.5kHz 以上，混叠不可逆' },
     hints: [
       '找到 U1 的 fs（采样率）参数——默认只有 500Hz，远低于 1kHz 信号。',
       '奈奎斯特：fs > 2 × 1kHz = 2kHz。目标窗口从 2.5kHz 起。',
@@ -184,7 +195,8 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：施密特触发器被做成了标准逻辑门（74HC14），你板子上每个「整形」过的复位信号、按键信号背后都有它。果断，是可以被电路化的美德。' },
     ],
     palette: [
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 100000 } },
+      // P1 修复：出厂 1kΩ → 迟滞几乎为 0（噪声一抖就翻转）；100kΩ 要自己算
+      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -218,18 +230,21 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '7 分钟内完成', check: 'time', value: 420 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['迟滞比较器', '正反馈'],
+    formula: { expr: 'Vth = Vcc × R2 / (R1 + R2)', vars: 'Vcc 电源(V)、R1/R2 分压电阻(Ω)', note: '阈值 1.65V；100kΩ 正反馈给出约 ±79mV 迟滞窗口（157mV）' },
     hints: [
       '三块积木：R1+R2 分压出阈值（接同相端 inp）；R3 把传感器信号送进反相端 inn；RP2 是正反馈，从 out 回到 inp。',
-      '阈值 = 3.3 × R2/(R1+R2) = 3.3/2 = 1.65V。反馈电阻 100kΩ 提供约 ±55mV 迟滞窗口。',
+      '阈值 = 3.3 × R2/(R1+R2) = 3.3/2 = 1.65V。反馈电阻 100kΩ 提供约 ±79mV 迟滞窗口（总宽约 157mV）。',
       'RP2 = 100kΩ 接在 inp 与 out 之间。注意反馈是回「同相端」——这是正反馈，和放大器的负反馈相反。',
     ],
     knowledge: {
       title: '迟滞比较器：用正反馈治抖动',
-      body: '单阈值比较器的死穴：输入在阈值附近带噪声，输出便在高/低间疯狂翻转，一次有效穿越产生几十个假脉冲。迟滞（Hysteresis）通过正反馈把单阈值劈成上下双阈值：输出高时阈值抬高，输出低时阈值拉低，中间形成「死区」。本关 100kΩ 正反馈配 10kΩ 源阻，迟滞窗口约 ±55mV——50mV 幅值的噪声（峰峰 100mV）再嚣张也翻不了 110mV 的盘。判据：迟滞窗口要盖过噪声的峰峰值。这个思想的工程化身无处不在：施密特触发输入门（74HC14）给慢变/带噪信号整形、空调温控的双限、电池的充放电截止电压差。电路之外，迟滞是一种系统哲学——状态切换需要越过「值得切换」的代价，才能换来稳定。果断，来自刻意设计的不灵敏区。',
+      body: '单阈值比较器的死穴：输入在阈值附近带噪声，输出便在高/低间疯狂翻转，一次有效穿越产生几十个假脉冲。迟滞（Hysteresis）通过正反馈把单阈值劈成上下双阈值：输出高时阈值抬高，输出低时阈值拉低，中间形成「死区」。本关 100kΩ 正反馈配 10kΩ 源阻，迟滞窗口约 ±79mV（总宽约 157mV）——50mV 幅值的噪声（峰峰 100mV）再嚣张也翻不了 157mV 的盘。判据：迟滞窗口要盖过噪声的峰峰值。这个思想的工程化身无处不在：施密特触发输入门（74HC14）给慢变/带噪信号整形、空调温控的双限、电池的充放电截止电压差。电路之外，迟滞是一种系统哲学——状态切换需要越过「值得切换」的代价，才能换来稳定。果断，来自刻意设计的不灵敏区。',
     },
     // 验算: 阈值 V=3.3×10k/(10k+10k)=1.65V；U1 电源轨悬空 → 比较器不饱和，inp 跟随传感器噪声，
     // 逐步实测 V(R2.a)∈[1.65002,1.75004]V ⊂ [1.55,1.76] ✓（RP2=90k/100k/110k 三点全窗口 0 失败步）
-    // 迟滞窗口（等效）约 ±55mV（110mV）> 噪声峰峰值 100mV（50mV 幅值 × 2）✓
+    // 迟滞窗口（等效）约 ±79mV（157mV）> 噪声峰峰值 100mV（50mV 幅值 × 2）✓（P4 复核：按 Vth 公式重算）
   },
   {
     id: 'sb-5',
@@ -251,7 +266,8 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { speaker: 'lingong', text: '成色不错。不过先别急着庆祝——信号处理的手艺，无线世界还要再考三场：衰减、陷波、检波。射频篇，开工。' },
     ],
     palette: [
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 19000 } },
+      // P1 修复：出厂 1kΩ 只有 2 倍增益（0.2V）；19kΩ 要自己算
+      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -288,6 +304,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '8 分钟内完成', check: 'time', value: 480 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['信号链', '同相放大', 'RC 低通'],
+    formula: { expr: 'Vout = Vin × (1 + R2 / R1)', vars: 'Vin 传感器输出(V)、R1/R2 增益电阻(Ω)', note: '20 倍 → 0.1V × 20 = 2.0V，再经 fc ≈ 159Hz 低通送进 ADC' },
     hints: [
       '三级串联：SEN1 → U1 放大级（R1 到地、RP2 反馈）→ R2+C1 低通 → U2 的 p0。',
       '增益 20：RP2 = (20−1)×1k = 19kΩ。fc = 1/(2π×1k×1µ) ≈ 159Hz。',
@@ -321,9 +340,10 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：3dB 衰减器同时把源和负载互相「隔离」了约 6dB——它不只是踩刹车，还是缓冲垫。仪表输入端的衰减器旋钮，转的就是这类网络。' },
     ],
     palette: [
-      { id: 'RS1', type: 'resistor', x: 0, y: 0, params: { resistance: 17.5 } },
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 292 } },
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 292 } },
+      // P1 修复：出厂三颗都是 100Ω（衰减量完全不对）；17.5/292/292 要按 π 型公式自己算
+      { id: 'RS1', type: 'resistor', x: 0, y: 0, params: { resistance: 100 } },
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 100 } },
+      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 100 } },
     ],
     preset: {
       components: [
@@ -355,6 +375,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '7 分钟内完成', check: 'time', value: 420 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['衰减器', '阻抗匹配'],
+    formula: { expr: 'N = 10^(A/20)，R并 = Z0(N+1)/(N−1)，R串 = Z0(N²−1)/(2N)', vars: 'A 衰减量(dB)、Z0 系统阻抗 50Ω', note: '3dB → N = 1.413 → R并 ≈ 292Ω、R串 ≈ 17.5Ω，两端看进去都是 50Ω' },
     hints: [
       'π 型结构：模块出口节点挂一只对地电阻（并联臂），串一颗电阻过去（串联臂），天线端再挂一只对地。',
       '3dB π 衰减器（50Ω 系统）：并联臂 ≈292Ω，串联臂 ≈17.5Ω。口诀 N=10^(3/20)≈1.413：R并 = 50×(N+1)/(N−1)，R串 = 50×(N²−1)/(2N)。',
@@ -386,8 +409,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：老收音机旋钮转动的就是可变电容——改变 C 就改变了 f₀，从一个电台滑到另一个电台。「调台」这个词，调的就是谐振。' },
     ],
     palette: [
-      { id: 'LD1', type: 'inductor', x: 0, y: 0, params: { inductance: 10e-6 } },
-      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 100e-9 } },
+      // P1 修复：出厂 1µH/10nF 谐振在约 1.6MHz（离 159kHz 干扰很远）；10µH/100nF 要自己凑
+      { id: 'LD1', type: 'inductor', x: 0, y: 0, params: { inductance: 1e-6 } },
+      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 10e-9 } },
     ],
     preset: {
       components: [
@@ -415,6 +439,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
     sim: { probes: [{ comp: 'SEN1', port: 'out' }, { comp: 'LD1', port: 'a' }] },
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['LC 谐振', '陷波'],
+    formula: { expr: 'f0 = 1 / (2π√(LC))', vars: 'L 电感(H)、C 电容(F)', note: '10µH × 100nF → f0 = 1/(2π×1µs) ≈ 159kHz，正对干扰频点' },
     hints: [
       '陷波器 = 串联 LC 之后接地：L 和 C 手拉手，尾巴落地。挂的位置在信号线（R1 之后）。',
       '凑 f₀=159kHz：√(LC) = 1/(2π×159000) ≈ 1µs²……直接记结果 L×C = 10µH × 100nF = 10⁻¹² s²，正好。',
@@ -448,8 +475,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'D1', type: 'diode', x: 0, y: 0, params: { vf: 0.7 } },
       // 检波升级件：肖特基低压降（知识卡提到的现代方案），与 D1 二选一
       { id: 'D2', type: 'schottky', x: 0, y: 0, params: { vf: 0.3 } },
-      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 10e-9 } },
-      { id: 'RL1', type: 'resistor', x: 0, y: 0, params: { resistance: 100000 } },
+      // P1 修复：出厂 1nF/10kΩ → τ=10µs 与载波周期同量级（抹不平纹波）；10nF/100kΩ 要按不等式自己选
+      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 1e-9 } },
+      { id: 'RL1', type: 'resistor', x: 0, y: 0, params: { resistance: 10000 } },
     ],
     preset: {
       components: [
@@ -478,6 +506,9 @@ export const SIDE_B_LEVELS: LevelDef[] = [
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
     sim: { probes: [{ comp: 'FG1', port: 'out' }, { comp: 'D1', port: 'k' }] },
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['包络检波', '二极管单向导电'],
+    formula: { expr: 'τ = RL × C', vars: 'RL 负载电阻(Ω)、C 检波电容(F)', note: 'τ = 100kΩ × 10nF = 1ms：远大于载波周期 6.25µs，又远小于音频周期 10ms' },
     hints: [
       '三条腿的检波器：二极管从信号进来，电容和负载电阻并联挂在阴极、另一头都落地。',
       '时间常数 τ = RL×C：100kΩ × 10nF = 1ms。载波周期 6.25µs —— τ 远大于它，纹波被抹平；音频若在百 Hz 量级，τ 又远小于它，包络保得住。',

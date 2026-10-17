@@ -1,10 +1,12 @@
 // 编辑器 — 参数弹窗（双击或再次点击元件，236px 小卡）
 // 数值编辑三通道：滑杆（即时生效）· 数字框（本地草稿，Enter/失焦提交）· ± 步进按钮
+// B6 参数防呆：空值/NaN/越界一律不写入，钳位到 schema min~max 并用 toast 说明。
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { ComponentSpec } from '@/engine/types';
 import { COMP_META, formatSI } from '@/engine/solver';
 import { PARAM_SCHEMA, type ParamField } from './symbols';
+import { toast } from './toast';
 
 export interface ParamDialogProps {
   comp: ComponentSpec;
@@ -39,6 +41,11 @@ export default function ParamDialog({ comp, anchor, onChange, onRotate, onClose 
   }, [onClose]);
 
   const setParam = (key: string, value: number | string | boolean) => {
+    // B6：NaN / Infinity 绝不写进电路（否则求解器矩阵直接烂掉）
+    if (typeof value === 'number' && !Number.isFinite(value)) {
+      toast('参数值非法（NaN / 无穷大），已忽略这次修改。', 'error');
+      return;
+    }
     onChange({ ...(comp.params ?? {}), [key]: value });
   };
 
@@ -145,25 +152,56 @@ function FieldRow({ field: f, comp, onSet }: { field: ParamField; comp: Componen
   return <NumericField field={f} comp={comp} onSet={onSet} />;
 }
 
+export interface NumericCommit {
+  /** 可写入的值；null = 输入非法、应保持原值 */
+  value: number | null;
+  /** 给玩家看的说明（钳位/恢复原值），无需提示时为 undefined */
+  notice?: string;
+  kind: 'info' | 'error';
+}
+
+/** B6 纯函数：把数字框的原始文本规范化成可写入的合法值（空/NaN → null；越界 → 钳位） */
+export function normalizeNumericInput(field: ParamField, text: string, current: number): NumericCommit {
+  const min = field.min ?? 0;
+  const max = field.max ?? 100;
+  const show = (v: number) => String(Number(v.toPrecision(6)));
+  const cleaned = text.trim().replace(',', '.');
+  const val = Number(cleaned);
+  const safeCurrent = Number.isFinite(current) ? Math.min(Math.max(current, min), max) : min;
+  if (cleaned === '' || !Number.isFinite(val)) {
+    return {
+      value: null, kind: 'error',
+      notice: `「${field.label}」要填数字，已恢复原值 ${show(safeCurrent)}${field.unit ?? ''}。`,
+    };
+  }
+  let v = Math.min(Math.max(val, min), max);
+  let notice: string | undefined;
+  if (v !== val) {
+    notice = `「${field.label}」超出允许范围（${show(min)}~${show(max)}${field.unit ?? ''}），已自动钳位到 ${show(v)}。`;
+  }
+  if (field.step && !field.log) v = Math.min(Math.max(Math.round(v / field.step) * field.step, min), max);
+  if (!Number.isFinite(v)) return { value: null, kind: 'error', notice };
+  return { value: Number(v.toPrecision(6)), notice, kind: 'info' };
+}
+
 /** 数值：滑杆即时 + 文本框草稿式提交 + ± 步进（独立组件保证 hooks 顺序稳定） */
 function NumericField({ field: f, comp, onSet }: { field: ParamField; comp: ComponentSpec; onSet: (k: string, v: number | string | boolean) => void }) {
   const raw = comp.params?.[f.key];
-  const num = typeof raw === 'number' ? raw : Number(raw ?? f.min ?? 0);
   const min = f.min ?? 0;
   const max = f.max ?? 100;
+  const rawNum = typeof raw === 'number' ? raw : Number(raw ?? f.min ?? 0);
+  // B6：历史数据里可能存着 NaN/越界值，显示与步进一律用「已钳位的安全值」
+  const num = Number.isFinite(rawNum) ? Math.min(Math.max(rawNum, min), max) : min;
   const clamp = (v: number) => Math.min(Math.max(v, min), max);
+  const show = (v: number) => String(Number(v.toPrecision(6)));
 
   // 文本框走本地草稿：聚焦期间随便打字，Enter 或失焦才提交 —— 不再和 toPrecision 打架
   const [draft, setDraft] = useState<string | null>(null); // null = 非编辑态，显示规范值
   const commitDraft = () => {
     if (draft === null) return;
-    const cleaned = draft.trim().replace(',', '.');
-    const val = Number(cleaned);
-    if (cleaned !== '' && Number.isFinite(val)) {
-      let v = clamp(val);
-      if (f.step && !f.log) v = Math.round(v / f.step) * f.step;
-      onSet(f.key, Number(v.toPrecision(6)));
-    }
+    const result = normalizeNumericInput(f, draft, num);
+    if (result.notice) toast(result.notice, result.kind);
+    if (result.value !== null) onSet(f.key, result.value);
     setDraft(null); // 无论有效与否都退出编辑态，回显规范值
   };
 
@@ -189,7 +227,7 @@ function NumericField({ field: f, comp, onSet }: { field: ParamField; comp: Comp
     return min + t * (max - min);
   };
 
-  const display = draft ?? (Number.isFinite(num) ? String(Number(num.toPrecision(6))) : '0');
+  const display = draft ?? show(num);
 
   return (
     <div className="mb-2.5">
@@ -237,7 +275,8 @@ function NumericField({ field: f, comp, onSet }: { field: ParamField; comp: Comp
         onChange={e => {
           let val = fromSlider(Number(e.target.value));
           if (f.step && !f.log) val = Math.round(val / f.step) * f.step;
-          onSet(f.key, Number(val.toPrecision(6)));
+          val = clamp(val); // B6：滑杆也兜一层，绝不写入越界/NaN
+          if (Number.isFinite(val)) onSet(f.key, Number(val.toPrecision(6)));
         }}
         className="w-full accent-pcb-500"
       />

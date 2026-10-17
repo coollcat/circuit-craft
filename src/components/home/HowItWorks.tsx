@@ -3,9 +3,17 @@ import { memo } from 'react';
 import { motion } from 'framer-motion';
 import SilkTag from '@/components/SilkTag';
 import TraceDivider from '@/components/TraceDivider';
+import { useMotionOn } from '@/hooks/useMotionOn';
+
+// 三张卡里的循环动画用的是 SMIL（<animate>/<animateMotion>/<animateTransform>）：
+// 它既不受 MotionConfig 降级，也不吃 CSS 的 animation 媒体查询，必须显式判断动效开关，
+// 关掉后统一落到「静态一帧」——导线画完、波形铺满、层叠展开到位。
+const STROKE_END = 266;
+const DOT_Y = 40;
 
 /** 卡 1：两个焊盘间导线自动绘出（2s loop） */
 const WiringAnim = memo(function WiringAnim() {
+  const motionOn = useMotionOn();
   return (
     <svg viewBox="0 0 320 120" className="h-28 w-full">
       <circle cx="40" cy="60" r="14" style={{ fill: 'rgb(var(--cc-copper-500))' }} />
@@ -19,12 +27,16 @@ const WiringAnim = memo(function WiringAnim() {
         strokeWidth="3"
         strokeLinejoin="round"
         strokeDasharray="230"
-        strokeDashoffset="230"
+        strokeDashoffset={motionOn ? 230 : 0}
       >
-        <animate attributeName="stroke-dashoffset" values="230;0;0;230" keyTimes="0;0.55;0.85;1" dur="2s" repeatCount="indefinite" />
+        {motionOn && (
+          <animate attributeName="stroke-dashoffset" values="230;0;0;230" keyTimes="0;0.55;0.85;1" dur="2s" repeatCount="indefinite" />
+        )}
       </path>
-      <circle r="3.5" style={{ fill: 'rgb(var(--cc-pcb-300))' }}>
-        <animateMotion dur="2s" repeatCount="indefinite" path="M54 60 L150 60 L170 40 L266 40" keyPoints="0;1;1" keyTimes="0;0.55;1" calcMode="linear" />
+      <circle r="3.5" cx={motionOn ? 0 : STROKE_END} cy={motionOn ? 0 : DOT_Y} style={{ fill: 'rgb(var(--cc-pcb-300))' }}>
+        {motionOn && (
+          <animateMotion dur="2s" repeatCount="indefinite" path="M54 60 L150 60 L170 40 L266 40" keyPoints="0;1;1" keyTimes="0;0.55;1" calcMode="linear" />
+        )}
       </circle>
     </svg>
   );
@@ -32,16 +44,17 @@ const WiringAnim = memo(function WiringAnim() {
 
 /** 卡 2：正弦波被滤波后变平（3s loop） */
 const WaveAnim = memo(function WaveAnim() {
+  const motionOn = useMotionOn();
   return (
     <svg viewBox="0 0 320 120" className="h-28 w-full">
       <path d="M0 60 H320" style={{ stroke: 'rgb(var(--cc-ink-700))' }} strokeWidth="1" />
       <path d="M0 20 V100 M160 20 V100" style={{ stroke: 'rgb(var(--cc-ink-700))' }} strokeWidth="1" strokeDasharray="3 4" />
       <path id="inwave" d="M0 60 C13 20 27 20 40 60 C53 100 67 100 80 60 C93 20 107 20 120 60 C133 100 147 100 160 60 C173 20 187 20 200 60 C213 100 227 100 240 60 C253 20 267 20 280 60 C293 100 307 100 320 60"
         fill="none" style={{ stroke: 'var(--col-sig-cyan)' }} strokeWidth="2" strokeDasharray="420" strokeDashoffset="0">
-        <animate attributeName="stroke-dashoffset" from="420" to="0" dur="3s" repeatCount="indefinite" />
+        {motionOn && <animate attributeName="stroke-dashoffset" from="420" to="0" dur="3s" repeatCount="indefinite" />}
       </path>
       <path d="M160 60 C180 58 200 58 220 59 C250 60 280 60 320 60" fill="none" style={{ stroke: 'var(--col-sig-magenta)' }} strokeWidth="2" opacity="0.9">
-        <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.45;0.6;0.9;1" dur="3s" repeatCount="indefinite" />
+        {motionOn && <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.45;0.6;0.9;1" dur="3s" repeatCount="indefinite" />}
       </path>
       <text x="8" y="16" fontSize="9" fontFamily="'JetBrains Mono',monospace" style={{ fill: 'var(--col-sig-cyan)' }}>CH1 IN</text>
       <text x="248" y="16" fontSize="9" fontFamily="'JetBrains Mono',monospace" style={{ fill: 'var(--col-sig-magenta)' }}>CH2 OUT</text>
@@ -51,6 +64,7 @@ const WaveAnim = memo(function WaveAnim() {
 
 /** 卡 3：Gerber 层叠展开（4s loop） */
 const LayersAnim = memo(function LayersAnim() {
+  const motionOn = useMotionOn();
   const layers = ['rgb(var(--cc-pcb-400))', 'rgb(var(--cc-copper-500))', 'var(--col-sig-cyan)', 'rgb(var(--cc-copper-400))'];
   return (
     <svg viewBox="0 0 320 120" className="h-28 w-full">
@@ -58,9 +72,11 @@ const LayersAnim = memo(function LayersAnim() {
         <g key={c}>
           <rect x="90" y="20" width="140" height="60" rx="4" fill="none" style={{ stroke: c }} strokeWidth="2" opacity="0.9"
             transform={`translate(${i * 8}, ${i * 10})`}>
-            <animateTransform attributeName="transform" type="translate"
-              values={`0 0;${i * 8} ${i * 10};${i * 8} ${i * 10};0 0`} keyTimes="0;0.4;0.75;1"
-              dur="4s" repeatCount="indefinite" />
+            {motionOn && (
+              <animateTransform attributeName="transform" type="translate"
+                values={`0 0;${i * 8} ${i * 10};${i * 8} ${i * 10};0 0`} keyTimes="0;0.4;0.75;1"
+                dur="4s" repeatCount="indefinite" />
+            )}
           </rect>
         </g>
       ))}

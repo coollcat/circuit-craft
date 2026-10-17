@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 // Navbar 全站导航（design.md 6.1，TopNav，64px，sticky top-0 z-50）
-import { useEffect, useState } from 'react';
-import { Link, NavLink } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router';
 import { Lock, Moon, Settings, Star, Sun, Zap } from 'lucide-react';
 import { useProgress } from '@/store/progress';
 import { LEVELS } from '@/content/levels';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/chapters', label: '章节地图' },
   { to: '/sandbox', label: '沙盒' },
   { to: '/codex', label: '图鉴' },
+  { to: '/figures', label: '图解' },
 ] as const;
 
 function graduationUnlocked(completed: string[]): boolean {
@@ -30,7 +31,28 @@ export default function Navbar() {
   const setSettings = useProgress(s => s.setSettings);
   const reset = useProgress(s => s.reset);
   const [showSettings, setShowSettings] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
   const gradLocked = !graduationUnlocked(completed);
+
+  // 设置浮层关闭逻辑：换路由收起（状态不跨路由存活），点浮层外 / 按 Esc 也收起；
+  // 原先只能再点一次齿轮，跳到新页面后浮层还挂在那里。
+  useEffect(() => setShowSettings(false), [pathname]);
+  useEffect(() => {
+    if (!showSettings) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!settingsRef.current?.contains(e.target as Node)) setShowSettings(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowSettings(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showSettings]);
 
   // 动效开关的全局兜底：<html data-motion="off">，供非 React 消费者（粒子系统等）读取
   useEffect(() => {
@@ -118,7 +140,7 @@ export default function Navbar() {
         </nav>
 
         {/* 右：总星数 / 称号 / 设置（shrink-0 防挤压，1280px 下限收紧间距） */}
-        <div className="relative flex shrink-0 items-center gap-3">
+        <div ref={settingsRef} className="relative flex shrink-0 items-center gap-3">
           <span className="flex items-center gap-1.5 font-mono text-[13px] text-copper-300">
             <Star className="h-4 w-4 fill-copper-300" />
             {totalStars}
@@ -139,6 +161,8 @@ export default function Navbar() {
           <button
             onClick={() => setShowSettings(v => !v)}
             aria-label="设置"
+            aria-expanded={showSettings}
+            aria-haspopup="true"
             className="rounded p-1.5 text-silk-300 transition-colors hover:bg-ink-800 hover:text-silk-100"
           >
             <Settings className="h-4 w-4" />
@@ -150,7 +174,7 @@ export default function Navbar() {
           <AccountDialog />
 
           {showSettings && (
-            <div className="panel-raised absolute right-0 top-12 z-50 w-64 rounded-lg p-4">
+            <div role="group" aria-label="设置面板" className="panel-raised absolute right-0 top-12 z-50 w-64 rounded-lg p-4">
               <h4 className="mb-3 text-sm font-bold text-silk-100">设置</h4>
               {(
                 [

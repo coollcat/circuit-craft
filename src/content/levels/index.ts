@@ -1,5 +1,5 @@
 // 回路工坊 — 关卡数据入口（API 签名冻结：LEVELS / SIDE_QUESTS / getLevel）
-// 主线 7 章 30 关 + 支线 A 6 关 + 支线 B 5 关 = 41 个 LevelDef
+// 主线 7 章 30 关 + 支线 A 6 关 + 支线 B 8 关 = 44 个 LevelDef
 //
 // 引擎契约（已由引擎组确认）：
 // - 单位：node-voltage 伏特(V)、branch-current 毫安(mA)、freq/fs 赫兹(Hz)、resistance 欧姆(Ω)、capacitance 法拉(F)

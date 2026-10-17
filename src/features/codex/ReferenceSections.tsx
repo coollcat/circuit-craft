@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, Search } from 'lucide-react';
-import { FORMULAS, GLOSSARY, PRO_CORNER } from './data/reference';
+import { FORMULAS, GLOSSARY, GLOSSARY_GROUPS, PRO_CORNER } from './data/reference';
 import { cn } from '@/lib/utils';
 
 /* ---------- 公式速查 ---------- */
@@ -65,7 +65,12 @@ export function GlossarySection() {
       arr.push(g);
       map.set(g.group, arr);
     }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'zh'));
+    // 按 GLOSSARY_GROUPS 的语义顺序排（未知分组排到最后），不再按首字母拼排
+    const order = (name: string) => {
+      const i = GLOSSARY_GROUPS.indexOf(name as (typeof GLOSSARY_GROUPS)[number]);
+      return i < 0 ? GLOSSARY_GROUPS.length : i;
+    };
+    return [...map.entries()].sort((a, b) => order(a[0]) - order(b[0]));
   }, [filtered]);
 
   return (

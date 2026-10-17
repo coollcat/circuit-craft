@@ -46,6 +46,9 @@ export const C6_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['调制', '载波', '波长'],
+    formula: { expr: 'λ = c / f', vars: 'c 光速 3×10⁸ m/s、f 载波频率(Hz)', note: '433MHz → λ ≈ 69cm，四分之一波长天线约 17cm 就能高效辐射' },
     hints: [
       '链路方向：信号源 → 发射模块 → 天线。先把三个环节连起来，再调频率。',
       'FG1 的 freq 参数默认 1kHz，远远不够——把它改到 433MHz（433000000）附近。',
@@ -97,6 +100,9 @@ export const C6_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '4 分钟内完成', check: 'time', value: 240 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['阻抗匹配', '反射系数'],
+    formula: { expr: 'Γ = (ZL − Z0) / (ZL + Z0)', vars: 'Z0 系统阻抗(Ω)、ZL 负载/天线阻抗(Ω)', note: '把天线调到 50Ω → Γ = 0，能量不再反射回模块' },
     hints: [
       '模块端口默认 50Ω，把天线的 impedance 参数改成同一个数。',
       'ANT1 默认 75Ω（电视天线规格），不匹配。改成 50Ω。',
@@ -116,7 +122,7 @@ export const C6_LEVELS: LevelDef[] = [
     title: 'RF 布局的禁区',
     subtitle: '丝印写着：RF 区域 · 禁止走线',
     briefing:
-      '给一块 ESP32 射频模块供电并接好天线：模块 vcc 接 3.3V，天线接射频输出脚，100nF 去耦电容并就绪。电气目标之外，记住铁律——天线下方和周围区域禁止铺铜走线（「天线净空区」），这条写进你的工程直觉里。',
+      '给一块 ESP32 射频模块供电并接好天线：模块 vcc 接 3.3V，天线接射频输出脚，再把去耦电容的容值和天线的阻抗都调到位。电气目标之外，记住铁律——天线下方和周围区域禁止铺铜走线（「天线净空区」），这条写进你的工程直觉里。',
     intro: [
       { speaker: 'lingong', text: '这批板子要上 ESP32。我先把丑话放前面：射频部分的布局，一条线都不许任性。天线下面的铜，一平方毫米都不能有。' },
       { speaker: 'laozhou', text: '天线靠电磁场工作，附近的铜皮会把场「闷」住，辐射效率雪崩。模块厂的手册里都印着 keepout 区域图——照做，别发明。' },
@@ -127,8 +133,9 @@ export const C6_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：ESP32 模块为什么大多把天线做成 PCB 板载「蛇形线」并伸出板边？就是为了让天线悬在主板铜皮之外。便宜、免调试、还通过了认证——工程的智慧常是「躲开」而非「硬刚」。' },
     ],
     palette: [
-      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 100e-9 } },
-      { id: 'ANT1', type: 'antenna', x: 0, y: 0, params: { impedance: 50 } },
+      // P1 修复：出厂 1nF / 75Ω 都离目标很远；100nF 与 50Ω 要玩家按去耦/匹配知识自己设定
+      { id: 'CP1', type: 'capacitor', x: 0, y: 0, params: { capacitance: 1e-9 } },
+      { id: 'ANT1', type: 'antenna', x: 0, y: 0, params: { impedance: 75 } },
     ],
     preset: {
       components: [
@@ -155,9 +162,12 @@ export const C6_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['射频布局', '去耦电容'],
+    formula: { expr: 'Xc = 1 / (2πfC)', vars: 'f 噪声频率(Hz)、C 去耦电容(F)', note: '100nF 在 100MHz 处 Xc ≈ 16mΩ，把电源噪声就近短路到地' },
     hints: [
       '三条线想清楚：供电（3.3V→vcc）、去耦（电容并在 vcc 与地）、射频输出（out→天线）。',
-      '所有 gnd 汇入 GND1；天线阻抗沿用上一关的 50Ω；电容容值 100nF。',
+      '所有 gnd 汇入 GND1；天线阻抗沿用上一关的 50Ω（出厂 75Ω 是电视天线规格，不对）；去耦电容调成 100nF（出厂 1nF 太小）。',
       '连线 7 条见 briefing 顺序：BT1→vcc，CP1 跨 vcc/gnd，MOD1.out→ANT1，各自接地。',
     ],
     knowledge: {
@@ -185,7 +195,8 @@ export const C6_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：真实的物联网节点靠「睡眠」把平均功耗压到微安级——99% 时间睡觉，醒来 50ms 采样发射。ESP32 深度睡眠只要 10µA。省电的最高境界，是尽量不存在。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
+      // P1 修复：出厂 1kΩ → LED 支路仅 3mA（预算下限 8mA）；220Ω 要自己算
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -218,6 +229,9 @@ export const C6_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '7 分钟内完成', check: 'time', value: 420 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['功耗预算', '信号链'],
+    formula: { expr: 'I总 = I_MCU + I_LED', vars: 'I_MCU MCU 静态电流(mA)、I_LED 指示支路电流(mA)', note: '30mA + 13.6mA = 43.6mA，落在 38~52mA 的续航预算内' },
     hints: [
       '总电流 = MCU 静态电流 + LED 支路电流。MCU 是固定的 30mA，你能调的只有 LED 支路。',
       '预算 38~52mA → LED 支路允许 8~22mA → 电阻范围 (5−2)÷I 算一下，220Ω 正好。',

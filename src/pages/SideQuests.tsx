@@ -1,4 +1,4 @@
-﻿// 支线任务 Side Quests（/sidequests）—— 双支线蓝色岔路地图与关卡入口
+// 支线任务 Side Quests（/sidequests）—— 双支线蓝色岔路地图与关卡入口
 // 支线 A「ESP32 单片机入门」6 关 / 支线 B「进阶信号处理」5 关 + 支线毕业设计介绍卡
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -9,6 +9,8 @@ import {
 import { SIDE_QUESTS, LEVELS } from '@/content/levels';
 import type { LevelDef } from '@/engine/types';
 import { useProgress } from '@/store/progress';
+import { useTransient, TOAST_MS, SHAKE_MS } from '@/hooks/useTransient';
+import { useMotionOn } from '@/hooks/useMotionOn';
 import SilkTag from '@/components/SilkTag';
 import PadButton from '@/components/PadButton';
 import { cn } from '@/lib/utils';
@@ -63,22 +65,13 @@ export default function SideQuests() {
   const completed = useProgress(s => s.completed);
   const stars = useProgress(s => s.stars);
   const isLevelUnlocked = useProgress(s => s.isLevelUnlocked);
+  // 循环动画（可玩脉冲环 / 锁定轨道流动光点）只在动效开启时跑，兼容系统 prefers-reduced-motion
+  const motionOn = useMotionOn();
 
   const [hovered, setHovered] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const [shakeTrack, setShakeTrack] = useState<string | null>(null);
+  const [toast, setToast] = useTransient<string>(TOAST_MS);
+  const [shakeTrack, setShakeTrack] = useTransient<string>(SHAKE_MS);
   const [showBoard, setShowBoard] = useState(false);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2600);
-    return () => clearTimeout(t);
-  }, [toast]);
-  useEffect(() => {
-    if (!shakeTrack) return;
-    const t = setTimeout(() => setShakeTrack(null), 400);
-    return () => clearTimeout(t);
-  }, [shakeTrack]);
 
   const chapterDone = (ch: number) => {
     const ls = LEVELS.filter(l => l.chapter === ch);
@@ -99,10 +92,11 @@ export default function SideQuests() {
   const sbLast = SIDE_QUESTS.filter(l => l.track === 'side-b').sort((a, b) => a.index - b.index).at(-1);
   const b5Done = sbLast ? completed.includes(sbLast.id) : false;
 
-  /* 轨道间联动提示（打字机，进入后延迟 1s 播一次） */
+  /* 轨道间联动提示（打字机，进入后延迟 1s 播一次；动效关闭时整句直出） */
   const hintText = '丝印提示：支线 A 的 ADC 知识会让主线 5-4 变简单 · 支线 B 尾声的射频篇需要主线第 6 章的语感';
   const [typed, setTyped] = useState('');
   useEffect(() => {
+    if (!motionOn) return; // 动效关闭：下面直接渲染整句，不跑打字机
     let i = 0;
     let interval: ReturnType<typeof setInterval> | undefined;
     const start = setTimeout(() => {
@@ -116,11 +110,12 @@ export default function SideQuests() {
       clearTimeout(start);
       if (interval) clearInterval(interval);
     };
-  }, []);
+  }, [hintText, motionOn]);
 
+  // 锁定焊盘与锁定轨道统一走「抖动 + 提示」，不再直接进关（与章节地图一致）
   const clickPad = (l: LevelDef) => {
-    const st = stateOf(l);
-    if (st === 'locked') {
+    if (stateOf(l) === 'locked') {
+      setShakeTrack(l.track);
       setToast('先通关前面的关卡哦');
       return;
     }
@@ -144,6 +139,8 @@ export default function SideQuests() {
         const levels = levelsOf(track);
         const doneCount = levels.filter(l => completed.includes(l.id)).length;
         const trackStars = levels.reduce((s, l) => s + (stars[l.id] ?? 0), 0);
+        // 继续/出发 = 第一个可玩的未通关关；全通关后「重温」回落本轨道最后一关（不再 to="#" 死链）
+        const resume = levels.find(l => !completed.includes(l.id) && isLevelUnlocked(l.id)) ?? levels[levels.length - 1];
         const Icon = track.icon;
         return (
           <motion.section
@@ -176,13 +173,7 @@ export default function SideQuests() {
                     {doneCount}/{levels.length} 关 · ⭐{trackStars}
                   </span>
                   {open ? (
-                    <PadButton
-                      size="S" variant="ghost"
-                      to={(() => {
-                        const next = levels.find(l => !completed.includes(l.id) && isLevelUnlocked(l.id));
-                        return next ? `/play/${next.id}` : '#';
-                      })()}
-                    >
+                    <PadButton size="S" variant="ghost" to={resume ? `/play/${resume.id}` : '/sidequests'}>
                       <Play className="h-3.5 w-3.5" /> {doneCount === 0 ? '出发' : doneCount === levels.length ? '重温' : '继续'}
                     </PadButton>
                   ) : (
@@ -211,7 +202,7 @@ export default function SideQuests() {
                       animate={{ pathLength: 1 }}
                       transition={{ duration: 0.8, delay: 0.3 + ti * 0.2 }}
                     />
-                    {!open && (
+                    {!open && motionOn && (
                       <motion.circle r="4" style={{ fill: 'rgb(var(--cc-sig-blue))' }} fillOpacity="0.5">
                         <animateMotion dur="6s" repeatCount="indefinite" path="M0 4 L1000 4" />
                       </motion.circle>
@@ -246,13 +237,16 @@ export default function SideQuests() {
                           {st === 'locked' ? (
                             <Lock className="h-4 w-4" />
                           ) : st === 'done' ? (
-                            <span className="font-mono text-xs font-bold">{'★'.repeat(Math.max(starCount, 1))}</span>
+                            // 星级如实显示：0 星不能再画成 1 星（截图/验收会当成功劳）
+                            <span className="font-mono text-xs font-bold">
+                              {starCount > 0 ? '★'.repeat(starCount) : '✓'}
+                            </span>
                           ) : (
                             <span className="font-mono text-xs font-bold">
                               {l.id.replace('s', '').toUpperCase()}
                             </span>
                           )}
-                          {st === 'open' && (
+                          {st === 'open' && motionOn && (
                             <motion.span
                               className="absolute inset-0 rounded-full border-2 border-sig-blue"
                               animate={{ scale: [1, 1.3], opacity: [0.8, 0] }}
@@ -306,7 +300,7 @@ export default function SideQuests() {
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1, duration: 0.4 }}
         className="rounded-md border border-dashed border-ink-600 px-4 py-2 font-mono text-[11px] text-silk-500"
       >
-        {typed}
+        {motionOn ? typed : hintText}
       </motion.div>
 
       {/* ESP32 支线块式伪代码说明卡 */}
@@ -407,11 +401,13 @@ export default function SideQuests() {
         )}
       </AnimatePresence>
 
-      {/* Toast */}
+      {/* Toast（与章节地图统一：同处停留时长 + 屏幕阅读器可播报） */}
       <AnimatePresence>
         {toast && (
           <motion.div
             initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
+            role="status"
+            aria-live="polite"
             className="panel-raised fixed right-6 top-20 z-50 rounded-md border-l-2 border-l-warn px-4 py-2.5 text-xs text-silk-100"
           >
             {toast}

@@ -22,7 +22,8 @@ export const C4_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：0805 的「8」和「5」是百分之一英寸。但工程师嘴里的「0805」有时也指公制 2012——下单前一定确认单位，这是用真金白银买的教训。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
+      // P1 修复：出厂 1kΩ 只有 3mA（点不到合格区间），220Ω 要自己算
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -44,6 +45,9 @@ export const C4_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['封装', '限流电阻'],
+    formula: { expr: 'R = (Vcc − Vf) / If', vars: 'Vcc 电源(V)、Vf LED 压降(V)、If 目标电流(A)', note: '电路不变、舞台换成 PCB：0805 贴片电阻照样按 220Ω 算' },
     hints: [
       '电路和第 1 章一模一样：电源 → 电阻 → LED → 回电源。变的只是「舞台」从原理图换成了 PCB。',
       '限流电阻照旧：(5−2)÷13.6mA ≈ 220Ω。',
@@ -77,7 +81,8 @@ export const C4_LEVELS: LevelDef[] = [
       // 去耦电容手写落位：紧贴 U1 供电脚（本关教学点就是「10mm 内」）
       { id: 'CP1', type: 'capacitor', x: 224, y: 272 },
       // LED 限流电阻手写落位：LED 正下方，短程直连
-      { id: 'RP1', type: 'resistor', x: 432, y: 464, params: { resistance: 220 } },
+      // P1 修复：出厂 1kΩ → 3mA 点不亮；220Ω 由 (5−2)÷13.6mA 算得
+      { id: 'RP1', type: 'resistor', x: 432, y: 464, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -108,6 +113,9 @@ export const C4_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['去耦电容', '布局顺序'],
+    formula: { expr: 'R = (Vcc − Vf) / If', vars: 'Vcc MCU 输出高电平(V)、Vf LED 压降(V)、If 目标电流(A)', note: '(5−2) ÷ 220Ω ≈ 13.6mA；去耦 100nF 要贴到芯片电源脚 10mm 内' },
     hints: [
       '布局顺序：先把电容拖到 U1 旁边（10mm 内），再连线。供电、去耦、输出三条链路分开想清楚。',
       '三条链：BT1 给 U1 供电；CP1 并在 U1 的 vcc 与地之间；U1.p0 → RP1 → LED → 地。',
@@ -127,7 +135,7 @@ export const C4_LEVELS: LevelDef[] = [
     title: '走线的礼仪：45° 的世界',
     subtitle: '拒绝直角，优雅转弯',
     briefing:
-      '在 PCB 上走线有条美学+工程的铁律：转弯只用 45°，不走 90° 直角。把 9V 分压电路（两颗 1kΩ）在板上布好，所有拐角用 45° 折线，中点输出 4.3~4.7V。',
+      '在 PCB 上走线有条美学+工程的铁律：转弯只用 45°，不走 90° 直角。把 9V 分压电路在板上布好：上电阻 R1 已固定 1kΩ，下电阻 R2 出厂是 2.2kΩ——先算中点要 4.5V 时 R2 该取多少，再把它调过来。所有拐角用 45° 折线，中点输出 4.3~4.7V。',
     intro: [
       { speaker: 'laozhou', text: '看一块板子先看走线。90° 直角的板子，多半是新手干的——直角外侧容易蚀刻过度，尖角还是电磁骚扰的「小天线」。' },
       { speaker: 'xiaohan', text: '45° 转弯，电流跑得顺，板子看着也专业！强迫症狂喜！' },
@@ -142,7 +150,8 @@ export const C4_LEVELS: LevelDef[] = [
       components: [
         { id: 'BT1', type: 'battery', x: 96, y: 176, params: { voltage: 9 }, locked: true },
         { id: 'R1', type: 'resistor', x: 272, y: 96, params: { resistance: 1000 }, locked: true },
-        { id: 'R2', type: 'resistor', x: 272, y: 256, params: { resistance: 1000 }, locked: true },
+        // P1 修复：下电阻出厂 2.2kΩ（中点 6.19V，偏出窗口），1kΩ 的答案要玩家自己算
+        { id: 'R2', type: 'resistor', x: 272, y: 256, params: { resistance: 2200 }, locked: true },
         { id: 'GND1', type: 'gnd', x: 96, y: 336, locked: true },
       ],
       wires: [],
@@ -160,10 +169,13 @@ export const C4_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['分压', '45° 走线'],
+    formula: { expr: 'Vmid = Vin × R下 / (R上 + R下)', vars: 'Vin 电源(V)、R上/R下 分压电阻(Ω)', note: '9V 要一半 4.5V → 下电阻调成与上电阻相等的 1kΩ' },
     hints: [
-      '电路本身是最简单的等比分压：9V 被两颗 1kΩ 平分。先保证电气连通，再调整走线形状。',
+      '电路是最简单的等比分压：中点要 4.5V，就是上下各分一半。先保证电气连通，再调整走线形状。',
       '连线时每次转弯都走一格斜线（45°）再拐回来，避免直接垂直转弯。',
-      '拓扑：BT1.pos→R1→R2→GND，BT1.neg→GND。中点 V=9×1k/2k=4.5V。走线全部用斜角段。',
+      '9 × R2 ÷ (1k + R2) = 4.5V → R2 = 1kΩ：把出厂的 2.2kΩ 调成 1kΩ。拓扑：BT1.pos→R1→R2→GND，BT1.neg→GND，走线全部用斜角段。',
     ],
     knowledge: {
       title: '为什么走线钟爱 45°',
@@ -190,8 +202,9 @@ export const C4_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：EMC（电磁兼容）测试室里，一半的整改案例最后都落到「地回路没走好」。省下的每一平方毫米环路面积，都是未来少掉的辐射超标。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
+      // P1 修复：出厂 1kΩ → 每支路仅 3mA；220Ω 由 (5−2)÷13.6mA 算得
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
+      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -221,6 +234,9 @@ export const C4_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '7 分钟内完成', check: 'time', value: 420 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['地平面', '回流路径'],
+    formula: { expr: 'I支路 = (Vcc − Vf) / R', vars: 'Vcc 电源(V)、Vf LED 压降(V)、R 支路电阻(Ω)', note: '两支路各 13.6mA；地线短而直地汇入同一点，回路面积最小' },
     hints: [
       '电路 = c3-2 的双灯并联。难点在「地」：两颗 LED 的阴极都要用尽量短的路径汇入 GND1。',
       '地线走板子下沿一整条直铜，两灯阴极垂直搭上去——这就是微缩版地平面。',
@@ -251,7 +267,8 @@ export const C4_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：板厂生产 1 盎司铜厚的板子，0.5mm 线宽载 1A 温升约 10°C。想要更凉？加宽线、加厚铜、并联过孔——散热的功夫全在铜上。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 100, power: 0.25 } },
+      // P1 修复：出厂 220Ω 只有 40mA（低于 60~110mA）；100Ω 与 ≥1W 功率要玩家自己算
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 220, power: 0.25 } },
     ],
     preset: {
       components: [
@@ -276,6 +293,9 @@ export const C4_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '7 分钟内完成', check: 'time', value: 420 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['线宽载流', '功率校核'],
+    formula: { expr: 'R = (Vcc − Vf) / I，P = I²R', vars: 'Vcc 电源(V)、Vf LED 压降(V)、I 目标电流(A)、P 电阻功耗(W)', note: 'R = 8.8V ÷ 88mA = 100Ω，P ≈ 0.77W → 必须选 1W 电阻' },
     hints: [
       '限流算法不变：R = (12 − 3.2) ÷ I。目标电流取中间值 88mA 左右。',
       'R = 8.8V ÷ 88mA = 100Ω。电阻功耗 P = I²R ≈ 0.77W，记得选 1W 以上的功率电阻。',

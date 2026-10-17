@@ -1,73 +1,69 @@
-# React + TypeScript + Vite
+# 回路工坊 · circuit-craft
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个把「电路计算」真正教会的交互式网站：**44 个关卡 + 会算的求解器 + 42 条图鉴 + 可交互实物图解**，
+从第一颗限流电阻一路走到画 PCB、出 Gerber、下单打样。
 
-Currently, two official plugins are available:
+## 它和普通电路小游戏的区别
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+| 常见做法 | 本项目的做法 |
+|---|---|
+| 连线对了就过关 | 目标由**真求解器**判定：节点电压、支路电流、LED 是否点亮，都来自 MNA 直流工作点与瞬态仿真 |
+| 拖动滑杆试到绿 | 每关的数值目标在**出厂参数下必定不成立**（免费绿灯由自动化审计禁止），必须先算再填 |
+| 只告诉你「错了」 | 验收台给出实测值、目标区间、偏大/偏小多少，以及误解定向反馈（「LED 极性反了」「缺限流电阻」） |
+| 公式藏在长文里 | 主导公式就在右栏，未达成时自动高亮；通关给三行小结 + 能量账本（ΣP≈0） |
+| 画出来的线和仿真的线不是一套 | 预览路径 = 落线路径 = 命中测试 = 电流粒子，逐点相同，并有断言守住 |
 
-## React Compiler
+## 功能
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **主线 7 章 30 关 + 支线 A 6 关 + 支线 B 8 关**：欧姆定律 → RC 时域 → 三极管开关 → PCB 走线 → 运放 → 射频 → 电源选型。
+- **工作台**：45°/90° 自动布线（带避让分道，不叠线）、四层板与过孔、参数弹窗、示波器、万用表、
+  撤销/重做（Ctrl+Z / Ctrl+Shift+Z）、非法连线防呆（自连 / 重复 / 已同网 / 电源短路一律拦截并说明原因）。
+- **图鉴**：42 条元件条目（一句话人话 → 工作原理 → 关键参数 → 选型 → 常见坑 → 实物封装），带布线案例、
+  计算方式、手绘原理图、3D 实物，以及 6 个可交互实验（色环 / RC / LED / 运放 / 上拉 / 迟滞比较器）。
+- **图解**（`/figures`）：等距工程图画的真实物件，读数由与关卡同一套模型算出——
+  例如电阻箱拨到 100 Ω，LED 会在 0.1 秒后烧掉（3× 额定持续 0.1s 的引擎判据）。
+- **沙盒 / 毕业流程**：自由搭电路；原理图复核 → PCB 布局 → DRC → BOM → Gerber → 下单清单。
 
-## Expanding the ESLint configuration
+## 技术栈
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+React 19 · TypeScript · Vite 7 · Tailwind CSS 3 · shadcn/ui · framer-motion · three.js
+后端 `api/`（Hono + tRPC）· 数据库 Drizzle ORM + MySQL
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 快速开始
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev        # 开发服务器
+npm test           # 单元测试（9 文件 292 例）
+npm run check      # 类型检查 tsc -b（必须零错误）
+npm run build      # 生产构建 → dist/
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> **Windows 提示**：若构建/测试报 `esbuild-…: Access is denied`，说明临时目录不可删改，
+> 把 TEMP/TMP 指到工作区内再跑：
+> `$env:TEMP="$PWD\.tmp-build"; $env:TMP="$PWD\.tmp-build"; npm run build`
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 目录结构
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+  engine/            求解器（MNA）、器件模型、GoalCheck 判定、代入演算 explain.ts
+  content/levels/    44 关数据 + 可通关性/免费绿灯/走线重叠三套审计
+  components/editor/ 电路编辑器：布线、防呆、参数、示波器
+  features/codex/    图鉴数据与实验；features/figures/ 等距实物图解
+  pages/             首页 / 章节地图 / 关卡 / 沙盒 / 支线 / 图鉴 / 图解 / 毕业
+api/  db/            后端与数据库
+figures/             图解离线预览构建器（node figures/build.mjs <name>）
+```
+
+## 内容维护约定（改关卡/引擎前请先读 `AGENTS.md`）
+
+三条硬约束，都有自动化守护：
+
+1. **免费绿灯审计**（`levels.test.ts`）：数值目标不得被出厂参数预先满足，未修完的必须进白名单并写明原因与 TODO。
+2. **可通关性审计**：每关参考解法必须真的达成全部可判定目标；推导不出的值写进 `solution.ts` 的 `LEVEL_PARAMS` 覆盖表。
+3. **走线质量审计**（`wires-diag.test.ts`）：44 关 × 互相覆盖率 < 0.15、近距伴随 < 90px、同网重合段为 0，且断言阈值未被放松。
+
+## License
+
+[Apache-2.0](LICENSE)

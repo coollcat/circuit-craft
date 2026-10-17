@@ -1,4 +1,4 @@
-﻿// 自由沙盒 /sandbox —— 全部件解锁自由搭建 + 函数发生器 + 5 槽存档 + 分享码 + 老手挑战 + CSV 导出
+// 自由沙盒 /sandbox —— 全部件解锁自由搭建 + 函数发生器 + 5 槽存档 + 分享码 + 老手挑战 + CSV 导出
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -19,6 +19,7 @@ import PadButton from '@/components/PadButton';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { MultimeterCard, RightCollapseBar, RightPanelHeader, RunControls } from '@/components/editor/WorkbenchBits';
 import { safeGetItem, safeSetItem, setStorageWarnHandler } from '@/lib/safeStorage';
+import { useUnsavedGuard } from '@/hooks/useUnsavedGuard';
 import { useProgress } from '@/store/progress';
 import { parseProject, serializeProject } from '@/features/pcb3d/projectFile';
 import { cn } from '@/lib/utils';
@@ -77,6 +78,23 @@ function readChallenges(): string[] {
 
 const EMPTY_CIRCUIT: CircuitSpec = { components: [], wires: [] };
 
+/**
+ * 触发本地下载。
+ * Firefox/Safari 对「游离节点」的 click 会直接取消下载，且 revokeObjectURL 紧跟 click
+ * 会把下载流掐断（Chrome 侥幸可用）——所以先进 DOM、点完移除、延时 revoke。
+ */
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 export default function Sandbox() {
   const [circuit, setCircuit] = useState<CircuitSpec>(EMPTY_CIRCUIT);
   const circuitRef = useRef(circuit);
@@ -93,6 +111,7 @@ export default function Sandbox() {
   const [paramEdit, setParamEdit] = useState<{ compId: string; anchor: { x: number; y: number } } | null>(null);
   const [selInfo, setSelInfo] = useState<{ kind: 'comp' | 'wire'; id: string } | null>(null);
   const [slotDrawer, setSlotDrawer] = useState(false);
+  const [slotVersion, setSlotVersion] = useState(0); // 存/删槽位后让抽屉读数失效
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [challengeOpen, setChallengeOpen] = useState(false);
@@ -115,6 +134,23 @@ export default function Sandbox() {
 
   const palette = useMemo(fullSandboxPalette, []);
   const emptyUsed = useMemo(() => new Set<string>(), []);
+
+  /* ---------------- 未保存改动（脏数据）判定 + 离开守卫 ---------------- */
+  // 与「上次保存/载入/导入的快照」比对；元件数量级很小，字符串比对足够便宜
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(EMPTY_CIRCUIT));
+  const dirty = useMemo(() => JSON.stringify(circuit) !== savedSnapshot, [circuit, savedSnapshot]);
+  useUnsavedGuard(dirty, '当前电路还没保存到存档槽，确定离开沙盒吗？');
+  /** 覆盖当前电路前的确认：只有存在未保存改动时才拦一道 */
+  const confirmOverwrite = (what: string) =>
+    !dirty || window.confirm(`当前电路有未保存的改动，${what}会覆盖它，继续？`);
+
+  /* ---------------- 存档槽读数：抽屉展开时才读盘（渲染体内逐个 JSON.parse 会拖慢每次重渲染） ---------------- */
+  const slots = useMemo(
+    () => (slotDrawer ? SLOT_KEYS.map(key => ({ key, slot: readSlot(key) })) : []),
+    // slotVersion 是刻意的额外依赖：存/覆盖槽位后强制重新读盘
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [slotDrawer, slotVersion],
+  );
 
   /* ---------------- 放置元件（自动生成位号；at 提供时为拖放落点） ---------------- */
   const addFromPalette = useCallback((item: ComponentSpec, at?: { x: number; y: number }) => {
@@ -151,16 +187,31 @@ export default function Sandbox() {
     const slot: SaveSlot = { name: docName, savedAt: Date.now(), circuit: circuitRef.current };
     // 写失败降级内存并弹一次性警告（safeStorage），这里只在真正持久化时报成功
     const persisted = safeSetItem(key, JSON.stringify(slot));
-    if (persisted) toast(`已保存到 ${key.replace('cc-sandbox-', '槽位 ')}。`, 'ok');
+    if (persisted) {
+      setSavedSnapshot(JSON.stringify(slot.circuit));
+      setSlotVersion(v => v + 1);
+      toast(`已保存到 ${key.replace('cc-sandbox-', '槽位 ')}。`, 'ok');
+    }
   };
   const loadSlot = (key: string) => {
     const s = readSlot(key);
     if (!s) return;
+    // 载入会整份覆盖当前电路：与「保存」用同一套确认，不静默丢弃改动
+    if (!confirmOverwrite(`载入「${s.name}」`)) return;
     setRunning(false);
     setCircuit(s.circuit); // s.pcb（旧存档的 PCB 布局字段）有意忽略
+    setSavedSnapshot(JSON.stringify(s.circuit));
     setDocName(s.name);
     setSlotDrawer(false);
     toast(`已载入「${s.name}」。`, 'ok');
+  };
+  /** 重置：清回空白电路（有未保存改动时先确认），并同步脏数据基线 */
+  const resetCircuit = () => {
+    if (!confirmOverwrite('重置')) return;
+    setRunning(false);
+    setCircuit(EMPTY_CIRCUIT);
+    setDocName('未命名电路');
+    setSavedSnapshot(JSON.stringify(EMPTY_CIRCUIT));
   };
 
   /* ---------------- 分享码 ---------------- */
@@ -179,8 +230,10 @@ export default function Sandbox() {
       toast('这不是回路工坊的分享码（应以 CCT1- 开头）。', 'error');
       return;
     }
+    if (!confirmOverwrite('导入分享码')) return;
     setRunning(false);
     setCircuit(c);
+    setSavedSnapshot(JSON.stringify(c));
     setDocName('导入的分享电路');
     setImportOpen(false);
     setImportText('');
@@ -192,12 +245,7 @@ export default function Sandbox() {
     const text = serializeProject(docName, circuitRef.current);
     const safe = (docName.trim() || '未命名电路').replace(/[\\/:*?"<>|]/g, '_');
     const filename = `${safe}.ccproj.json`;
-    const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadBlob(new Blob([text], { type: 'application/json;charset=utf-8' }), filename);
     setProjMenu(false);
     toast(`工程已导出为 ${filename}。`, 'ok');
   };
@@ -208,8 +256,10 @@ export default function Sandbox() {
       toast(`导入失败：${result.error}`, 'error');
       return;
     }
+    if (!confirmOverwrite(`导入工程「${result.name}」`)) return;
     setRunning(false);
     setCircuit(result.circuit);
+    setSavedSnapshot(JSON.stringify(result.circuit));
     setDocName(result.name);
     setProjMenu(false);
     toast(`工程「${result.name}」导入成功！元件 ${result.circuit.components.length} · 导线 ${result.circuit.wires.length}`, 'ok');
@@ -233,11 +283,7 @@ export default function Sandbox() {
       rows.push(`${t.toPrecision(8)},${vs.join(',')}`);
     }
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `circuitcraft-${docName}-wave.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadBlob(blob, `circuitcraft-${docName}-wave.csv`);
     toast(`已导出 ${rows.length - 1} 行波形数据（最近 ${windowSec}s）。`, 'ok');
   };
 
@@ -303,28 +349,32 @@ export default function Sandbox() {
     <div className="flex h-[calc(100dvh-64px)] flex-col overflow-hidden">
       <ToastHost />
       {/* ---------- 顶部工具栏 ---------- */}
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-ink-700 bg-ink-900 px-4">
-        <FlaskConical className="h-4 w-4 text-pcb-300" />
-        <span className="text-base font-bold text-silk-100">自由沙盒</span>
-        <input
-          value={docName}
-          onChange={e => setDocName(e.target.value)}
-          className="w-40 rounded border border-ink-700 bg-ink-850 px-2 py-1 font-mono text-xs text-silk-300 outline-none focus:border-sig-cyan"
-          title="点击改名"
-        />
-        {challengeBadge && (
-          <span className="flex items-center gap-1 rounded border border-copper-500/50 px-2 py-0.5 font-mono text-[10px] text-copper-300">
-            <Trophy className="h-3 w-3" /> · 沙盒玩家
-          </span>
-        )}
+      {/* 十余个控件原先挤在单行 ~1.35k px 里，1024~1366px 下右侧「导入/运行/暂停/重置」被裁且点不到：
+          改成可换行的「左=状态/信号源 + 右=操作组」，控件 shrink-0 不被压扁，窄屏折行而不是裁掉 */}
+      <div className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-ink-700 bg-ink-900 px-4 py-2">
+        <div className="flex shrink-0 items-center gap-3">
+          <FlaskConical className="h-4 w-4 text-pcb-300" />
+          <span className="text-base font-bold text-silk-100">自由沙盒</span>
+          <input
+            value={docName}
+            onChange={e => setDocName(e.target.value)}
+            className="w-28 rounded border border-ink-700 bg-ink-850 px-2 py-1 font-mono text-xs text-silk-300 outline-none focus:border-sig-cyan sm:w-40"
+            title="点击改名"
+          />
+          {challengeBadge && (
+            <span className="flex shrink-0 items-center gap-1 rounded border border-copper-500/50 px-2 py-0.5 font-mono text-[10px] text-copper-300">
+              <Trophy className="h-3 w-3" /> · 沙盒玩家
+            </span>
+          )}
+        </div>
 
         {/* 原理图四层走线提示：层切换 + 过孔（画布工具区内操作） */}
-        <span className="mx-1 hidden rounded border border-ink-700 bg-ink-850 px-2.5 py-1 font-mono text-[11px] text-silk-500 lg:inline" title="原理图支持四层走线：顶/内1/内2/底层切换 + V 键循环过孔换层">
+        <span className="mx-1 hidden rounded border border-ink-700 bg-ink-850 px-2.5 py-1 font-mono text-[11px] text-silk-500 min-[1200px]:inline" title="原理图支持四层走线：顶/内1/内2/底层切换 + V 键循环过孔换层">
           原理图 · 四层走线
         </span>
 
         {/* 信号源控制 */}
-        <div className="mx-1 flex items-center gap-2 rounded border border-ink-700 bg-ink-850 px-3 py-1">
+        <div className="mx-1 flex max-w-full flex-wrap items-center gap-2 rounded border border-ink-700 bg-ink-850 px-3 py-1">
           <span className="font-mono text-[10px] tracking-widest text-silk-700">FUNC GEN</span>
           {funcgen ? (
             <>
@@ -364,63 +414,65 @@ export default function Sandbox() {
           )}
         </div>
 
-        <div className="flex-1" />
-        <PadButton
-          size="S"
-          variant={preview3d ? 'primary' : 'ghost'}
-          onClick={() => setPreview3d(v => !v)}
-          title="把当前电路转印成 3D PCB"
-        >
-          <Box className="h-3.5 w-3.5" /> 3D 预览
-        </PadButton>
-        {/* 工程文件菜单 */}
-        <div className="relative">
-          <PadButton size="S" variant="ghost" onClick={() => setProjMenu(v => !v)} title="本地工程文件导入/导出">
-            <FileBox className="h-3.5 w-3.5" /> 工程
+        {/* 操作组：窄屏整组折到第二行，组内再折行，保证运行/暂停/重置永远可达 */}
+        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
+          <PadButton
+            size="S"
+            variant={preview3d ? 'primary' : 'ghost'}
+            onClick={() => setPreview3d(v => !v)}
+            title="把当前电路转印成 3D PCB"
+          >
+            <Box className="h-3.5 w-3.5" /> 3D 预览
           </PadButton>
-          <AnimatePresence>
-            {projMenu && (
-              <>
-                <div className="fixed inset-0 z-[68]" onClick={() => setProjMenu(false)} />
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  className="panel-raised absolute right-0 top-full z-[69] mt-1 w-56 rounded-lg border border-ink-700 p-1.5"
-                >
-                  <button
-                    onClick={exportProject}
-                    className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-silk-300 hover:bg-ink-700 hover:text-silk-100"
+          {/* 工程文件菜单 */}
+          <div className="relative">
+            <PadButton size="S" variant="ghost" onClick={() => setProjMenu(v => !v)} title="本地工程文件导入/导出">
+              <FileBox className="h-3.5 w-3.5" /> 工程
+            </PadButton>
+            <AnimatePresence>
+              {projMenu && (
+                <>
+                  <div className="fixed inset-0 z-[68]" onClick={() => setProjMenu(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    className="panel-raised absolute right-0 top-full z-[69] mt-1 w-56 rounded-lg border border-ink-700 p-1.5"
                   >
-                    <FileDown className="h-3.5 w-3.5 text-copper-400" />
-                    <span>导出工程 <span className="font-mono text-[10px] text-silk-700">.ccproj.json</span></span>
-                  </button>
-                  <button
-                    onClick={() => { fileInputRef.current?.click(); }}
-                    className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-silk-300 hover:bg-ink-700 hover:text-silk-100"
-                  >
-                    <FileUp className="h-3.5 w-3.5 text-sig-cyan" />
-                    <span>导入工程文件…</span>
-                  </button>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,application/json"
-            className="hidden"
-            onChange={e => {
-              const f = e.target.files?.[0];
-              if (f) void importProjectFile(f);
-              e.target.value = '';
-            }}
-          />
+                    <button
+                      onClick={exportProject}
+                      className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-silk-300 hover:bg-ink-700 hover:text-silk-100"
+                    >
+                      <FileDown className="h-3.5 w-3.5 text-copper-400" />
+                      <span>导出工程 <span className="font-mono text-[10px] text-silk-700">.ccproj.json</span></span>
+                    </button>
+                    <button
+                      onClick={() => { fileInputRef.current?.click(); }}
+                      className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-xs text-silk-300 hover:bg-ink-700 hover:text-silk-100"
+                    >
+                      <FileUp className="h-3.5 w-3.5 text-sig-cyan" />
+                      <span>导入工程文件…</span>
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) void importProjectFile(f);
+                e.target.value = '';
+              }}
+            />
+          </div>
+          <PadButton size="S" variant="ghost" onClick={() => setSlotDrawer(v => !v)}><FolderOpen className="h-3.5 w-3.5" /> 存档槽</PadButton>
+          <PadButton size="S" variant="ghost" onClick={() => saveToSlot(SLOT_KEYS[0])}><Save className="h-3.5 w-3.5" /> 保存</PadButton>
+          <PadButton size="S" variant="ghost" onClick={exportShare}><Link2 className="h-3.5 w-3.5" /> 分享码</PadButton>
+          <PadButton size="S" variant="ghost" onClick={() => setImportOpen(true)}><Import className="h-3.5 w-3.5" /> 导入</PadButton>
+          <RunControls running={running} onRun={() => setRunning(true)} onPause={() => setRunning(false)} onReset={resetCircuit} />
         </div>
-        <PadButton size="S" variant="ghost" onClick={() => setSlotDrawer(v => !v)}><FolderOpen className="h-3.5 w-3.5" /> 存档槽</PadButton>
-        <PadButton size="S" variant="ghost" onClick={() => saveToSlot(SLOT_KEYS[0])}><Save className="h-3.5 w-3.5" /> 保存</PadButton>
-        <PadButton size="S" variant="ghost" onClick={exportShare}><Link2 className="h-3.5 w-3.5" /> 分享码</PadButton>
-        <PadButton size="S" variant="ghost" onClick={() => setImportOpen(true)}><Import className="h-3.5 w-3.5" /> 导入</PadButton>
-        <RunControls running={running} onRun={() => setRunning(true)} onPause={() => setRunning(false)} onReset={() => { setRunning(false); setCircuit(EMPTY_CIRCUIT); setDocName('未命名电路'); }} />
       </div>
 
       {/* ---------- 三栏 ---------- */}
@@ -567,6 +619,7 @@ export default function Sandbox() {
               onClick={() => setPreview3d(false)}
               className="absolute right-3 top-2 z-10 text-silk-500 hover:text-silk-100"
               title="关闭 3D 预览"
+              aria-label="关闭 3D 预览"
             >
               <X className="h-4 w-4" />
             </button>
@@ -586,8 +639,13 @@ export default function Sandbox() {
 
       {/* ---------- 底部状态条 ---------- */}
       <div className="flex h-8 shrink-0 items-center gap-5 border-t border-ink-700 bg-ink-900 px-4 font-mono text-[11px] text-silk-500">
-        <span className={cn('flex items-center gap-1.5', running ? 'text-ok' : error ? 'text-danger' : '')}>
-          <span className={cn('h-1.5 w-1.5 rounded-full', running ? 'animate-pulse bg-ok' : error ? 'bg-danger' : 'bg-silk-700')} />
+        {/* 运行/暂停不只靠颜色区分：文字 + aria-live 播报（色盲与读屏用户可辨） */}
+        <span
+          role="status"
+          aria-live="polite"
+          className={cn('flex items-center gap-1.5', running ? 'text-ok' : error ? 'text-danger' : '')}
+        >
+          <span aria-hidden="true" className={cn('h-1.5 w-1.5 rounded-full', running ? 'animate-pulse bg-ok' : error ? 'bg-danger' : 'bg-silk-700')} />
           {error ? `仿真错误：${error}` : running ? '仿真运行中' : '仿真已暂停'}
         </span>
         <span>节点 {Math.max(nodeCount - 1, 0)}</span>
@@ -605,36 +663,33 @@ export default function Sandbox() {
           >
             <div className="flex items-center justify-between border-b border-ink-700 px-4 py-3">
               <span className="text-sm font-bold text-silk-100">存档槽（本地 5 槽）</span>
-              <button onClick={() => setSlotDrawer(false)} className="text-silk-500 hover:text-silk-100"><X className="h-4 w-4" /></button>
+              <button onClick={() => setSlotDrawer(false)} aria-label="关闭存档槽" className="text-silk-500 hover:text-silk-100"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
-              {SLOT_KEYS.map((key, i) => {
-                const s = readSlot(key);
-                return (
-                  <motion.div key={key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                    className="rounded-lg border border-ink-700 bg-ink-900 p-3">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="font-mono text-xs text-sig-cyan">SLOT {i + 1}</span>
-                      {s && <span className="font-mono text-[10px] text-silk-700">{new Date(s.savedAt).toLocaleString('zh-CN')}</span>}
-                    </div>
-                    {s ? (
-                      <>
-                        <div className="mb-1 text-sm text-silk-100">{s.name}</div>
-                        <p className="mb-2 font-mono text-[10px] text-silk-700">元件 {s.circuit.components.length} · 导线 {s.circuit.wires.length}</p>
-                        <div className="flex gap-2">
-                          <PadButton size="S" onClick={() => loadSlot(key)}>载入</PadButton>
-                          <PadButton size="S" variant="ghost" onClick={() => saveToSlot(key)}>覆盖保存</PadButton>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <p className="mb-2 text-xs text-silk-700">空槽位</p>
-                        <PadButton size="S" variant="ghost" onClick={() => saveToSlot(key)}>保存当前电路</PadButton>
-                      </>
-                    )}
-                  </motion.div>
-                );
-              })}
+              {slots.map(({ key, slot: s }, i) => (
+                <motion.div key={key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                  className="rounded-lg border border-ink-700 bg-ink-900 p-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="font-mono text-xs text-sig-cyan">SLOT {i + 1}</span>
+                    {s && <span className="font-mono text-[10px] text-silk-700">{new Date(s.savedAt).toLocaleString('zh-CN')}</span>}
+                  </div>
+                  {s ? (
+                    <>
+                      <div className="mb-1 text-sm text-silk-100">{s.name}</div>
+                      <p className="mb-2 font-mono text-[10px] text-silk-700">元件 {s.circuit.components.length} · 导线 {s.circuit.wires.length}</p>
+                      <div className="flex gap-2">
+                        <PadButton size="S" onClick={() => loadSlot(key)}>载入</PadButton>
+                        <PadButton size="S" variant="ghost" onClick={() => saveToSlot(key)}>覆盖保存</PadButton>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mb-2 text-xs text-silk-700">空槽位</p>
+                      <PadButton size="S" variant="ghost" onClick={() => saveToSlot(key)}>保存当前电路</PadButton>
+                    </>
+                  )}
+                </motion.div>
+              ))}
             </div>
           </motion.aside>
         )}

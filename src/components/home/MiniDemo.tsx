@@ -64,6 +64,9 @@ export default function MiniDemo() {
   const [wires, setWires] = useState<Wire[]>([]);
   const [dragFrom, setDragFrom] = useState<PortId | null>(null);
   const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null);
+  // 按下但还没移动的端口：用于区分「拖拽」与「点击-点击」（触摸/键盘回退）
+  const pressRef = useRef<PortId | null>(null);
+  const suppressClick = useRef(false);
 
   const state = useMemo(() => {
     const n = nets(wires);
@@ -80,7 +83,7 @@ export default function MiniDemo() {
 
   const lit = state.lit;
 
-  const svgPoint = (e: React.MouseEvent) => {
+  const svgPoint = (e: { clientX: number; clientY: number }) => {
     const svg = svgRef.current!;
     const rect = svg.getBoundingClientRect();
     return {
@@ -89,34 +92,88 @@ export default function MiniDemo() {
     };
   };
 
-  const startWire = (p: PortId) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (wires.length >= 4) return;
+  const canWire = () => wires.length < 4;
+
+  /** 从一个端口起线（点击/键盘第一次触发） */
+  const startWire = (p: PortId) => {
+    if (!canWire()) return;
     setDragFrom(p);
-    setMouse(svgPoint(e));
+    setMouse({ x: PORTS[p].x, y: PORTS[p].y });
   };
 
-  const onMove = (e: React.MouseEvent) => {
-    if (dragFrom) setMouse(svgPoint(e));
-  };
-
-  const endWire = (p: PortId) => () => {
-    if (dragFrom && dragFrom !== p && wires.length < 4) {
+  /** 落到目标端口：真正连一条线 */
+  const connect = (from: PortId, to: PortId) => {
+    if (from !== to && canWire()) {
       const dup = wires.some(
-        w => (w.from === dragFrom && w.to === p) || (w.from === p && w.to === dragFrom),
+        w => (w.from === from && w.to === to) || (w.from === to && w.to === from),
       );
-      if (!dup) setWires(ws => [...ws, { from: dragFrom, to: p }]);
+      if (!dup) setWires(ws => [...ws, { from, to }]);
     }
     setDragFrom(null);
     setMouse(null);
   };
 
   const cancelDrag = () => {
+    pressRef.current = null;
     setDragFrom(null);
     setMouse(null);
   };
 
+  // 指针按下：拖动起点；若已有起线端口，则本次按下就是「第二下」→ 直接连线
+  const portDown = (p: PortId) => {
+    if (dragFrom && dragFrom !== p) {
+      connect(dragFrom, p);
+      suppressClick.current = true;
+      pressRef.current = null;
+      return;
+    }
+    pressRef.current = p;
+  };
+
+  // 指针抬起：跨端口 = 一次拖拽完成；同端口且已起线 = 拖拽取消
+  const portUp = (p: PortId) => {
+    const from = pressRef.current;
+    pressRef.current = null;
+    if (!from) return;
+    if (from !== p) {
+      connect(from, p);
+      suppressClick.current = true;
+      return;
+    }
+    if (dragFrom === p) {
+      cancelDrag();
+      suppressClick.current = true;
+    }
+  };
+
+  // 点击回退（触摸/无移动的按下）：点一下起线，再点一下落线；已起线的端口再点取消
+  const portClick = (p: PortId) => {
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      return;
+    }
+    if (dragFrom === p) {
+      cancelDrag();
+      return;
+    }
+    if (dragFrom) {
+      connect(dragFrom, p);
+      return;
+    }
+    startWire(p);
+  };
+
+  const onMove = (e: React.PointerEvent) => {
+    const pressed = pressRef.current;
+    if (pressed && dragFrom !== pressed) {
+      if (!canWire()) return;
+      setDragFrom(pressed); // 移动才起线：纯点击不会闪出橡皮筋
+    }
+    if (dragFrom || pressed) setMouse(svgPoint(e));
+  };
+
   const reset = () => {
+    cancelDrag();
     setWires([]);
   };
 
@@ -154,7 +211,7 @@ export default function MiniDemo() {
               }
             : { boxShadow: '0 0 0px rgba(255,82,99,0)' }
         }
-        className="relative mx-auto w-[960px] rounded-lg border border-ink-600 bg-ink-850"
+        className="relative mx-auto w-full max-w-[960px] rounded-lg border border-ink-600 bg-ink-850"
       >
         {/* 四角丝印角标 DEMO-01 */}
         <span className="absolute left-3 top-2 font-mono text-[10px] tracking-widest text-silk-700">DEMO-01</span>
@@ -172,10 +229,18 @@ export default function MiniDemo() {
         <svg
           ref={svgRef}
           viewBox="0 0 960 540"
-          className="gerber-grid-fine block h-[540px] w-[960px] select-none"
-          onMouseMove={onMove}
-          onMouseLeave={cancelDrag}
-          onMouseUp={cancelDrag}
+          className="gerber-grid-fine block aspect-[16/9] w-full select-none"
+          onPointerMove={onMove}
+          onPointerUp={cancelDrag}
+          onPointerLeave={cancelDrag}
+          onPointerCancel={cancelDrag}
+          onClick={e => {
+            // 一次拖拽结束后浏览器会把 click 派发到共同祖先（SVG），而不是端口本身：
+            // 在这里清掉一次性抑制标记，避免「下次点端口没反应」；顺便实现点空白处取消接线
+            suppressClick.current = false;
+            const fromPort = (e.target as Element | null)?.closest?.('[data-port-hit]');
+            if (!fromPort) cancelDrag();
+          }}
         >
           {/* 已连导线 */}
           {wires.map((w, i) => {
@@ -275,15 +340,34 @@ export default function MiniDemo() {
                   style={{ stroke: isSource ? 'var(--col-sig-cyan)' : 'rgb(var(--cc-copper-500) / 0.4)' }}
                   strokeWidth="2"
                 />
+                {/* 交互热区：比可见焊盘大一圈，触摸/鼠标/键盘都能操作（Pointer Events 同时覆盖触屏） */}
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r="18"
+                  role="button"
+                  tabIndex={0}
+                  data-port-hit={p}
+                  aria-label={`端口 ${pt.label}：${dragFrom ? `点击在此落线（从 ${PORTS[dragFrom].label} 起）` : '点击或回车开始接线'}`}
+                  className="cursor-crosshair"
+                  style={{ fill: 'transparent', pointerEvents: 'all', touchAction: 'none' }}
+                  onPointerDown={() => portDown(p)}
+                  onPointerUp={() => portUp(p)}
+                  onClick={() => portClick(p)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      portClick(p);
+                    }
+                  }}
+                />
                 <circle
                   cx={pt.x}
                   cy={pt.y}
                   r="7"
-                  className="cursor-crosshair"
-                  style={{ fill: 'rgb(var(--cc-copper-500))', stroke: '#0A100D', pointerEvents: 'all' }}
+                  className="pointer-events-none"
+                  style={{ fill: 'rgb(var(--cc-copper-500))', stroke: '#0A100D' }}
                   strokeWidth="2"
-                  onMouseDown={startWire(p)}
-                  onMouseUp={endWire(p)}
                 />
                 <text
                   x={pt.x + (p === 'ledA' || p === 'ledK' ? 26 : 0)}

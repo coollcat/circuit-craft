@@ -159,7 +159,7 @@ export const ANNOTATIONS: Record<string, AnnotationDef[]> = {
     { text: '两引脚：长脚为正', anchor: [5.08, 0.6, 0] },
   ],
   schottky: [
-    { text: '双白环 = 阴极', anchor: [1.65, 2.6, 0.4] },
+    { text: '白色阴极环 = 阴极', anchor: [1.65, 2.6, 0.4] },
     { text: '低压降 ≈ 0.3V', anchor: [-1.2, 2.55, 0.4] },
     { text: '轴向引脚', anchor: [-5.08, 0.5, 0] },
   ],
@@ -172,7 +172,7 @@ export const ANNOTATIONS: Record<string, AnnotationDef[]> = {
     { text: '七段红色数码', anchor: [0, 2.9, 3.4] },
     { text: '小数点 DP', anchor: [1.75, 0.98, 3.4] },
     { text: '环氧底座', anchor: [-3.4, 4.6, 3.3] },
-    { text: '底部引脚', anchor: [1.3, 0.5, 2.3] },
+    { text: '上下各 5 脚（共 10 脚）', anchor: [1.3, 0.5, 2.3] },
   ],
   relay: [
     { text: '顶部丝印：线圈电压 / 触点容量', anchor: [-1, 11.7, 0] },
@@ -202,6 +202,28 @@ export const ANNOTATIONS: Record<string, AnnotationDef[]> = {
     { text: '磁路钢缸', anchor: [0, 4.3, 1.8] },
     { text: '盆架环', anchor: [0, 0.9, 4.9] },
     { text: '两接线引脚', anchor: [-5.08, 0.5, 0] },
+  ],
+  comparator: [
+    { text: '圆点 = 1 脚', anchor: [-3.5, 3.5, -1.8] },
+    { text: 'DIP-8（LM393 双比较器）', anchor: [2, 3.4, 0] },
+    { text: '两侧各 4 引脚', anchor: [1, 0.6, 3.4] },
+  ],
+  levelshift: [
+    { text: 'LV 侧 3 针（低压）', anchor: [-5.6, 0.9, 0] },
+    { text: 'HV 侧 3 针（高压）', anchor: [5.6, 0.9, 0] },
+    { text: 'MOS 阵列 + 两侧上拉', anchor: [0.4, 1.7, 0] },
+    { text: '4 路双向通道', anchor: [2.6, 1.4, 1.6] },
+  ],
+  dcdc: [
+    { text: '功率电感（储能）', anchor: [-3.2, 3.5, 0] },
+    { text: '输入/输出电解电容', anchor: [2.6, 3.7, 2.4] },
+    { text: '开关芯片', anchor: [3.0, 1.9, -0.2] },
+    { text: 'IN/OUT 焊盘', anchor: [6.2, 1.1, 3.4] },
+  ],
+  opto: [
+    { text: '圆点 = 1 脚（阳极）', anchor: [-2.4, 3.3, -1.6] },
+    { text: 'DIP-4 黑色本体', anchor: [1.5, 3.3, 0] },
+    { text: '两排共 4 引脚', anchor: [1.27, 0.5, 3.0] },
   ],
 };
 

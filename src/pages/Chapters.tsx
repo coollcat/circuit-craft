@@ -10,6 +10,8 @@ import {
 import { LEVELS, SIDE_QUESTS } from '@/content/levels';
 import type { LevelDef } from '@/engine/types';
 import { useProgress } from '@/store/progress';
+import { useTransient, TOAST_MS, SHAKE_MS } from '@/hooks/useTransient';
+import { useMotionOn } from '@/hooks/useMotionOn';
 import PadButton from '@/components/PadButton';
 import SilkTag from '@/components/SilkTag';
 import { titleForStars } from '@/lib/titles';
@@ -96,12 +98,46 @@ const PAD_STYLE: Record<PadState, { ring: string; fill: string; text: string }> 
 
 const GUIDE_KEY = 'cc-guide-chapters-v1';
 
+/** 右键菜单尺寸（w-36 + 两个条目），用于视口内 clamp */
+const CTX_MENU_W = 144;
+const CTX_MENU_H = 64;
+
+/** 焊盘星数：如实显示，0 星用 ✓ 表示「通关但没拿星」，不能补成 1 星 */
+function starGlyphs(starCount: number): string {
+  return starCount > 0 ? '★'.repeat(starCount) : '✓';
+}
+
+/**
+ * 底部状态条打字机：独立成组件，55ms 一次的 setState 只重渲染这一行文本，
+ * 不再带动整张 30 焊盘 SVG（含 O(n²) 的 stateOf）重绘；设置里关掉动效时整句直出。
+ */
+function TypewriterText({ text, className }: { text: string; className?: string }) {
+  const motionOn = useMotionOn();
+  // 记录「是谁的已打字数」，文本变化时不会短暂闪出上一句的尾巴
+  const [state, setState] = useState({ text, typed: '' });
+  useEffect(() => {
+    if (!motionOn) return; // 动效关闭：直接渲染整句，无需打字机
+    let i = 0;
+    const t = setInterval(() => {
+      i += 1;
+      setState({ text, typed: text.slice(0, i) });
+      if (i >= text.length) clearInterval(t);
+    }, 55);
+    return () => clearInterval(t);
+  }, [text, motionOn]);
+  const typed = motionOn && state.text === text ? state.typed : motionOn ? '' : text;
+  return <span className={className}>{typed}</span>;
+}
+
 export default function Chapters() {
   const navigate = useNavigate();
   const location = useLocation();
   const completed = useProgress(s => s.completed);
   const stars = useProgress(s => s.stars);
   const isLevelUnlocked = useProgress(s => s.isLevelUnlocked);
+  // 循环动画（当前关脉冲环 / 可玩呼吸 / 继续按钮呼吸光）只在动效开启时跑；
+  // useMotionOn 同时尊重设置开关与系统 prefers-reduced-motion
+  const motionOn = useMotionOn();
 
   const pads = useMemo(buildPads, []);
   const totalStars = useMemo(() => Object.values(stars).reduce((a, b) => a + b, 0), [stars]);
@@ -109,18 +145,23 @@ export default function Chapters() {
   const TOTAL_LEVELS = LEVELS.length + SIDE_QUESTS.length;
   const TOTAL_STARS = TOTAL_LEVELS * 3;
 
+  // 焊盘状态一次算全：原先 stateOf 每次调用都从头扫一遍 pads（30 焊盘 → 每次渲染 O(n²)）
+  const padStates = useMemo(() => {
+    const firstOpen = pads.find(p => !completed.includes(p.level.id) && isLevelUnlocked(p.level.id))?.level.id;
+    const m = new Map<string, PadState>();
+    for (const p of pads) {
+      if (completed.includes(p.level.id)) m.set(p.level.id, 'done');
+      else if (isLevelUnlocked(p.level.id)) m.set(p.level.id, p.level.id === firstOpen ? 'current' : 'open');
+      else m.set(p.level.id, 'locked');
+    }
+    return m;
+  }, [completed, isLevelUnlocked, pads]);
+
+  // pads 之外的关卡（理论上不会出现）走一次即算的兜底分支，保证语义不变
   const stateOf = useCallback(
-    (l: LevelDef): PadState => {
-      const done = completed.includes(l.id);
-      const open = isLevelUnlocked(l.id);
-      if (done) return 'done';
-      if (open) {
-        const firstOpen = pads.find(p => !completed.includes(p.level.id) && isLevelUnlocked(p.level.id));
-        return firstOpen?.level.id === l.id ? 'current' : 'open';
-      }
-      return 'locked';
-    },
-    [completed, isLevelUnlocked, pads],
+    (l: LevelDef): PadState =>
+      padStates.get(l.id) ?? (completed.includes(l.id) ? 'done' : isLevelUnlocked(l.id) ? 'open' : 'locked'),
+    [padStates, completed, isLevelUnlocked],
   );
 
   const nextLevel = pads.find(p => stateOf(p.level) === 'current')?.level ?? null;
@@ -209,8 +250,8 @@ export default function Chapters() {
   /* ---------- 弹层状态 ---------- */
   const [hovered, setHovered] = useState<string | null>(null);
   const [drawerCh, setDrawerCh] = useState<number | null>(null);
-  const [shake, setShake] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [shake, setShake] = useTransient<string>(SHAKE_MS);
+  const [toast, setToast] = useTransient<string>(TOAST_MS);
   const [knowledgeOf, setKnowledgeOf] = useState<LevelDef | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [guideStep, setGuideStep] = useState<number>(() =>
@@ -221,13 +262,7 @@ export default function Chapters() {
   useEffect(() => {
     setStorageWarnHandler(setToast);
     return () => setStorageWarnHandler(null);
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2600);
-    return () => clearTimeout(t);
-  }, [toast]);
+  }, [setToast]);
 
   // URL 直达未解锁关卡被重定向回来时，接住 LevelPlay 带来的提示
   useEffect(() => {
@@ -236,34 +271,42 @@ export default function Chapters() {
       setToast(msg);
       navigate(location.pathname, { replace: true, state: null });
     }
-  }, [location, navigate]);
+  }, [location, navigate, setToast]);
 
+  // 右键菜单：滚动/改窗口尺寸后坐标失效，直接关掉；Esc 兜底
   useEffect(() => {
-    if (!shake) return;
-    const t = setTimeout(() => setShake(null), 400);
-    return () => clearTimeout(t);
-  }, [shake]);
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [ctxMenu]);
 
-  // 允许点击任意焊盘进入关卡（未解锁也可进入，进度系统会照常记录）
-  const clickPad = (p: PadPos) => {
-    navigate(`/play/${p.level.id}`);
+  // 锁定关卡统一 guard：抖动 + 提示，不再「点了就进关」，也不再分散成两套语义
+  const playLevel = (l: LevelDef) => {
+    if (stateOf(l) !== 'locked') {
+      navigate(`/play/${l.id}`);
+      return;
+    }
+    const idx = pads.findIndex(q => q.level.id === l.id);
+    const prev = idx > 0 ? pads[idx - 1].level : null;
+    setShake(l.id);
+    setToast(prev ? `先通关「${prev.title}」解锁本关` : '先通关前面的关卡哦');
   };
+  const clickPad = (p: PadPos) => playLevel(p.level);
 
-  /* ---------- 状态条打字机 ---------- */
+  /* ---------- 状态条文案（打字机在 TypewriterText 内，避免整图重渲染） ---------- */
   const statusText = nextLevel
     ? `小焊：下一个是「${nextLevel.title}」——${CHAPTER_META[nextLevel.chapter - 1].laozhou}`
     : '小焊：主线全部通关！去毕业设计台迎接终极挑战吧！';
-  const [typed, setTyped] = useState('');
-  useEffect(() => {
-    setTyped('');
-    let i = 0;
-    const t = setInterval(() => {
-      i += 1;
-      setTyped(statusText.slice(0, i));
-      if (i >= statusText.length) clearInterval(t);
-    }, 55);
-    return () => clearInterval(t);
-  }, [statusText]);
 
   /* ---------- 走线路径 ---------- */
   const tracePath = useMemo(() => {
@@ -292,6 +335,14 @@ export default function Chapters() {
 
   const hoveredLevel = hovered ? pads.find(p => p.level.id === hovered) : null;
   const drawerMeta = drawerCh ? CHAPTER_META.find(m => m.chapter === drawerCh) : null;
+  // 右键菜单位置：用光标实际坐标 + 两轴视口 clamp（原先是 clientX-320 / clientY-80 的写死偏移，
+  // 点在焊盘右侧时菜单会飞到大半个屏幕之外）
+  const ctxPos = ctxMenu
+    ? {
+        left: Math.min(Math.max(ctxMenu.x, 8), Math.max(8, window.innerWidth - CTX_MENU_W - 8)),
+        top: Math.min(Math.max(ctxMenu.y, 8), Math.max(8, window.innerHeight - CTX_MENU_H - 8)),
+      }
+    : null;
 
   const guideSteps = [
     { title: '这是你的主板', body: '点亮走线就是通关。30 个关卡焊盘由铜色主走线串联，通关一段，走线就点亮一段。' },
@@ -338,7 +389,15 @@ export default function Chapters() {
                 第 {nextLevel.chapter} 章 · {nextLevel.title}
               </div>
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-silk-500">{nextLevel.briefing}</p>
-              <motion.div animate={{ boxShadow: ['0 0 4px rgba(63,196,127,0.4)', '0 0 14px rgba(63,196,127,0.8)', '0 0 4px rgba(63,196,127,0.4)'] }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 2.8 }} className="mt-3 rounded-md">
+              <motion.div
+                animate={
+                  motionOn
+                    ? { boxShadow: ['0 0 4px rgba(63,196,127,0.4)', '0 0 14px rgba(63,196,127,0.8)', '0 0 4px rgba(63,196,127,0.4)'] }
+                    : { boxShadow: '0 0 6px rgba(63,196,127,0.5)' }
+                }
+                transition={motionOn ? { duration: 1.2, repeat: Infinity, repeatDelay: 2.8 } : { duration: 0 }}
+                className="mt-3 rounded-md"
+              >
                 <PadButton to={`/play/${nextLevel.id}`} variant="primary" size="L" className="w-full">
                   <Play className="h-4 w-4" /> 继续 {nextLevel.id.replace('c', '')} 关
                 </PadButton>
@@ -572,21 +631,21 @@ export default function Chapters() {
                     onMouseEnter={() => setHovered(p.level.id)}
                     onMouseLeave={() => setHovered(null)}
                   >
-                    {/* 当前关脉冲环 */}
+                    {/* 当前关脉冲环（动效关闭时只留静态环） */}
                     {st === 'current' && (
                       <motion.circle
                         cx={p.x} cy={p.y} r="18" fill="none" strokeWidth="2"
                         style={{ stroke: 'rgb(var(--cc-sig-cyan))', transformOrigin: `${p.x}px ${p.y}px` }}
-                        animate={{ scale: [1, 1.35], opacity: [0.9, 0] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
+                        animate={motionOn ? { scale: [1, 1.35], opacity: [0.9, 0] } : { scale: 1, opacity: 0.55 }}
+                        transition={motionOn ? { duration: 1.5, repeat: Infinity } : { duration: 0 }}
                       />
                     )}
                     {/* 可玩呼吸 */}
                     {st === 'open' && (
                       <motion.circle
                         cx={p.x} cy={p.y} r="16" fill="none" stroke="rgb(var(--cc-pcb-500))" strokeWidth="2"
-                        animate={{ opacity: [0.5, 1, 0.5] }}
-                        transition={{ duration: 2, repeat: Infinity }}
+                        animate={motionOn ? { opacity: [0.5, 1, 0.5] } : { opacity: 0.8 }}
+                        transition={motionOn ? { duration: 2, repeat: Infinity } : { duration: 0 }}
                       />
                     )}
                     <motion.circle
@@ -597,7 +656,7 @@ export default function Chapters() {
                     />
                     {st === 'done' ? (
                       <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="11" fontWeight="bold" style={{ fill: s.text }} fontFamily="JetBrains Mono">
-                        {'★'.repeat(Math.max(starCount, 1))}
+                        {starGlyphs(starCount)}
                       </text>
                     ) : st === 'locked' ? (
                       <foreignObject x={p.x - 6} y={p.y - 6} width="12" height="12">
@@ -654,16 +713,26 @@ export default function Chapters() {
                 <div className="mt-0.5 text-sm font-bold text-silk-100">{hoveredLevel.level.title}</div>
                 <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-silk-500">{hoveredLevel.level.briefing}</p>
                 <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-silk-500">
-                  <span className="text-copper-300">{'★'.repeat(stars[hoveredLevel.level.id] ?? 0) || '未完成'}</span>
+                  {/* 0 星关卡也要如实说「已通关」，不能显示成「未完成」 */}
+                  <span className="text-copper-300">
+                    {(stars[hoveredLevel.level.id] ?? 0) > 0
+                      ? '★'.repeat(stars[hoveredLevel.level.id] ?? 0)
+                      : completed.includes(hoveredLevel.level.id)
+                        ? '已通关 · 0 星'
+                        : '未完成'}
+                  </span>
                   <span>预计 5–10 分钟</span>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* 右键菜单（已通关） */}
-          {ctxMenu && (
-            <div className="panel-raised absolute z-30 w-36 rounded-md py-1" style={{ left: ctxMenu.x - 320, top: ctxMenu.y - 80, position: 'fixed' }}>
+          {/* 右键菜单（已通关）：跟随光标，且在视口内 clamp */}
+          {ctxMenu && ctxPos && (
+            <div
+              className="panel-raised fixed z-30 w-36 rounded-md py-1"
+              style={{ left: ctxPos.left, top: ctxPos.top }}
+            >
               <button className="block w-full px-3 py-1.5 text-left text-xs text-silk-300 hover:bg-ink-700" onClick={() => { setCtxMenu(null); navigate(`/play/${ctxMenu.id}`); }}>
                 重玩本关
               </button>
@@ -724,7 +793,10 @@ export default function Chapters() {
                           <motion.button
                             key={l.id}
                             initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
-                            onClick={() => (setDrawerCh(null), navigate(`/play/${l.id}`))}
+                            onClick={() => {
+                              setDrawerCh(null);
+                              playLevel(l);
+                            }}
                             className={cn(
                               'flex items-center gap-3 rounded-md border px-3 py-2 text-left text-xs transition-colors',
                               st === 'locked' ? 'border-ink-700 text-silk-700' : 'border-ink-600 text-silk-300 hover:border-pcb-400 hover:text-silk-100',
@@ -735,7 +807,7 @@ export default function Chapters() {
                             {st === 'locked' ? (
                               <Lock className="h-3.5 w-3.5" />
                             ) : st === 'done' ? (
-                              <span className="font-mono text-copper-300">{'★'.repeat(Math.max(stars[l.id] ?? 0, 1))}</span>
+                              <span className="font-mono text-copper-300">{starGlyphs(stars[l.id] ?? 0)}</span>
                             ) : (
                               <Play className="h-3.5 w-3.5 text-pcb-300" />
                             )}
@@ -776,11 +848,13 @@ export default function Chapters() {
           )}
         </AnimatePresence>
 
-        {/* Toast */}
+        {/* Toast（与支线页统一：同处停留时长 + 屏幕阅读器可播报） */}
         <AnimatePresence>
           {toast && (
             <motion.div
               initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
+              role="status"
+              aria-live="polite"
               className="panel-raised absolute right-6 top-6 z-50 rounded-md border-l-2 border-l-warn px-4 py-2.5 text-xs text-silk-100"
             >
               {toast}
@@ -826,7 +900,7 @@ export default function Chapters() {
       <div className="flex h-8 shrink-0 items-center justify-between border-t border-ink-700 bg-ink-900 px-4">
         <div className="flex items-center gap-2 overflow-hidden">
           <img src="/npc-xiaohan.png" alt="" className="h-5 w-5 rounded-full border border-pcb-400" />
-          <span className="truncate text-[11px] text-silk-300">{typed}</span>
+          <TypewriterText text={statusText} className="truncate text-[11px] text-silk-300" />
         </div>
         <div className="shrink-0 font-mono text-[11px] text-silk-500">
           进度 {totalCompleted}/{TOTAL_LEVELS} · ⭐{totalStars} · 称号：{titleForStars(totalStars)}

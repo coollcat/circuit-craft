@@ -2,7 +2,7 @@
 // DialogueBar 剧情对话条（design.md 6.8）：NPC 头像 + 打字机文本 + 继续
 import { useEffect, useRef, useState } from 'react';
 import type { DialogueLine, NPCId } from '@/engine/types';
-import { useProgress } from '@/store/progress';
+import { useMotionOn } from '@/hooks/useMotionOn';
 import { cn } from '@/lib/utils';
 
 export const NPC_META: Record<
@@ -46,8 +46,8 @@ export default function DialogueBar({ lines, onDone, className }: DialogueBarPro
   const timer = useRef<number | null>(null);
   const line = lines[lineIdx];
   const done = lineIdx >= lines.length - 1 && chars >= (line?.text.length ?? 0);
-  // 设置·动效关闭时：打字机停用，整句瞬时显示
-  const motionOn = useProgress(s => s.settings.motion);
+  // 设置·动效关闭（或系统 prefers-reduced-motion）时：打字机停用，整句瞬时显示
+  const motionOn = useMotionOn();
 
   // 打字机：18 字/秒（动效关闭 → 瞬时全文）
   useEffect(() => {

@@ -271,9 +271,14 @@ export default function EntryDetail({
               {entry.usedIn.map((u, i) => (
                 <span
                   key={i}
-                  className="rounded border border-ink-600 bg-ink-800 px-3 py-1.5 font-mono text-xs text-silk-300"
+                  className={cn(
+                    'rounded border px-3 py-1.5 font-mono text-xs',
+                    u.pending
+                      ? 'border-dashed border-silk-700 bg-ink-800/60 text-silk-500'
+                      : 'border-ink-600 bg-ink-800 text-silk-300',
+                  )}
                 >
-                  第 {u.chapter} 章 · {u.label}
+                  {u.pending ? u.label : `第 ${u.chapter} 章 · ${u.label}`}
                 </span>
               ))}
             </div>

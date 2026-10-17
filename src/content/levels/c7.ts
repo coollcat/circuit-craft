@@ -45,6 +45,9 @@ export const C7_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['数据手册', '降额设计'],
+    formula: { expr: 'R = (Vcc − Vf) / If', vars: 'Vcc 电源(V)、Vf LED 典型压降(V)、If 降额后的工作电流(A)', note: '按额定 20mA 的 40~60% 取 8.7mA → R = 1.3V ÷ 8.7mA ≈ 150Ω' },
     hints: [
       '目标电流取额定 20mA 的一半以下，比如 8~9mA。R = (3.3 − 2) ÷ I。',
       'R = 1.3V ÷ 8.7mA ≈ 150Ω，正好是 E24 标准值，顺手、便宜、好买。',
@@ -65,7 +68,7 @@ export const C7_LEVELS: LevelDef[] = [
     title: 'LDO 选型：冷静供电',
     subtitle: '压差、电流与发热的三国杀',
     briefing:
-      '5V 输入要稳定输出 3.3V，负载是一颗 33Ω 电阻（约 100mA）。用一颗 LDO 稳压器完成任务：输出电压 3.2~3.4V、负载电流 90~110mA，并且 LDO 的额定电流要留足裕量（imax ≥ 110mA）。',
+      '5V 输入要稳定输出 3.3V，负载是一颗电阻，要求负载电流落在 90~110mA。用一颗 LDO 稳压器完成任务：自己反推电阻值，输出电压 3.2~3.4V、负载电流 90~110mA，并且 LDO 的额定电流要留足裕量（imax ≥ 0.11A，即 110mA；参数单位是安培）。',
     intro: [
       { speaker: 'lingong', text: '这批节点的 MCU 要 3.3V 干净电源。DC-DC 效率高但噪声大，LDO 噪声低但发热——传感器模拟前端怕噪声，这单用 LDO。选型给我看计算过程。' },
       { speaker: 'laozhou', text: 'LDO 选型三问：压差够不够（输入至少高输出 0.2~0.3V）、电流定额够不够（留 20% 裕量）、热不热（P = (Vin−Vout)×I）。' },
@@ -76,12 +79,15 @@ export const C7_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：同样 5V 转 3.3V，LDO 效率只有 66%，剩下 34% 变成热。要是 12V 转 3.3V，效率 27%——那种场景请老老实实用 DC-DC，LDO 会烫到怀疑人生。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 33 } },
+      // P1 修复：出厂 100Ω 只有 33mA 负载；33Ω 由 I = 3.3V ÷ R 反推
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 100 } },
     ],
     preset: {
       components: [
         { id: 'BT1', type: 'battery', x: 64, y: 176, params: { voltage: 5 }, locked: true },
-        { id: 'U1', type: 'ic', x: 288, y: 176, params: { vout: 3.3, imax: 150 }, locked: true },
+        // P1 修复：出厂 imax=0.05A（50mA）带不动 100mA 负载，玩家必须把定额抬到 ≥0.11A（110mA）
+        // 单位口径与 PARAM_SCHEMA.ic.imax 一致：安培（0.11 = 110mA）
+        { id: 'U1', type: 'ic', x: 288, y: 176, params: { vout: 3.3, imax: 0.05 }, locked: true },
         { id: 'GND1', type: 'gnd', x: 64, y: 336, locked: true },
       ],
       wires: [],
@@ -93,7 +99,7 @@ export const C7_LEVELS: LevelDef[] = [
       { kind: 'connected', a: { comp: 'BT1', port: 'neg' }, b: { comp: 'GND1', port: 'gnd' } },
       { kind: 'connected', a: { comp: 'U1', port: 'out' }, b: { comp: 'RP1', port: 'a' } },
       { kind: 'connected', a: { comp: 'RP1', port: 'b' }, b: { comp: 'GND1', port: 'gnd' } },
-      { kind: 'param', comp: 'U1', param: 'imax', min: 110 },
+      { kind: 'param', comp: 'U1', param: 'imax', min: 0.11 },
       { kind: 'param', comp: 'RP1', param: 'resistance', min: 31, max: 36 },
       { kind: 'node-voltage', node: { comp: 'U1', port: 'out' }, min: 3.2, max: 3.4 },
       { kind: 'branch-current', comp: 'RP1', min: 90, max: 110 },
@@ -103,17 +109,21 @@ export const C7_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['LDO 选型', '压差', '功率校核'],
+    formula: { expr: 'P = (Vin − Vout) × Iload，Imax ≥ 1.2 × Iload', vars: 'Vin/Vout 输入输出电压(V)、Iload 负载电流(A)', note: 'Iload = 3.3V ÷ 33Ω = 100mA → Imax ≥ 0.11A；发热 P = 1.7V × 0.1A = 0.17W' },
     hints: [
-      '负载电流由 3.3V 和你的电阻决定：I = 3.3 ÷ R。要 100mA 左右，R ≈ 33Ω。',
-      '确认 LDO 的 imax（150mA）≥ 110mA——也就是负载上限再加裕量。压差 5−3.3=1.7V 远大于 0.3V，无忧。',
-      'RP1 设 33Ω 接在 out 与地之间。I = 3.3/33 = 100mA，发热 (5−3.3)×0.1 = 0.17W。',
+      '负载电流由 3.3V 和你的电阻决定：I = 3.3 ÷ R。要 100mA 左右，自己反推 R。',
+      'LDO 出厂定额只有 0.05A（50mA），带不动 100mA 的负载——双击 U1 把额定电流抬到 0.11A 以上（=110mA，负载上限再留 1.2 倍裕量）。压差 5−3.3 = 1.7V 远大于 0.3V，无忧。',
+      'RP1 = 3.3V ÷ 100mA = 33Ω，接在 out 与地之间。I = 3.3/33 = 100mA，发热 (5−3.3)×0.1 = 0.17W。',
     ],
     knowledge: {
       title: 'LDO 选型四步棋',
       body: 'LDO（低压差线性稳压器）选型按四步走：第一步看压差 Dropout——输入必须高出输出至少这个值（传统 1117 要 1V，现代 LDO 只要 100~300mV），3.3V 输出配 5V 输入从容，配 3.6V 锂电就得精挑低压差型号；第二步看电流定额，按最大负载的 1.2~1.5 倍选；第三步算发热 P = (Vin − Vout) × Iload，本关 0.17W 对应 SOT-223 约 17°C 温升，安全——超过 0.5W 就要认真算热阻；第四步看 PSRR（电源抑制比）和噪声，模拟/射频前端的 LDO 这两行参数比效率重要。LDO vs DC-DC 的判据很朴素：压差小、电流小、怕噪声，用 LDO；压差大、电流大、怕发热，用 DC-DC。',
     },
     // 验算: I=3.3/33=100mA ∈ [90,110] ✓；R∈[31,36] → I∈[91.7,106.5] ⊂ [90,110] ✓
-    // LDO 发热 P=(5−3.3)×0.1=0.17W，SOT-223(θJA≈100°C/W) 温升≈17°C ✓；imax=150 ≥ 110 ✓；压差 1.7V ≫ 0.3V ✓
+    // LDO 发热 P=(5−3.3)×0.1=0.17W，SOT-223(θJA≈100°C/W) 温升≈17°C ✓；压差 1.7V ≫ 0.3V ✓
+    // P1 修复：preset imax=0.05A 不达标 → 玩家必须抬到 ≥0.11A（参考解法取 0.15A）；palette RP1 出厂 100Ω（33mA）→ 33Ω 自己算
   },
   {
     id: 'c7-3',
@@ -157,6 +167,9 @@ export const C7_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['E24 标准值', '可采购设计'],
+    formula: { expr: 'R = (Vcc − Vf) / If', vars: 'Vcc 电源(V)、Vf LED 压降(V)、If 目标电流(A)', note: '(5−2) ÷ 13.6mA ≈ 220Ω——E24 里最大路、最好买的一档' },
     hints: [
       '电气上和第 1 章一样：3V 压降、十几 mA。但答案要落在「最大路」的阻值上。',
       'E24 里 3V÷13.6mA 对应的标准值是 220Ω。',
@@ -189,12 +202,13 @@ export const C7_LEVELS: LevelDef[] = [
     ],
     palette: [
       // 限流电阻手写落位：贴在 U2 右下，让 p0→RP1→LED 指示链整体收在右侧，不再横穿地线走廊
-      { id: 'RP1', type: 'resistor', x: 560, y: 352, params: { resistance: 150 } },
+      // P1 修复：出厂 1kΩ → LED 支路仅 1.3mA（低于 6mA）；150Ω 要自己算
+      { id: 'RP1', type: 'resistor', x: 560, y: 352, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
         { id: 'BT1', type: 'battery', x: 64, y: 176, params: { voltage: 5 }, locked: true },
-        { id: 'U1', type: 'ic', x: 240, y: 176, params: { vout: 3.3, imax: 150 }, locked: true },
+        { id: 'U1', type: 'ic', x: 240, y: 176, params: { vout: 3.3, imax: 0.15 }, locked: true },
         { id: 'U2', type: 'mcu', x: 448, y: 160, params: { pinVoltage: 3.3, current: 20 }, locked: true },
         { id: 'SEN1', type: 'sensor', x: 176, y: 432, params: { output: 1.65 }, locked: true },
         { id: 'LED1', type: 'led', x: 640, y: 176, params: { vf: 2 }, locked: true },
@@ -224,6 +238,9 @@ export const C7_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '8 分钟内完成', check: 'time', value: 480 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['BOM', '最小系统'],
+    formula: { expr: 'I_LED = (Vout_LDO − Vf) / R', vars: 'Vout_LDO 稳压输出(V)、Vf LED 压降(V)、R 限流电阻(Ω)', note: '(3.3 − 2) ÷ 150Ω ≈ 8.7mA；LDO 3.3V 供 MCU，传感器输出进 p1' },
     hints: [
       '按信号流分三段：电源段（BT1→LDO→MCU）、采集段（SEN1→p1）、指示段（p0→电阻→LED）。所有地汇到 GND1。',
       'LDO 输出 3.3V 给 MCU；MCU 的 p0 高电平也是 3.3V。LED 电流 = (3.3−2)÷R。',
@@ -234,6 +251,6 @@ export const C7_LEVELS: LevelDef[] = [
       body: 'BOM（Bill of Materials）把原理图翻译成可执行的采购与生产指令。每一行包含：位号（R1、C3）、型号或参数（10kΩ 1% 0805）、封装、数量、供应商料号、单价。制作 BOM 的纪律：参数写全（电阻除阻值外还有精度、功率、封装）、关键件双货源、停产（EOL）料即时替换、价格波动大的料备注替代方案。成本核算顺手做：本关系统——LDO 约 ¥0.5、MCU 模组约 ¥12、无源件合计不到 ¥1，电源与连接器占大头——BOM 表一拉，产品毛利心中就有数。最后一步「贴装坐标 + BOM + Gerber」打包发板厂，你的设计就变成了流水线上的实物。恭喜，这是工程师的成人礼。',
     },
     // 验算: LDO vout=3.3V ∈ [3.2,3.4] ✓；LED 支路 I=(3.3−2)/150=8.67mA ∈ [6,12] ✓
-    // MCU 静态 20mA + LED 8.7mA = 28.7mA < LDO imax 150mA ✓；LDO 发热 (5−3.3)×0.029≈0.05W ✓
+    // MCU 静态 20mA + LED 8.7mA = 28.7mA < LDO imax 0.15A（150mA）✓；LDO 发热 (5−3.3)×0.029≈0.05W ✓
   },
 ];

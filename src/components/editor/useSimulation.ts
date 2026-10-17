@@ -12,8 +12,12 @@ export interface SimulationHandle {
   error: string | null;
 }
 
+// 动态元件：储能件 + 信号源。sensor 在支线 B 的射频/噪声关里当 159kHz 噪声源用，
+// 必须算动态，否则仿真按静态电路只走 8 步/帧，dt 过大 → 波形是数值混叠的假象。
+const DYNAMIC_TYPES = ['capacitor', 'inductor', 'crystal', 'funcgen', 'sensor'];
+
 function isDynamic(circuit: CircuitSpec): boolean {
-  return circuit.components.some(c => ['capacitor', 'inductor', 'crystal', 'funcgen'].includes(c.type));
+  return circuit.components.some(c => DYNAMIC_TYPES.includes(c.type));
 }
 
 export function useSimulation(circuit: CircuitSpec, running: boolean): SimulationHandle {

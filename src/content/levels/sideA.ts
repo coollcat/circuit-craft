@@ -23,7 +23,8 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     ],
     palette: [
       // 限流电阻手写落位：贴 LED 下方，p0 馈线与 LED 回流各自短程直连
-      { id: 'RP1', type: 'resistor', x: 416, y: 432, params: { resistance: 220 } },
+      // P1 修复：出厂 1kΩ → 1.3mA 点不到 4~9mA；220Ω 要自己算
+      { id: 'RP1', type: 'resistor', x: 416, y: 432, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -52,6 +53,9 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['GPIO 输出', '限流电阻'],
+    formula: { expr: 'R = (Vcc − Vf) / If', vars: 'Vcc GPIO 高电平 3.3V、Vf LED 压降(V)、If 目标电流(A)', note: '(3.3 − 2) ÷ 6mA ≈ 220Ω；GPIO 一根手指最多推十几 mA' },
     hints: [
       '电路结构和主线点亮 LED 那关一样，唯一的变化：电压从 5V 变成了 3.3V。重新算一次限流电阻。',
       '电阻要消化 3.3 − 2 = 1.3V。想要 6mA 左右：R ≈ 220Ω。',
@@ -107,6 +111,9 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['PWM 占空比', '平均电压'],
+    formula: { expr: 'Vavg = Vcc × D', vars: 'Vcc 高电平(V)、D 占空比(0~1)', note: '3.3V × 50% = 1.65V：LED 看到的等效电压，亮度跟着占空比走' },
     hints: [
       '电路与 sa-1 相似，只是驱动源换成函数发生器 FG1（扮演 MCU 的 PWM 引脚）。关键是 FG1 的 duty（占空比）参数。',
       'duty 默认 0.1（太暗），改成 0.5：平均电压 3.3×0.5=1.65V，LED 半亮。',
@@ -129,7 +136,7 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     title: '按键的脾气：上拉与消抖',
     subtitle: '悬空的引脚会「闹鬼」',
     briefing:
-      '把按键接到 p1 读状态。坑来了：按键松开时引脚悬空，电平随机漂移——必须加一颗 10kΩ 上拉电阻（8~12kΩ 窗口），把松开态「拽」回 3.3V。目标：按键未按下时 p1 稳定在 3.1~3.4V。',
+      '把按键接到 p1 读状态。坑来了：按键松开时引脚悬空，电平随机漂移——必须加一颗上拉电阻把松开态「拽」回 3.3V。阻值多大合适？太大抗干扰差，太小按下时白费电流（本关验收窗口 8~12kΩ）。目标：按键未按下时 p1 稳定在 3.1~3.4V。',
     intro: [
       { speaker: 'xiaohan', text: '悬空的引脚是天线！手一靠近电平就乱跳，程序以为按键在疯狂蹦迪！上拉电阻就是它的定心丸！' },
       { speaker: 'laozhou', text: '上拉的逻辑：松开时，电阻把引脚轻轻拉到 3.3V（电流极小）；按下时，按键直接短路到地——「拽」不过「摁」，电平干净利落地变低。' },
@@ -141,7 +148,8 @@ export const SIDE_A_LEVELS: LevelDef[] = [
     ],
     palette: [
       // 上拉电阻手写落位：从上方馈入 p1，与下方按键的馈线上下分离不贴行
-      { id: 'RP1', type: 'resistor', x: 256, y: 64, params: { resistance: 10000 } },
+      // P1 修复：出厂 1kΩ 不在 8~12kΩ 窗口内，上拉阻值要玩家按功耗/抗扰折中选择
+      { id: 'RP1', type: 'resistor', x: 256, y: 64, params: { resistance: 1000 } },
       { id: 'KEY1', type: 'button', x: 0, y: 0 },
     ],
     preset: {
@@ -170,6 +178,9 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['上拉电阻', '按键输入'],
+    formula: { expr: 'I按下 = Vcc / R上拉', vars: 'Vcc 电源(V)、R上拉 上拉电阻(Ω)', note: '10kΩ 时按下仅 0.33mA；松开时引脚经电阻被拉到 3.3V，不再悬空' },
     hints: [
       '上拉结构：电源 → 电阻 → 引脚，引脚 → 按键 → 地。电阻和按键在引脚处「会师」。',
       '未按下时按键断开，引脚经电阻被拉到电源电压；输入引脚几乎不取电流，电阻上几乎没有压降。',
@@ -201,7 +212,8 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：游戏手柄的摇杆就是两只互相垂直的电位器；无人机遥控的油门、航向，全是 ADC 读数。你打的每一局游戏，都在用今天这个电路。' },
     ],
     palette: [
-      { id: 'RP1', type: 'pot', x: 0, y: 0, params: { resistance: 10000, wiper: 0.5 } },
+      // P1 修复：出厂 wiper=0.2（0.66V）不是中点，0.5 要玩家自己调
+      { id: 'RP1', type: 'pot', x: 0, y: 0, params: { resistance: 10000, wiper: 0.2 } },
     ],
     preset: {
       components: [
@@ -227,6 +239,9 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['电位器分压', 'ADC 量化'],
+    formula: { expr: 'Vw = Vcc × wiper', vars: 'Vcc 电源 3.3V、wiper 抽头位置(0~1)', note: 'wiper = 0.5 → 1.65V，12 位 ADC 读数约 2048' },
     hints: [
       '电位器 = 可调分压器：a 接 3.3V、b 接地、w 输出。wiper 参数 0~1 就是旋钮位置。',
       '正中点 wiper = 0.5：V = 3.3 × 0.5 = 1.65V，对应 12 位 ADC 读数 2048。',
@@ -257,7 +272,8 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：你的电脑每秒处理成千上万次中断——键盘、网卡、定时器。操作系统的灵魂，就是一个巨大的中断分发器。概念代码：`当 p1 下降沿时 → 点亮 p0`，一行顶轮询一百行。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 10000 } },
+      // P1 修复：上拉出厂 1kΩ 不在 8~12kΩ 窗口内（与 sa-3 同一选型任务）
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
       { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
       { id: 'KEY1', type: 'button', x: 0, y: 0 },
     ],
@@ -293,6 +309,9 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['中断', '上拉电阻'],
+    formula: { expr: 'I按下 = Vcc / R上拉', vars: 'Vcc 电源(V)、R上拉 上拉电阻(Ω)', note: '上拉 10kΩ 保证 p1 默认 3.3V；下降沿一到，硬件中断立刻点亮 p0 的 LED' },
     hints: [
       '这是 sa-1 与 sa-3 的合体：p0 带 LED（220Ω），p1 带按键上拉（10kΩ）。',
       '上拉让 p1 默认 3.3V；程序层面（概念代码）用「当 p1 下降沿时」触发 p0 点亮。',
@@ -323,8 +342,9 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：你刚才 conceptually 完成的，正是千亿物联网设备的最小形态。智能家居、农田监测、共享单车锁——剥开外壳，都是「MCU + 射频 + 传感器 + 电源」这套骨架。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
-      { id: 'ANT1', type: 'antenna', x: 0, y: 0, params: { impedance: 50 } },
+      // P1 修复：出厂 1kΩ/75Ω 都不达标；220Ω（限流）与 50Ω（匹配）分别要算/要对齐
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
+      { id: 'ANT1', type: 'antenna', x: 0, y: 0, params: { impedance: 75 } },
     ],
     preset: {
       components: [
@@ -359,6 +379,9 @@ export const SIDE_A_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '7 分钟内完成', check: 'time', value: 420 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['物联网节点', '天线匹配'],
+    formula: { expr: 'λ = c / f，Γ = (ZL − Z0) / (ZL + Z0)', vars: 'c 光速 3×10⁸ m/s、f 频率(Hz)、Z0 系统阻抗 50Ω', note: '2.4GHz → λ ≈ 12.5cm；天线 50Ω 匹配，LED 限流 220Ω（I ≈ 5.9mA）' },
     hints: [
       '三条链：供电（3.3V 同时喂 U1 和 MOD1）、射频（p1→MOD1→天线）、指示（p0→电阻→LED）。',
       '天线阻抗用主线第 6 章的答案：50Ω。LED 限流：3.3V 体系 220Ω。',

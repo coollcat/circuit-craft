@@ -1,8 +1,8 @@
-// 图鉴条目数据：26 个元件，六段式（一句话 / 工作原理 / 关键参数 / 选型要点 / 常见坑 / 实物与封装）
+// 图鉴条目数据：42 个元件（原 38 条 + W6 新增比较器/电平转换/DC-DC/光耦 4 条），六段式（一句话 / 工作原理 / 关键参数 / 选型要点 / 常见坑 / 实物与封装）
 // + 每条必填「布线案例」(wiring) 与「计算方式」(calc)：典型接法配公式与代入示例。
 // + 「原理图看一看」(schematic)：MiniSchematic 手绘风典型应用小电路。
 import type { SchematicFig } from '../MiniSchematic';
-export type LabKind = 'bands' | 'rc' | 'led' | 'opamp' | 'pullup';
+export type LabKind = 'bands' | 'rc' | 'led' | 'opamp' | 'pullup' | 'hyst';
 export type CategoryId = 'passive' | 'semi' | 'ic' | 'mech' | 'supply';
 
 export interface ParamRow {
@@ -69,7 +69,7 @@ export interface CodexEntry {
   selection: string[];
   pitfalls: string[];
   pkg: { packages: string[]; note: string };
-  usedIn: { chapter: number; label: string }[];
+  usedIn: { chapter: number; label: string; /** 尚未在任何关卡登场（仅图鉴延伸知识） */ pending?: boolean }[];
   keywords: string[];
 }
 
@@ -162,7 +162,8 @@ export const ENTRIES: CodexEntry[] = [
       { param: '额定电压', symbol: 'Vr', unit: 'V', guide: '工作电压打 5~7 折用：5V 电路选 10V 以上，别顶格' },
       { param: '介质类型', symbol: '—', unit: 'X7R / C0G / 电解', guide: '滤波选 X7R；定时/谐振选 C0G(NP0)；大容量才轮到电解' },
       { param: '等效串联电阻', symbol: 'ESR', unit: 'Ω', guide: 'LDO 对输出电容 ESR 有要求，固态钽/陶瓷 ESR 极低' },
-      { param: '容差', symbol: 'Tol', unit: '%', guide: 'Y5V 随电压可掉 80% 容值，定时电路千万别用' },
+      { param: '容差与温度特性', symbol: 'Tol', unit: '%', guide: 'C0G ±5%、X7R ±10%；Y5V 是 EIA 二类介质里最差的一档：−30~+85°C 内容值变化可达 −82%/+22%，只适合对容值无要求的场合，定时/谐振/滤波都别用它' },
+      { param: '直流偏压效应', symbol: 'ΔC/ΔV', unit: '%', guide: 'X5R/X7R/Y5V 这类二类介质加上直流电压后容值下降（与温度特性是两回事）：10µF/16V 的 0805 在 12V 下常只剩一半左右；选型看「工作电压下的剩余容值」，C0G 几乎不受影响' },
     ],
     wiring: {
       title: '去耦电容（每个芯片的标配）',
@@ -178,15 +179,16 @@ export const ENTRIES: CodexEntry[] = [
       { title: 'RC 时间常数', formula: 'τ = R × C', example: '10kΩ 电阻配 100µF 电容：τ = 10⁴ × 10⁻⁴ = 1 秒。充电 1 个 τ 到达 63%，5 个 τ 基本充满。' },
       { title: '容抗（对交流的「电阻」）', formula: 'Xc = 1 ÷ (2πfC)', example: '100nF 在 1MHz 下：Xc ≈ 1 ÷ (2×3.14×10⁶×10⁻⁷) ≈ 1.6Ω——高频噪声几乎被它短路到地，这就是去耦的原理。' },
       { title: '储能', formula: 'E = ½CV²', example: '100µF 充到 5V：E = 0.5 × 10⁻⁴ × 25 = 1.25mJ，断电后能替小电路顶一小会儿。' },
+      { title: '纹波估算（整流滤波）', formula: 'ΔV = I × t ÷ C', example: '50Hz 整流、负载 100mA、滤波电容 1000µF：电容每 10ms 被充一次，ΔV = 0.1 × 0.01 ÷ 10⁻³ = 1V 的纹波；想压到 0.1V 就得 10000µF 或者后级加稳压器。开关电源的纹波还要另算 ESR 和开关频率。' },
     ],
     selection: [
       '每个芯片电源脚配 100nF X7R 陶瓷，贴脚放，越远越没用。',
-      'MLCC 有直流偏压效应：10µF/16V 的 0805 用在 12V 上可能只剩一半容值。',
+      'MLCC 二类介质（X5R/X7R/Y5V）有直流偏压效应：10µF/16V 的 0805 用在 12V 上可能只剩一半容值；要稳定容值就选 C0G。',
       '电解电容有极性，长脚正、壳体白条为负，接反会鼓包甚至爆。',
     ],
     pitfalls: [
       '老周：电解电容接反？先冒烟再开花，那个味儿你闻一次记一辈子。',
-      '老周：拿 Y5V 当去耦，温度一上来容值掉一半，板子冬天抽风别找我。',
+      '老周：拿 Y5V 当去耦？它的 EIA 温度特性是 −82%/+22%，冬天和夏天的容值能差一倍多，板子换季就抽风。',
       '老周：100nF 离芯片 20mm 远？那叫装饰品，不叫去耦。',
     ],
     pkg: {
@@ -221,6 +223,7 @@ export const ENTRIES: CodexEntry[] = [
       { param: '温升电流', symbol: 'Irms', unit: 'A', guide: '由直流电阻发热决定，持续工作看这个' },
       { param: '直流电阻', symbol: 'DCR', unit: 'Ω', guide: '越低越省电，功率电感从几十 mΩ 到几 Ω' },
       { param: '自谐振频率', symbol: 'SRF', unit: 'MHz', guide: '超过 SRF 它表现得像电容，射频应用必须查' },
+      { param: '磁珠阻抗', symbol: 'Z@100MHz', unit: 'Ω', guide: '磁珠（Ferrite Bead）按 100MHz 下的阻抗标称，如 600Ω@100MHz；直流电阻只有几十 mΩ，作用是把高频噪声变成热——选它看频点和额定电流，不看感量' },
     ],
     wiring: {
       title: '继电器续流（保护你的三极管）',
@@ -261,7 +264,7 @@ export const ENTRIES: CodexEntry[] = [
     tagline: '电路的心跳起搏器。',
     essence: '晶振：用压电效应给出精确稳定的时钟频率。',
     plain: '大白话：电路的「节拍器」，嗒、嗒、嗒，带着整块芯片踩着点儿干活。',
-    schematic: { fig: 'xtal-mcu', title: 'MCU 的晶振电路', note: '晶振跨在 X1/X2 两脚，两颗负载电容（常见 18pF）分别接地，帮它稳定起振。' },
+    schematic: { fig: 'xtal-mcu', title: 'MCU 的晶振电路', note: '晶振跨在 X1/X2 两脚，两颗负载电容分别接地：CL=12.5pF（32.768kHz 最常见）配 15~18pF，CL=18pF 配 26~27pF——电容值由 CL 反推，不是随手抓两颗 18pF。' },
     unlockChapter: 6,
     principle: [
       '石英晶体有压电效应：加电压会形变，形变又产生电压。切成特定尺寸后，它在固有频率上机械谐振，等效为一个 Q 值极高的 LC 回路。',
@@ -270,7 +273,7 @@ export const ENTRIES: CodexEntry[] = [
     analogy: '像音叉：敲一下就以固定音高振动，晶振是电路世界的音叉。',
     params: [
       { param: '标称频率', symbol: 'f', unit: 'MHz / kHz', guide: 'MCU 主频 8/12/16/40MHz；RTC 用 32.768kHz' },
-      { param: '负载电容', symbol: 'CL', unit: 'pF', guide: '常见 12/18/20pF，外配两颗 ≈2×(CL−Cstray) 的电容' },
+      { param: '负载电容', symbol: 'CL', unit: 'pF', guide: '常见 12.5pF（32.768kHz）/18pF/20pF；外部两颗相等的电容 ≈ 2×(CL−Cstray)，杂散按 3~5pF 估：CL=12.5pF→15~18pF，CL=18pF→26~27pF' },
       { param: '频率精度', symbol: 'Tol', unit: 'ppm', guide: '常温 ±10~±20ppm 常见，通信场景看总预算' },
       { param: '等效串联电阻', symbol: 'ESR', unit: 'Ω', guide: '超过芯片驱动能力会不起振，低功耗 MCU 尤其要查' },
       { param: '工作温度', symbol: '—', unit: '°C', guide: '工业级 −40~+85°C，温漂曲线呈二次抛物线' },
@@ -279,13 +282,13 @@ export const ENTRIES: CodexEntry[] = [
       title: '晶振最小接法（两颗电容是灵魂）',
       steps: [
         '晶振两脚分别接 MCU 的 XTAL1 / XTAL2，方向不分正反。',
-        '每个脚再接一颗小电容到地（常见 18pF×2），这两颗「负载电容」决定振荡准不准。',
+        '每个脚再接一颗小电容到地，这两颗「负载电容」决定振荡准不准——值按晶振的 CL 反推：CL=12.5pF 配 15~18pF，CL=18pF 配 26~27pF。',
         '晶振紧贴芯片放，走线短而对称，金属壳接地，下方地平面保持完整别跨分割。',
       ],
       note: '老周：晶振电路是整块板最怕脏的部分——手汗、助焊剂残留都能让它罢工，焊完洗板。',
     },
     calc: [
-      { title: '负载电容匹配', formula: 'CL = (C1 × C2) ÷ (C1 + C2) + Cstray', example: '晶振要求 CL=18pF、板上杂散 Cstray≈5pF：取 C1=C2=26pF，串联等效 13pF + 5pF ≈ 18pF，就近选 22~27pF。' },
+      { title: '负载电容匹配', formula: 'CL = (C1 × C2) ÷ (C1 + C2) + Cstray；C1=C2 时化简为 C1 = 2 × (CL − Cstray)', example: '晶振要求 CL=18pF、板上杂散 Cstray≈5pF：C1 = C2 = 2 × (18 − 5) = 26pF，就近取 27pF。反过来，手上只有 18pF 电容时实际 CL ≈ 9 + 5 = 14pF，只适合 CL=12.5pF 的晶振（32.768kHz 最常见）——这就是「常见 18pF×2」的真实来历。' },
       { title: '频偏换算', formula: 'Δf = f × ppm ÷ 10⁶', example: '40MHz 晶振 ±20ppm：Δf = 40×10⁶ × 20 ÷ 10⁶ = ±800Hz，对串口波特率影响约 0.002%，放心用。' },
     ],
     selection: [
@@ -300,12 +303,9 @@ export const ENTRIES: CodexEntry[] = [
     ],
     pkg: {
       packages: ['HC-49S 直插（大铁壳）', '3225 / 2520 贴片无源晶振', '有源晶振 4 脚（Vcc/GND/OUT/EN）'],
-      note: '实物照片位：HC-49S 与 3225 贴片晶振对比，旁边放两颗 18pF 匹配电容。金属壳通常接地以屏蔽。',
+      note: '实物照片位：HC-49S 与 3225 贴片晶振对比，旁边放两颗匹配电容（CL=12.5pF 规格配 15~18pF，CL=18pF 规格配 26~27pF）。金属壳通常接地以屏蔽。',
     },
-    usedIn: [
-      { chapter: 6, label: 'ESP32 的 40MHz 主时钟布局' },
-      { chapter: 7, label: '负载电容计算与选型' },
-    ],
+    usedIn: [{ chapter: 6, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['晶振', 'crystal', 'oscillator', '负载电容', '32.768', '时钟', 'ppm'],
   },
   {
@@ -327,7 +327,7 @@ export const ENTRIES: CodexEntry[] = [
     params: [
       { param: '正向压降', symbol: 'Vf', unit: 'V', guide: '1N4148≈0.7V@10mA；肖特基 SS14≈0.4V@1A' },
       { param: '正向电流', symbol: 'If', unit: 'A', guide: '1N4148 仅 200mA；1N4007 为 1A；按需留 2 倍余量' },
-      { param: '反向耐压', symbol: 'Vrrm', unit: 'V', guide: '1N4148 为 75V，1N4007 达 1000V；工作反压打 5 折' },
+      { param: '反向耐压', symbol: 'VRRM', unit: 'V', guide: '1N4148 的 VRRM = 100V（75V 是它的连续反向电压 VR，两个参数别混用）；1N4007 达 1000V；工作反压打 5 折' },
       { param: '反向恢复时间', symbol: 'trr', unit: 'ns', guide: '1N4148 约 4ns 适合信号；1N4007 慢，只能用在工频' },
       { param: '反向漏电流', symbol: 'Ir', unit: 'µA', guide: '肖特基漏电大（µA~mA 级），精密采样电路要避开' },
     ],
@@ -455,12 +455,14 @@ export const ENTRIES: CodexEntry[] = [
         '负载并在稳压管两端，取到的就是被钳住的 Vz。',
         '限流电阻绝不能省：它负责吃掉多余的电压，稳压管负责泄走多余的电流。',
         '正着接它只是一颗 0.7V 的普通二极管，稳不了压。',
+        '要带大电流就给它「扩流」：稳压管接在 NPN 的基极，集电极接 Vin，负载从发射极取——输出变成 Vz − 0.7V（不再精确等于 Vz），但能供出 β 倍的电流。',
       ],
       note: '老周：稳压管、限流电阻、负载，这仨是铁三角，少一个都不叫稳压电路。',
     },
     calc: [
       { title: '限流电阻取值', formula: 'R = (Vin − Vz) ÷ (Iz + IL)', example: '12V 输入稳到 5.1V，稳压管留 5mA、负载要 10mA：R = (12−5.1) ÷ 0.015 = 460Ω，取 470Ω。' },
       { title: '最坏情况功耗', formula: 'Pz = Vz × Iz(max)', example: '负载拔掉后全部电流走稳压管：Iz = (12−5.1) ÷ 470 ≈ 14.7mA，Pz ≈ 5.1 × 0.0147 ≈ 75mW，0.5W 贴片很从容。' },
+      { title: '扩流（加一只 NPN 射极跟随器）', formula: 'I(负载) ≈ β × I(基极)，Vout ≈ Vz − 0.7V', example: '5.1V 稳压管 + S8050（β 按 100 算）：基极走 5mA，发射极能供约 0.5A，但输出只有 5.1 − 0.7 = 4.4V；要精确 5V 又要大电流，请直接上 LDO 或 DC-DC。' },
     ],
     selection: [
       '限流电阻按 R=(Vin−Vz)/(Iz+IL) 算，并校核 Vin 最高时的功耗。',
@@ -476,7 +478,7 @@ export const ENTRIES: CodexEntry[] = [
       packages: ['DO-35 / DO-41 直插（如 1N47xx 系列）', 'SOD-123 / SOD-323 贴片（BZT52）', 'SOT-23 双稳压管（ESD 阵列）'],
       note: '实物照片位：DO-41 封装的 1N4733A（5.1V/1W）与 SOD-123 贴片 BZT52C5V1，均标注阴极色环/丝印线。',
     },
-    usedIn: [{ chapter: 3, label: '过压钳位与简易稳压' }],
+    usedIn: [{ chapter: 3, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['稳压管', 'zener', '齐纳', '钳位', '击穿', 'BZT52', '1N47'],
   },
   {
@@ -492,7 +494,7 @@ export const ENTRIES: CodexEntry[] = [
     unlockChapter: 2,
     principle: [
       '两层 N 型半导体夹一层薄薄的 P 型。基极-发射极之间是一个二极管，Vbe≈0.7V 导通后，基极每注入 1 份电流，集电极允许流过 β 份电流：Ic=β·Ib。',
-      '两个工作区要分清：放大区（Ic=βIb，模拟放大用）与饱和区（Vce≈0.2V，开关用）。当开关用时要给足基极电流让它「饱和到底」，按 Ic/10 估算强制 β。',
+      '两个工作区要分清：放大区（Ic=βIb，模拟放大用）与饱和区（Vce≈0.2V，开关用）。当开关用时要给足基极电流让它「饱和到底」——本图鉴统一口径：按强制 β_sat = Ic ÷ Ib 取 10~20 设计（手册的 Vce(sat) 一般就标在 Ic/Ib = 10 的条件下；按手册 β_min 的三分之一以下给基流同样安全）。',
     ],
     analogy: '像水库闸门旁的小舵轮：手拧小舵轮（基极电流），闸门（集电极电流）大开大合。',
     params: [
@@ -509,21 +511,22 @@ export const ENTRIES: CodexEntry[] = [
         '单片机 IO → 基极限流电阻 → 基极（B），IO 高电平时管子导通、负载得电。',
         '基极电阻不能省：基极-发射极就是个二极管，不限流会烧 IO。',
         '负载是继电器/电机这类线圈时，线圈两端并续流二极管（1N4148）。',
+        '基极再加一颗 10kΩ 下拉到地：上电/复位瞬间 IO 是高阻，下拉能防止干扰或漏电流把管子误导通（驱动感性负载时尤其重要）。',
       ],
       note: '老周：记口诀「E 接地、C 接货、B 经电阻听指挥」，三个脚搞反它也能苟活，但 β 惨不忍睹。',
     },
     calc: [
-      { title: '基极电阻（开关用法）', formula: 'Rb = (Vio − 0.7) ÷ Ib，Ib = Ic ÷ 10', example: '3.3V IO 开关 100mA 负载：Ib = 100 ÷ 10 = 10mA，Rb = (3.3−0.7) ÷ 0.01 = 260Ω，取 270Ω。按 Ic/10 给基流叫「强制 β」，保证饱和到底。' },
+      { title: '基极电阻（开关用法）', formula: 'Rb = (Vio − 0.7) ÷ Ib，Ib = Ic ÷ β_sat（β_sat 取 10~20）', example: '3.3V IO 开关 100mA 负载、取 β_sat=10：Ib = 100 ÷ 10 = 10mA，Rb = (3.3−0.7) ÷ 0.01 = 260Ω，就近取 270Ω。取 β_sat=20 则 Ib=5mA、Rb≈520Ω，仍在深饱和区——10~20 这个区间就是用来容忍 β 的离散和温度下降的。' },
       { title: '饱和发热', formula: 'P = Vce(sat) × Ic', example: '饱和压降 0.2V 过 500mA：P = 0.1W，TO-92 摸起来温温的，正常。' },
     ],
     selection: [
       '小信号开关选 S8050/2N2222；>1A 的负载直接上 NMOS，别为难三极管。',
-      '当开关用：基极电流按 Ic/10 给，确保饱和，否则管子发热严重。',
+      '当开关用：基极电流按 Ic/β_sat 给（β_sat 取 10~20），确保深饱和，否则管子发热严重。',
       '驱动继电器记得在线圈两端并续流二极管（1N4148 即可）。',
     ],
     pitfalls: [
       '老周：基极不接限流电阻直接怼 IO 口？单片机的脚就是给你这么烧的。',
-      '老周：Ic=βIb 当圣旨，β 取 300 去设计开关——饱和不足管子烫得能煎蛋。强制 β=10 记牢。',
+      '老周：Ic=βIb 当圣旨，β 取 300 去设计开关——饱和不足管子烫得能煎蛋。开关用法认准 β_sat = Ic/Ib 取 10~20。',
       '老周：发射极和集电极焊反了它也能「工作」，β 只剩个位数，别问我怎么知道的。',
     ],
     pkg: {
@@ -557,7 +560,7 @@ ENTRIES.push(
     ],
     analogy: '像一扇电控水闸：旋钮（栅压）本身不流水，拧到位闸板就完全打开。',
     params: [
-      { param: '导通电阻', symbol: 'Rds(on)', unit: 'mΩ', guide: 'AO3400 约 30mΩ@4.5V；注意是在哪个 Vgs 下测的' },
+      { param: '导通电阻', symbol: 'Rds(on)', unit: 'mΩ', guide: 'AO3400 约 30mΩ@Vgs=4.5V（这是手册的标定档）；Vgs=2.5V 驱动时 Rds(on) 明显更大（约 1.5~2 倍以上），务必看清测试条件' },
       { param: '漏源耐压', symbol: 'Vds', unit: 'V', guide: 'AO3400 为 30V；感性负载按 1.5~2 倍留量' },
       { param: '漏极电流', symbol: 'Id', unit: 'A', guide: '手册值是理想散热下的，实际按 3~5 折看' },
       { param: '栅极阈值', symbol: 'Vgs(th)', unit: 'V', guide: 'AO3400 约 0.5~1.4V；3.3V IO 驱动要选「逻辑电平」管' },
@@ -575,7 +578,8 @@ ENTRIES.push(
     },
     calc: [
       { title: '导通发热', formula: 'P = I² × Rds(on)', example: '2A 电流过 Rds(on)=30mΩ 的 AO3400：P = 4 × 0.03 = 0.12W，SOT-23 轻松扛住。同电流换 1Ω 的三极管试试？早烫手了。' },
-      { title: '驱动电压校核', formula: 'Vgs(驱动) > Vgs(th)，并查 Rds(on) 测试条件', example: 'AO3400 在 Vgs=2.5V 下就标定了 30mΩ，3.3V IO 直驱没问题；IRF540 的 Rds(on) 是在 10V 下测的，3.3V 只能让它半开。' },
+      { title: '驱动电压校核', formula: 'Vgs(驱动) > Vgs(th)，并按驱动电压那一档查 Rds(on)', example: 'AO3400 的 30mΩ 是 Vgs=4.5V 的标定值：3.3V IO 直驱「够用但导通更浅」，2.5V 档的 Rds(on) 明显更大（查手册该档典型值，可能到 1.5~2 倍）；IRF540 的 Rds(on) 是在 10V 下测的，3.3V 只能让它半开。' },
+      { title: '栅极驱动损耗', formula: 'P = Qg × Vgs × f', example: 'AO3400 的 Qg 约 6nC（4.5V 档量级，具体查手册）：3.3V 驱动、20kHz PWM 时 P = 6n × 3.3 × 20k ≈ 0.4mW，可以忽略；频率提到 200kHz 损耗跟着 ×10，还要看驱动器能不能供出 I = Qg ÷ t 的峰值电流。' },
     ],
     selection: [
       '3.3V/5V IO 直驱选逻辑电平 NMOS（Vgs(th) 远低于驱动电压）。',
@@ -588,10 +592,10 @@ ENTRIES.push(
       '老周：体二极管是娘胎里带的，想靠它防反接？方向先想清楚。',
     ],
     pkg: {
-      packages: ['SOT-23（AO3400 等小信号管）', 'SOP-8 / DFN 功率管', 'TO-220 大功率（需散热片）'],
-      note: '实物照片位：SOT-23 封装的 AO3400 与 TO-220 的 IRF 系列对比。G/D/S 引脚顺序务必查手册。',
+      packages: ['TO-92 直插（图鉴 3D 预览用的通用小信号造型）', 'SOT-23（AO3400 等逻辑电平管最常见的封装）', 'SOP-8 / DFN 功率管', 'TO-220 大功率（需散热片）'],
+      note: '实物照片位：SOT-23 的 AO3400、TO-92 通用小信号管与 TO-220 的 IRF 系列对比。3D 预览画的是 TO-92 通用造型，AO3400 实物多为 SOT-23；G/D/S 引脚顺序务必查手册。',
     },
-    usedIn: [{ chapter: 5, label: 'MOS 开关与 PWM 调光' }],
+    usedIn: [{ chapter: 5, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['NMOS', 'MOSFET', 'AO3400', 'Rds', '场效应管', '开关', '逻辑电平'],
   },
   {
@@ -645,7 +649,7 @@ ENTRIES.push(
       packages: ['SOT-23（AO3401）', 'SOP-8 功率 PMOS', '与 NMOS 同封装时注意 G/S/D 脚位差异'],
       note: '实物照片位：SOT-23 的 AO3401 与 AO3400 并排，标注两者电路中的摆放方向差异（高边 vs 低边）。',
     },
-    usedIn: [{ chapter: 5, label: '高边开关与电源防反接' }],
+    usedIn: [{ chapter: 5, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['PMOS', 'MOSFET', 'AO3401', '高边开关', '防反接', '场效应管'],
   },
   {
@@ -678,7 +682,7 @@ ENTRIES.push(
         '信号直接进同相输入端（+），输入阻抗高，不惊动被测信号。',
         '输出端经反馈电阻 Rf 接回反相端（−），反相端再经 Rin 到地——这两颗电阻决定增益。',
         '电源脚就近各并一颗 100nF 去耦电容到地。',
-        '单电源供电时，同相端要用两颗 100kΩ 分压给个 Vcc/2 的「中间偏置」，信号才有地方摆。',
+        '单电源供电时，同相端要用两颗等值电阻（如 10kΩ 对 10kΩ）分压给个 Vcc/2 的「中间偏置」，分压中点再并 10µF + 100nF 到地——否则偏置点会被输入偏置电流和噪声拖偏，信号也没地方摆。',
       ],
       note: '小焊：「虚短虚断」记牢——接好负反馈后，运放会拼命让两个输入端电压一样，增益全看外面两颗电阻。',
     },
@@ -686,6 +690,7 @@ ENTRIES.push(
       { title: '同相增益', formula: 'G = 1 + Rf ÷ Rin', example: 'Rin = 10kΩ、Rf = 90kΩ：G = 10，10mV 的小信号出来变成 100mV。' },
       { title: '反相增益', formula: 'G = −Rf ÷ Rin', example: 'Rin = 10kΩ、Rf = 100kΩ：G = −10，输出倒了个头还放大 10 倍。' },
       { title: '带宽校核', formula: '带宽 = GBW ÷ G', example: 'LM358（GBW=1MHz）增益 10 倍：带宽只剩 100kHz；想放大 100 倍？那就只剩 10kHz，音频高音都悬。' },
+      { title: '单电源 Vcc/2 偏置', formula: 'Vbias = Vcc × R2 ÷ (R1 + R2)，R1 = R2 时就是 Vcc/2', example: '3.3V 单电源：两颗 10kΩ 分压得到 1.65V，中点并 10µF + 100nF 到地做「交流地」；输入信号经耦合电容叠在 1.65V 上摆动 ±1.5V 左右，输出才不会一头撞到电源轨。分压电阻别取太大（>100kΩ 容易被偏置电流带偏），也别太小（白耗电）。' },
     ],
     selection: [
       '单电源小信号选轨到轨运放（MCP600x/OPA 系列）；双电源经典场合 LM358/TL072 仍堪用。',
@@ -739,7 +744,7 @@ ENTRIES.push(
     },
     calc: [
       { title: '电源裕量', formula: 'I(电源) ≥ Ipeak × 1.5', example: 'Wi-Fi 发射峰值 500mA：电源按 500 × 1.5 = 750mA 起步选，直接上 1A 的稳压器最省心。' },
-      { title: 'ADC 分压采样', formula: 'Vadc = Vin × R2 ÷ (R1 + R2)', example: '量 5V 传感器输出：R1 = 10kΩ、R2 = 20kΩ，5 × 20 ÷ 30 ≈ 3.3V，刚好不超 3.3V 量程。' },
+      { title: 'ADC 分压采样', formula: 'Vadc = Vin × R2 ÷ (R1 + R2)，且 Vadc 要留出衰减档满量程的余量', example: '量 5V 传感器输出、用 12dB 档（本条目参数表写的 0~3.1V）：R1 = 13kΩ、R2 = 20kΩ，5 × 20 ÷ 33 ≈ 3.03V，留了约 70mV 余量。顺手用 R1=10k、R2=20k 会得到 3.33V，已经超出 3.1V 满量程、读数削顶——要么改分压比，要么换更小的衰减档并重新校准。' },
     ],
     selection: [
       '3.3V 电源至少 1A 裕量，10µF+100nF 去耦紧贴 3V3 引脚。',
@@ -772,7 +777,7 @@ ENTRIES.push(
     essence: '开关：机械触点通断电路，简单却伴随抖动。',
     plain: '大白话：就是家里开关的迷你版——但按下去的一瞬间，它会偷偷「弹」好几下。',
     schematic: { fig: 'sw-pullup', title: '按键加上拉电阻', note: '松开时上拉电阻把引脚拉回高电平，按下接地变低——悬空引脚会乱跳，上拉不能省。' },
-    unlockChapter: 2,
+    unlockChapter: 3,
     lab: 'pullup',
     principle: [
       '靠金属弹片的机械接触导通电流。按下瞬间触点会弹跳数次，产生 5~20ms 的快速通断序列——这就是「按键抖动」，数字电路会把每一次弹跳都当成一次按下。',
@@ -814,7 +819,10 @@ ENTRIES.push(
       packages: ['6×6mm 轻触按键（四脚两两内部相通！）', '拨动/船型开关', '带锁自锁按键'],
       note: '实物照片位：6×6 轻触按键底视图，标注哪两个引脚内部直通——布板时跨对角线接线最稳。',
     },
-    usedIn: [{ chapter: 2, label: '按键输入与消抖' }],
+    usedIn: [
+      { chapter: 3, label: '三极管开关（c3-5）：按键当输入信号' },
+      { chapter: 3, label: '支线 sa-3 按键的脾气：上拉与消抖' },
+    ],
     keywords: ['开关', '按键', 'switch', 'button', '抖动', '去抖', '轻触'],
   },
   {
@@ -827,7 +835,7 @@ ENTRIES.push(
     essence: '电位器：滑动触点把固定电阻分成可调比例的两段。',
     plain: '大白话：带旋钮的电阻，拧一拧，分出来的电压就跟着变。',
     schematic: { fig: 'pot-div', title: '电位器分压进 ADC', note: '电位器两端接 VCC 和地，抽头电压随旋钮在 0~VCC 连续变化，正好喂给 ADC。' },
-    unlockChapter: 2,
+    unlockChapter: 5,
     principle: [
       '一条电阻膜两端固定，中间的滑动触点随旋钮移动，把总阻值分成 R1+R2。三脚用法是分压器（输出 0~100% 电压），两脚用法是可变电阻。',
       '分压规律分两种「 taper 」：线性（B 档）阻值随角度均匀变化，音量电位器用对数（A 档）匹配人耳听觉。多圈精密电位器（如 3296）可以拧 25 圈做细调。',
@@ -836,7 +844,7 @@ ENTRIES.push(
     params: [
       { param: '总阻值', symbol: 'R', unit: 'kΩ', guide: '常用 1k/10k/50k/100kΩ；分压用 10kΩ 最百搭' },
       { param: '阻值规律', symbol: 'Taper', unit: '—', guide: 'B=线性（调压/调参），A=对数（音量）' },
-      { param: '额定功率', symbol: 'P', unit: 'W', guide: '3296 仅 0.5W；WH148 约 0.05W，只走信号' },
+      { param: '额定功率', symbol: 'P', unit: 'W', guide: '3296 为 0.5W；WH148 手册通常标 0.5W 级（也有 0.25W 的小体积版本，按实物手册为准）——不管哪一档都只走信号，别当功率电阻' },
       { param: '圈数', symbol: '—', unit: '圈', guide: '单圈 270°；3296 多圈 25 圈，精密细调' },
       { param: '机械寿命', symbol: '—', unit: '次', guide: '碳膜约 1 万次，频繁调节场合选导电塑料' },
     ],
@@ -852,7 +860,7 @@ ENTRIES.push(
     },
     calc: [
       { title: '分压输出', formula: 'Vout = Vin × (旋钮位置%)', example: '10kΩ 电位器接 5V，拧到 30%：Vout = 5 × 0.3 = 1.5V。线性档（B）拧多少就是多少。' },
-      { title: '总功耗校核', formula: 'P = V² ÷ R', example: '5V 加在 1kΩ 电位器两端：P = 25 ÷ 1000 = 25mW，WH148 只有 50mW 额度，已用一半——换 10kΩ 只剩 2.5mW，从容得多。' },
+      { title: '总功耗校核', formula: 'P = V² ÷ R', example: '5V 加在 1kΩ 电位器两端：P = 25 ÷ 1000 = 25mW，按 WH148 的 0.5W 级额度只用了 5%，并不危险；不过换成 10kΩ 功耗只剩 2.5mW，滑片电流应力也更小——分压采样优先用 10kΩ。' },
     ],
     selection: [
       '做 ADC 输入采样：10kΩ 线性档，两端接 Vref/GND，中点进 ADC。',
@@ -868,7 +876,10 @@ ENTRIES.push(
       packages: ['WH148 单圈（面板旋钮）', '3296 多圈精密（蓝色方块+顶调螺丝）', '3362 贴片微调'],
       note: '实物照片位：WH148 与 3296 并排。3296 侧面印有阻值代码（103=10kΩ），调节螺丝下是 25 圈丝杆。',
     },
-    usedIn: [{ chapter: 2, label: '分压调节实验' }],
+    usedIn: [
+      { chapter: 5, label: '采样与 ADC（c5-3）：电位器分压进 ADC' },
+      { chapter: 5, label: '支线 sa-4 读世界的 ADC：同一个三脚分压接法' },
+    ],
     keywords: ['电位器', 'potentiometer', '3296', 'WH148', '分压', '可调电阻'],
   },
   {
@@ -888,7 +899,7 @@ ENTRIES.push(
     ],
     analogy: '像大坝的泄洪牺牲段：洪水（过流）来了先冲垮它，保住下游整座城市。',
     params: [
-      { param: '额定电流', symbol: 'In', unit: 'A', guide: '按正常工作电流的 1.5~2 倍选，再按 75% 降额使用' },
+      { param: '额定电流', symbol: 'In', unit: 'A', guide: 'In ≥ 工作电流 ÷ 0.75（约 1.33 倍，UL/IEC 常用的 75% 降额口径）；选完再单独校核环境温度降额与开机浪涌 I²t——「1.5~2 倍」是浪涌余量的说法，不是额定值的算法' },
       { param: '熔断积分', symbol: 'I²t', unit: 'A²s', guide: '抗浪涌能力指标，电机/电容充电场合选慢断型' },
       { param: '额定电压', symbol: 'V', unit: 'V', guide: '熔断后要能可靠熄弧，直流比交流更难断' },
       { param: '分断能力', symbol: '—', unit: 'A', guide: '故障短路电流上限，玻璃管通常 35A 级' },
@@ -905,7 +916,7 @@ ENTRIES.push(
       note: '老周：保险丝烧了先查短路点再换新的。直接换根更大的？你这是把报警器拆了让火接着烧。',
     },
     calc: [
-      { title: '额定电流选择', formula: 'In ≈ 正常工作电流 × 1.5~2', example: '板子正常工作 300mA：选 500mA 快断；有电机或大电容上电浪涌就选 500mA 慢断（T 型）。' },
+      { title: '额定电流选择', formula: 'In ≥ Iop ÷ 0.75', example: '板子正常工作 300mA：In ≥ 300 ÷ 0.75 = 400mA，就近选 500mA 快断；有电机或大电容上电浪涌就选 500mA 慢断（T 型）。「1.5~2 倍」只用来事后确认浪涌余量，不是选额定值的公式，两者别混着用。' },
       { title: '抗浪涌校核（I²t）', formula: 'I²t(浪涌) < I²t(保险丝)', example: '上电浪涌 2A 持续 50ms：I²t = 2² × 0.05 = 0.2A²s，查手册选熔断积分大于它的慢断管。' },
     ],
     selection: [
@@ -922,7 +933,7 @@ ENTRIES.push(
       packages: ['1206 / 0805 贴片一次性保险丝', 'PPTC 自恢复（贴片/直插圆片）', '玻璃管 5×20mm（带座）'],
       note: '实物照片位：1206 贴片保险丝（表面印额定电流代码）与一片直插 PPTC 圆片。丝印 F 位号提醒它串联在电源入口。',
     },
-    usedIn: [{ chapter: 7, label: '整机电源入口保护设计' }],
+    usedIn: [{ chapter: 7, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['保险丝', 'fuse', 'PPTC', '自恢复', '过流保护', '快断', '慢断'],
   },
   {
@@ -1345,7 +1356,7 @@ ENTRIES.push(
     calc: [
       { title: '分压读数', formula: 'Vout = Vcc × Rsensor ÷ (R + Rsensor)', example: '3.3V、10kΩ 定值电阻、NTC 在 25°C 正好 10kΩ：Vout = 3.3 × 10 ÷ 20 = 1.65V，温度升阻值降，电压跟着降。' },
       { title: '灵敏度换算', formula: '物理量 = Vout ÷ S', example: 'LM35 输出 0.28V：温度 = 280mV ÷ 10mV/°C = 28°C。线性传感器就是这么朴实无华。' },
-      { title: 'ADC 数字量换算', formula: 'V = 读数 × Vref ÷ 4095', example: '12 位 ADC、Vref 3.3V、读到 2048：V ≈ 1.65V——正好中点，大概率是个分压中点。' },
+      { title: 'ADC 数字量换算', formula: 'V = 读数 × Vref ÷ 2ᴺ', example: '12 位 ADC、Vref 3.3V、读到 2048：V = 2048 × 3.3 ÷ 4096 = 1.65V——正好中点，大概率是个分压中点。注意：1 个 LSB = Vref ÷ 4096 ≈ 0.806mV，满码是 2¹² − 1 = 4095（对应 3.2992V，比 Vref 少 1 个 LSB）；别再用 ÷4095 那一套。' },
     ],
     selection: [
       '入门三件套：NTC（温度）、光敏电阻（光线）、HC-SR04（距离），便宜好学。',
@@ -1385,7 +1396,7 @@ ENTRIES.push(
       { param: '供电电压', symbol: 'Vdd', unit: 'V', guide: '5V 派（51/AVR 经典）与 3.3V 派（STM32/ESP32）别混电平' },
       { param: 'IO 驱动电流', symbol: 'Iio', unit: 'mA', guide: '单脚 20mA 上下，还有总电流限额——查 datasheet' },
       { param: 'Flash / RAM', symbol: '—', unit: 'KB', guide: '程序与变量之家；RAM 爆了程序会莫名其妙重启' },
-      { param: 'ADC 位数', symbol: '—', unit: 'bit', guide: '10/12 位常见；12 位把 Vref 分成 4096 格' },
+      { param: 'ADC 位数', symbol: '—', unit: 'bit', guide: '10/12 位常见；12 位把 Vref 分成 2¹² = 4096 个 LSB（一格 ≈ Vref/4096），而满码是 4095' },
     ],
     wiring: {
       title: '最小系统（让单片机活过来的四件套）',
@@ -1400,7 +1411,7 @@ ENTRIES.push(
     calc: [
       { title: 'IO 带载检查', formula: 'Iio(单脚) 与 Iio(总和) 都别超', example: 'IO 点 5mA 的 LED 很轻松；但 8 个脚同时各输出 15mA = 120mA，超总限额芯片就复位罢工。' },
       { title: '定时器分频', formula: 'f(计数) = f(主频) ÷ 分频', example: '16MHz 主频 256 分频 = 62.5kHz：数 62500 下就是 1 秒，定时器的中断节拍就是这么凑出来的。' },
-      { title: 'ADC 分辨率', formula: '一格 = Vref ÷ 2ⁿ', example: '12 位 ADC、Vref 3.3V：一格 ≈ 0.8mV。想分辨 0.1mV 的信号？上外部高精度 ADC 或运放先放大。' },
+      { title: 'ADC 分辨率', formula: 'LSB = Vref ÷ 2ⁿ，换算 V = 读数 × LSB', example: '12 位 ADC、Vref 3.3V：LSB = 3.3 ÷ 4096 ≈ 0.806mV，读到 2048 就是 1.65V；满码 4095 对应 3.2992V。全站统一用「LSB = Vref/2ⁿ、电压 = 读数 × LSB」这一套，别把满码当 4096 用。想分辨 0.1mV 的信号？上外部高精度 ADC 或运放先放大。' },
     ],
     selection: [
       '入门 Arduino Uno（5V 生态、资料海），进阶 STM32 / ESP32（3.3V 高性能）。',
@@ -1539,6 +1550,7 @@ ENTRIES.push(
     tagline: '会叫的小喇叭。',
     essence: '蜂鸣器：把电信号变成声音的元件。',
     plain: '大白话：它就是电路板的「嗓子」——通电或给它唱歌（方波），它就发出哔哔声。',
+    schematic: { fig: 'npn-buzz', title: '三极管驱动蜂鸣器', note: 'GPIO 电流小推不动蜂鸣器，让三极管当「扩音开关」；无源蜂鸣器记得喂方波。' },
     unlockChapter: 2,
     principle: [
       '分两种：有源蜂鸣器内部自带振荡电路，通电就响（音调固定）；无源蜂鸣器相当于一个小喇叭，必须由外部给方波，频率决定音调。',
@@ -1563,20 +1575,20 @@ ENTRIES.push(
     },
     calc: [
       { title: '无源蜂鸣器的方波周期', formula: 'T = 1 / f', example: '想发 2kHz 的音：T = 1/2000Hz = 0.5ms，即高低电平各 0.25ms 翻转一次。' },
-      { title: '基极电阻（强制 β=10）', formula: 'Rb = (V_GPIO − 0.7V) / (Ic / 10)', example: 'Ic=40mA、V_GPIO=3.3V：Ib=4mA，Rb=(3.3−0.7)/0.004 = 650Ω，取 620Ω 标称。' },
+      { title: '基极电阻（强制 β=10）', formula: 'Rb = (V(IO) − 0.7V) / (Ic / 10)', example: 'Ic=40mA、V(IO)=3.3V：Ib=4mA，Rb=(3.3−0.7)/0.004 = 650Ω，取 620Ω 标称。' },
     ],
     selection: ['只要提示音选有源（5V 电磁式最皮实）', '要播旋律选无源压电式', '贴片蜂鸣器注意发声孔方向别被外壳挡住'],
     pitfalls: [
       '小焊：把无源蜂鸣器当有源的用——通电只「咔」一声，还以为是坏的。',
       '老周：GPIO 直驱 40mA 蜂鸣器，引脚烧了还纳闷「明明能响就是越来越小声」。',
+      '老周：蜂鸣器装在密闭外壳里、发声孔又被面板挡住，声音闷成蚊子叫——选型时先确认开孔位置。',
     ],
     pkg: {
       packages: ['Φ12mm 插针电磁式', '5×5mm 贴片压电式', '带驱动电路的三线模组（VCC/GND/SIG）'],
       note: '实物照片位：直径 12mm 的黑色圆柱蜂鸣器，顶部发声孔，底部印有「+」极性标记。',
     },
-    usedIn: [{ chapter: 2, label: '按键反馈与提示音' }],
+    usedIn: [{ chapter: 2, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['蜂鸣器', 'buzzer', '提示音', '报警', '压电', '电磁式', '方波'],
-    schematic: { fig: 'npn-buzz', title: '三极管驱动蜂鸣器', note: 'GPIO 电流小推不动蜂鸣器，让三极管当「扩音开关」；无源蜂鸣器记得喂方波。' },
   },
   {
     id: 'relay',
@@ -1587,6 +1599,7 @@ ENTRIES.push(
     tagline: '用弱电开关强电的闸门。',
     essence: '继电器：用小电流线圈吸合机械触点，去开关另一路大电流。',
     plain: '大白话：它是一个「电控的手」——你给线圈一点电，里面的开关就「啪嗒」合上，帮你去开台灯、电机这些大家伙。',
+    schematic: { fig: 'relay-drive', title: '继电器驱动电路', note: '三极管负责放大电流，续流二极管负责在断电瞬间给线圈反压一条泄放的路。' },
     unlockChapter: 6,
     principle: [
       '线圈通电产生磁场，吸动衔铁带动触点切换：常开（NO）闭合、常闭（NC）断开。控制侧与负载侧电气隔离，可以拿 3.3V 逻辑去开关 220V 市电。',
@@ -1594,9 +1607,9 @@ ENTRIES.push(
     ],
     analogy: '继电器像铁路道岔的扳道工：你在值班室按个小按钮（线圈），他在现场用大力气扳动道岔（触点），两路人马互不照面。',
     params: [
-      { param: '线圈电压', symbol: 'V_coil', unit: 'V', guide: '常见 5V/12V/24V，要能让它「吸得动」' },
+      { param: '线圈电压', symbol: 'V(coil)', unit: 'V', guide: '常见 5V/12V/24V，要能让它「吸得动」' },
       { param: '触点容量', symbol: '—', unit: 'A/V', guide: '如 10A 250VAC；感性负载再打 5 折' },
-      { param: '线圈电阻', symbol: 'R_coil', unit: 'Ω', guide: '决定线圈电流：5V/70Ω≈71mA' },
+      { param: '线圈电阻', symbol: 'R(coil)', unit: 'Ω', guide: '决定线圈电流：5V/70Ω≈71mA' },
       { param: '触点形式', symbol: '—', unit: 'NO/NC/COM', guide: '一组转换（SPDT）最常用' },
     ],
     wiring: {
@@ -1610,21 +1623,21 @@ ENTRIES.push(
       note: '老周：省掉续流二极管的人，断电那一瞬的尖峰会教你做人——轻则单片机复位，重则三极管报废。',
     },
     calc: [
-      { title: '线圈工作电流', formula: 'I_coil = V_coil / R_coil', example: '5V 继电器线圈 70Ω：I = 5/70 ≈ 71mA——GPIO 直驱不了，必须三极管。' },
-      { title: '触点降额', formula: 'I_实际 ≤ I_额定 × 0.5（感性负载）', example: '触点标 10A 阻性，驱动电机按 5A 用：1.5A 的电机很安全，5A 的就到边了。' },
+      { title: '线圈工作电流', formula: 'I(coil) = V(coil) / R(coil)', example: '5V 继电器线圈 70Ω：I = 5/70 ≈ 71mA——GPIO 直驱不了，必须三极管。' },
+      { title: '触点降额', formula: 'I(实际) ≤ I(额定) × 0.5（感性负载）', example: '触点标 10A 阻性，驱动电机按 5A 用：1.5A 的电机很安全，5A 的就到边了。' },
     ],
     selection: ['负载是交流或大电流选继电器（隔离好、导通压降为零）', '高频开关场合别用继电器（机械寿命 10 万次级），改用 MOS', '线圈电压要匹配电源，12V 线圈接 5V 吸合不稳'],
     pitfalls: [
       '老周：拿 5A 触点容量的继电器去切 10A 电机，触点焊死粘连，设备再也关不掉。',
       '小焊：把续流二极管方向焊反——一通电二极管直接短路，线圈没劲还发烫。',
+      '老周：12V 线圈的继电器接 5V 电源，吸合无力、触点打火拉弧，寿命断崖式下跌——线圈电压必须和电源对上。',
     ],
     pkg: {
       packages: ['5 脚/6 脚 PCB 功率继电器（如 SRD-05VDC）', '固态继电器 SSR（无触点、寿命长）', '带光耦驱动板的继电器模组'],
       note: '实物照片位：蓝色小方块继电器，顶部丝印线圈电压与触点容量，底部 5 个引脚（线圈 2 + COM/NO/NC）。',
     },
-    usedIn: [{ chapter: 6, label: '功率控制与电气隔离' }],
+    usedIn: [{ chapter: 6, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['继电器', 'relay', '触点', '线圈', '续流二极管', '隔离', '强电', 'SSR'],
-    schematic: { fig: 'relay-drive', title: '继电器驱动电路', note: '三极管负责放大电流，续流二极管负责在断电瞬间给线圈反压一条泄放的路。' },
   },
   {
     id: 'dcmotor',
@@ -1635,6 +1648,7 @@ ENTRIES.push(
     tagline: '通电就转的力气担当。',
     essence: '直流电机：把电能变成旋转机械能，电压越高转越快。',
     plain: '大白话：它就是四驱车里的那颗马达——接上电池就呼呼转，电压给足跑得快，反过来接就倒着转。',
+    schematic: { fig: 'nmos-motor', title: 'PWM 驱动直流电机', note: 'NMOS 负责按 PWM 节奏通断，续流二极管负责消化电机线圈的尖峰反压。' },
     unlockChapter: 6,
     principle: [
       '内部是线圈+永磁体：线圈通电受磁力旋转，换向器（电刷）不断切换电流方向保持转动。转速近似与电压成正比，扭矩与电流成正比。',
@@ -1645,7 +1659,7 @@ ENTRIES.push(
     params: [
       { param: '额定电压', symbol: 'V', unit: 'V', guide: '常见 3V/6V/12V；超压转速高但短命' },
       { param: '空载电流', symbol: 'I₀', unit: 'mA', guide: '空转电流，几十到几百 mA' },
-      { param: '堵转电流', symbol: 'I_stall', unit: 'A', guide: '按它选驱动！130 小马达约 1~2A' },
+      { param: '堵转电流', symbol: 'I(stall)', unit: 'A', guide: '按它选驱动！130 小马达约 1~2A' },
       { param: '空载转速', symbol: 'n₀', unit: 'rpm', guide: '要扭矩大配减速箱' },
     ],
     wiring: {
@@ -1659,21 +1673,21 @@ ENTRIES.push(
       note: '老周：电机一启动单片机就复位？电源被拉垮了。电机和逻辑分开供电、共地，再在电机电源上加个大电容。',
     },
     calc: [
-      { title: 'PWM 等效电压', formula: 'V_avg = D × V_CC', example: '6V 电源、占空比 50%：等效 3V，转速约为额定的六成（带负载会再低些）。' },
-      { title: '堵转电流估算', formula: 'I_stall = V / R_线圈', example: '线圈电阻 3Ω、6V 供电：堵转 2A——驱动 MOS 至少要能吃 2A 以上，电源也要跟得上。' },
+      { title: 'PWM 等效电压', formula: 'V(avg) = D × Vcc', example: '6V 电源、占空比 50%：等效 3V，转速约为额定的六成（带负载会再低些）。' },
+      { title: '堵转电流估算', formula: 'I(stall) = V / R(线圈)', example: '线圈电阻 3Ω、6V 供电：堵转 2A——驱动 MOS 至少要能吃 2A 以上，电源也要跟得上。' },
     ],
     selection: ['先看堵转电流选驱动，再看额定电压选电源', '需要精准控速选带编码器的减速电机', '正反转需求上 H 桥（如 DRV8833/TB6612）'],
     pitfalls: [
       '老周：拿 500mA 的驱动芯片推堵转 2A 的电机，芯片两秒烫手、十秒冒烟。',
       '小焊：电机电源和单片机共用 USB 小功率口，电机一转全板重启。',
+      '老周：电机两端既不并续流二极管也不并去火花电容，PWM 一开关就是一堆尖峰——MOS 和 MCU 一起遭殃。',
     ],
     pkg: {
       packages: ['130/280 玩具级微电机', '370/540 模型级电机', '带减速箱与编码器的 TT 马达'],
       note: '实物照片位：130 直流电机，尾部两根接线端子，转轴直径 2mm，壳体印有额定电压。',
     },
-    usedIn: [{ chapter: 6, label: 'PWM 调速与驱动' }],
+    usedIn: [{ chapter: 6, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['电机', 'motor', '马达', 'PWM', '堵转', '续流', '减速箱', 'H桥'],
-    schematic: { fig: 'nmos-motor', title: 'PWM 驱动直流电机', note: 'NMOS 负责按 PWM 节奏通断，续流二极管负责消化电机线圈的尖峰反压。' },
   },
   {
     id: 'servo',
@@ -1684,6 +1698,7 @@ ENTRIES.push(
     tagline: '指哪转哪的角度执行器。',
     essence: '舵机：内置电机+减速+电位器反馈，按脉冲宽度转到指定角度。',
     plain: '大白话：你跟它说「转到 45 度」（用一个特定长短的脉冲），它就乖乖转到 45 度停住——机器人关节基本都是它。',
+    schematic: { fig: 'servo-3w', title: '舵机三线控制', note: '5V 和地负责喂饱它，信号线负责告诉它角度：50Hz 脉冲，脉宽 0.5~2.5ms 对应 0~180°。' },
     unlockChapter: 4,
     principle: [
       '舵机 = 直流电机 + 减速齿轮 + 电位器角度反馈 + 控制板，闭环控制：内部电路比较目标角度（脉冲宽度）和当前角度（电位器），自动纠偏。',
@@ -1714,14 +1729,14 @@ ENTRIES.push(
     pitfalls: [
       '小焊：把舵机红线插上 3.3V——舵机软绵绵转不动还抖，不是坏了是饿的。',
       '老周：拿舵机当云台硬掰，塑料齿轮当场报废；要手动调节请断电再掰。',
+      '老周：给舵机喂的不是 50Hz 脉宽信号，而是普通 PWM 占空比，角度乱飘——舵机是「脉宽定角度」，不是「占空比定速度」。',
     ],
     pkg: {
       packages: ['SG90 9g 塑料齿（入门首选）', 'MG90S 金属齿 9g', 'MG996R 标准大扭矩'],
       note: '实物照片位：SG90 蓝色小方块舵机，顶部输出轴配摇臂，引出棕红橙三色线。',
     },
-    usedIn: [{ chapter: 4, label: '角度执行与闭环反馈' }],
+    usedIn: [{ chapter: 4, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['舵机', 'servo', 'SG90', '脉宽', '角度', '机器人', 'PWM'],
-    schematic: { fig: 'servo-3w', title: '舵机三线控制', note: '5V 和地负责喂饱它，信号线负责告诉它角度：50Hz 脉冲，脉宽 0.5~2.5ms 对应 0~180°。' },
   },
   {
     id: 'seg7',
@@ -1732,6 +1747,7 @@ ENTRIES.push(
     tagline: '七段 LED 拼数字。',
     essence: '数码管：七个 LED 段 + 小数点，点亮不同组合显示 0~9。',
     plain: '大白话：它是七个长条小灯拼成的「8」字——想让显示几，就点亮对应的几根：全部点亮是 8，只点右上两根是 1。',
+    schematic: { fig: 'seg7-drive', title: '共阴数码管驱动', note: 'com 接地，每段串一颗限流电阻接到 GPIO：亮哪几段，就拼出哪个数字。' },
     unlockChapter: 4,
     principle: [
       '一位数码管内部是 8 颗 LED（a~g 段 + dp 小数点）。共阴型所有 LED 负极接在一起（com 接地），给某段正电就亮；共阳型相反。',
@@ -1741,8 +1757,8 @@ ENTRIES.push(
     analogy: '数码管像电子版的「火柴棒拼字」：七根火柴摆成 8，抽掉几根就是别的数字；动态扫描像快速翻页的动画书。',
     params: [
       { param: '极性', symbol: '—', unit: '共阴/共阳', guide: '买前先定，驱动逻辑完全相反' },
-      { param: '段压降', symbol: 'V_f', unit: 'V', guide: '红管 ≈2V，蓝白管 ≈3V' },
-      { param: '段电流', symbol: 'I_seg', unit: 'mA', guide: '5~10mA 亮度合适，别超 20mA' },
+      { param: '段压降', symbol: 'Vf', unit: 'V', guide: '红管 ≈2V，蓝白管 ≈3V' },
+      { param: '段电流', symbol: 'I(seg)', unit: 'mA', guide: '5~10mA 亮度合适，别超 20mA' },
       { param: '位数', symbol: '—', unit: '位', guide: '1/2/4 位常见，多位用动态扫描' },
     ],
     wiring: {
@@ -1756,21 +1772,21 @@ ENTRIES.push(
       note: '老周：一位数码管直接上 8 个 IO 不心疼；四位还直驱就 32 个脚了——学会动态扫描，12 个脚搞定。',
     },
     calc: [
-      { title: '段限流电阻', formula: 'R = (V_CC − V_f) / I_seg', example: '5V 驱动红管（Vf=2V）取 8mA：R = (5−2)/0.008 = 375Ω，取 360Ω 或 390Ω 标称。' },
-      { title: '扫描频率下限', formula: 'f_扫 ≥ 位数 × 50Hz', example: '4 位管要每位刷新 50Hz 以上才不闪：整帧扫描频率 ≥ 200Hz，即每位窗口 1.25ms。' },
+      { title: '段限流电阻', formula: 'R = (Vcc − Vf) / I(seg)', example: '5V 驱动红管（Vf=2V）取 8mA：R = (5−2)/0.008 = 375Ω，取 360Ω 或 390Ω 标称。' },
+      { title: '扫描频率下限', formula: 'f(扫) ≥ 位数 × 50Hz', example: '4 位管要每位刷新 50Hz 以上才不闪：整帧扫描频率 ≥ 200Hz，即每位窗口 1.25ms。' },
     ],
     selection: ['红管最亮最便宜，蓝白管压降高（3V 系统注意余量）', '多位显示直接选 TM1637/MAX7219 驱动模块更省心', '共阴配低边驱动、共阳配高边驱动，别搞反'],
     pitfalls: [
       '小焊：共阴当共阳接——全亮或全灭，还以为是管子坏了。',
       '老周：动态扫描亮度不均？每位点亮时间不一致。定时器中断里均匀分配，别在主循环里碰运气。',
+      '老周：每段都不串限流电阻，靠 IO 内阻「凑合」——段电流失控，管子越用越暗，IO 也早早老化。',
     ],
     pkg: {
       packages: ['0.36/0.56 英寸单位列插', '4 位一体（带时钟冒号）', 'TM1637 四位显示模组（两线控制）'],
       note: '实物照片位：0.56 英寸红色一位数码管，上下各 5 脚，正面可辨 a~g 段与右下角小数点。',
     },
-    usedIn: [{ chapter: 4, label: '数字显示与动态扫描' }],
+    usedIn: [{ chapter: 4, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['数码管', '7段', 'segment', '共阴', '共阳', '动态扫描', 'TM1637'],
-    schematic: { fig: 'seg7-drive', title: '共阴数码管驱动', note: 'com 接地，每段串一颗限流电阻接到 GPIO：亮哪几段，就拼出哪个数字。' },
   },
   {
     id: 'ldr',
@@ -1781,6 +1797,7 @@ ENTRIES.push(
     tagline: '见光就变软的电阻。',
     essence: '光敏电阻：光照越强，阻值越小的感光元件。',
     plain: '大白话：它是个「怕光」的电阻——黑灯瞎火时阻值很大（几百万欧），灯一照就变小（几千欧），路灯自动亮靠的就是它。',
+    schematic: { fig: 'sensor-div', title: '光敏分压采样', note: '光敏电阻与固定电阻分压：光一变、阻值一变、中点电压就变，ADC 读走的全是环境信息。' },
     unlockChapter: 5,
     principle: [
       '硫化镉（CdS）材料受光照产生载流子，电导率上升：暗电阻可达 1MΩ 以上，亮电阻降到几 kΩ。响应较慢（几十毫秒），适合测光强不适合测光通信。',
@@ -1788,10 +1805,10 @@ ENTRIES.push(
     ],
     analogy: '光敏电阻像瞳孔：光线强就收缩（阻值小），光线暗就放大（阻值大）——全自动，不用你操心。',
     params: [
-      { param: '亮电阻', symbol: 'R_亮', unit: 'kΩ', guide: '10lux 下约 5~20kΩ（GL5516 ≈5~10kΩ）' },
-      { param: '暗电阻', symbol: 'R_暗', unit: 'MΩ', guide: '≥1MΩ' },
+      { param: '亮电阻', symbol: 'R(亮)', unit: 'kΩ', guide: '10lux 下约 5~20kΩ（GL5516 ≈5~10kΩ）' },
+      { param: '暗电阻', symbol: 'R(暗)', unit: 'MΩ', guide: '≥1MΩ' },
       { param: '响应时间', symbol: 't', unit: 'ms', guide: '上升/下降 20~30ms，慢热型选手' },
-      { param: '耐压', symbol: 'V_max', unit: 'V', guide: '一般 ≤150V，低压场景随便用' },
+      { param: '耐压', symbol: 'Vmax', unit: 'V', guide: '一般 ≤150V，低压场景随便用' },
     ],
     wiring: {
       title: '分压采样（进 ADC）',
@@ -1804,21 +1821,21 @@ ENTRIES.push(
       note: '老周：固定电阻取亮暗阻值的几何中值附近灵敏度最好——GL5516 配 10kΩ 是经典搭子。',
     },
     calc: [
-      { title: '分压输出', formula: 'V_out = V_CC × R_定 / (R_光 + R_定)', example: 'VCC=3.3V、R定=10k：亮时 R光=5k → Vout=3.3×10/15=2.2V；暗时 R光=1M → Vout≈0.03V。' },
-      { title: '阈值判断', formula: '比较 V_out 与设定阈值', example: '想「天黑了开灯」：Vout<0.5V 时开灯——对应 R光≈56kΩ 以上的环境亮度。' },
+      { title: '分压输出', formula: 'Vout = Vcc × R(定) / (R(光) + R(定))', example: 'VCC=3.3V、R定=10k：亮时 R光=5k → Vout=3.3×10/15=2.2V；暗时 R光=1M → Vout≈0.03V。' },
+      { title: '阈值判断', formula: '比较 Vout 与设定阈值', example: '想「天黑了开灯」：Vout<0.5V 时开灯——对应 R光≈56kΩ 以上的环境亮度。' },
     ],
     selection: ['入门光控选 GL5516/GL5528（便宜量大）', '要快响应选光电二极管/三极管', '要精确勒克斯值选 BH1750 数字光感模组'],
     pitfalls: [
       '老周：拿光敏电阻做光通信接收——响应 30ms，波特率超过 30 就追不上，白调一下午。',
       '小焊：分压电阻选 1k，亮的时候分压几乎不变，还奇怪「传感器不灵敏」。',
+      '老周：给光敏电阻套热缩管当防水，结果光也进不来了——感光面必须露在开孔处，别被胶和外壳挡住。',
     ],
     pkg: {
       packages: ['Φ5mm GL55 系列直插', 'Φ3mm 小体积直插', '带比较器 + 电位器阈值的光控模组（DO/AO 双输出）'],
       note: '实物照片位：Φ5mm 光敏电阻，顶部蛇形感光纹路，两只无极性引脚。',
     },
-    usedIn: [{ chapter: 5, label: '光线采样与光控开关' }],
+    usedIn: [{ chapter: 5, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['光敏电阻', 'LDR', '光控', 'GL5516', '分压', '感光', '路灯'],
-    schematic: { fig: 'sensor-div', title: '光敏分压采样', note: '光敏电阻与固定电阻分压：光一变、阻值一变、中点电压就变，ADC 读走的全是环境信息。' },
   },
   {
     id: 'thermistor',
@@ -1829,6 +1846,7 @@ ENTRIES.push(
     tagline: '感温的电阻温度计。',
     essence: '热敏电阻：阻值随温度规律性变化的元件，NTC 型越热阻值越小。',
     plain: '大白话：它是个「怕热」的电阻——温度一高阻值就掉，量出阻值是多少，就知道现在几度。电饭煲、体温计里都有它。',
+    schematic: { fig: 'sensor-div', title: 'NTC 分压测温', note: 'NTC 与固定电阻分压进 ADC：电压 → 阻值 → 温度，两步反推，注意测量电流别让它自热。' },
     unlockChapter: 5,
     principle: [
       'NTC（负温度系数）：温度升、阻值降，变化很陡（每度约 −4%），灵敏度高；PTC 相反，常用于过流保护。',
@@ -1853,21 +1871,21 @@ ENTRIES.push(
       note: '老周：固定电阻取 R₂₅ 同值（10k 配 10k），在 25℃ 附近灵敏度最高——人体测温、环境温度都落在这个甜区。',
     },
     calc: [
-      { title: '分压反推阻值', formula: 'R_NTC = R_定 × (V_CC − V_out) / V_out', example: 'R定=10k、VCC=3.3V、Vout=1.65V：R_NTC = 10k×1.65/1.65 = 10kΩ——正好是 25℃。' },
+      { title: '分压反推阻值', formula: 'R(NTC) = R(定) × (Vcc − Vout) / Vout', example: 'R定=10k、VCC=3.3V、Vout=1.65V：R(NTC) = 10k×1.65/1.65 = 10kΩ——正好是 25℃。' },
       { title: 'B 值公式估算', formula: 'R = R₂₅ × e^(B×(1/T − 1/298))', example: '10k/B3950 在 50℃（323K）：R = 10k×e^(3950×(1/323−1/298)) ≈ 10k×e^(−1.027) ≈ 3.6kΩ。' },
     ],
     selection: ['环境温度/人体温度选 10k B3950（甜区正中）', '高温（>150℃）选玻封 NTC 或 PT100', '要数字直读选 DS18B20，免标定'],
     pitfalls: [
       '老周：测温回路电流太大，NTC 自己发热 2℃——测的不是环境温度是它自己的体温。',
       '小焊：B 值抄错（3380 抄成 3950），25℃ 挺准，80℃ 偏差十度，查半天以为是 ADC 漂移。',
+      '老周：NTC 引线拉得老长又不做标定，导线电阻和 ADC 基准误差全叠进读数——要精度就做两点标定。',
     ],
     pkg: {
       packages: ['MF52 小黑头直插（最常用）', 'MF58 玻封（耐高温）', '带线的防水探头（水箱测温）'],
       note: '实物照片位：MF52 黑色环氧树脂小圆头热敏电阻，两根细引脚，常配 10kΩ B3950 丝印规格。',
     },
-    usedIn: [{ chapter: 5, label: '温度采样与温补' }],
+    usedIn: [{ chapter: 5, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['热敏电阻', 'NTC', 'PTC', '测温', 'B值', 'MF52', '分压'],
-    schematic: { fig: 'sensor-div', title: 'NTC 分压测温', note: 'NTC 与固定电阻分压进 ADC：电压 → 阻值 → 温度，两步反推，注意测量电流别让它自热。' },
   },
 );
 
@@ -1881,6 +1899,7 @@ ENTRIES.push(
     tagline: '压降低、速度快的二极管。',
     essence: '肖特基二极管：金属-半导体结，压降只有 0.3V 左右，开关速度极快。',
     plain: '大白话：普通二极管过路要收 0.7V「过路费」，肖特基只收 0.3V——电压金贵的场合（电池供电）都请它站岗。',
+    schematic: { fig: 'diode-or', title: '双电源 OR-ing 切换', note: '两路电源各串一颗肖特基再汇合：电压高的一路自动接管，互相不倒灌，代价只是 0.3V。' },
     unlockChapter: 3,
     principle: [
       '普通 PN 结二极管导通压降约 0.6~0.7V；肖特基是金属-半导体结，压降仅 0.2~0.4V，导通损耗小一半以上。',
@@ -1889,10 +1908,10 @@ ENTRIES.push(
     ],
     analogy: '普通二极管是收费站人工通道（收 0.7V 还慢），肖特基是 ETC 通道（收 0.3V 还秒过）——就是节假日（高温高反压）会有点漏。',
     params: [
-      { param: '正向压降', symbol: 'V_f', unit: 'V', guide: '0.2~0.45V（电流越大越高），比 PN 结低一半' },
-      { param: '反向耐压', symbol: 'V_R', unit: 'V', guide: '常见 20~100V，普遍不高' },
-      { param: '正向电流', symbol: 'I_F', unit: 'A', guide: '1N5819=1A，SS34=3A' },
-      { param: '反向漏流', symbol: 'I_R', unit: 'µA', guide: 'µA~mA 级，比 PN 结大；高温暴涨' },
+      { param: '正向压降', symbol: 'Vf', unit: 'V', guide: '0.2~0.45V（电流越大越高），比 PN 结低一半' },
+      { param: '反向耐压', symbol: 'VR', unit: 'V', guide: '常见 20~100V，普遍不高' },
+      { param: '正向电流', symbol: 'If', unit: 'A', guide: '1N5819=1A，SS34=3A' },
+      { param: '反向漏流', symbol: 'IR', unit: 'µA', guide: 'µA~mA 级，比 PN 结大；高温暴涨' },
     ],
     wiring: {
       title: '双电源自动切换（OR-ing）',
@@ -1905,21 +1924,23 @@ ENTRIES.push(
       note: '老周：电池供电的设备做防反接，用肖特基串联最省事——0.3V 的代价换永远不烧板，划算。',
     },
     calc: [
-      { title: '导通损耗对比', formula: 'P = V_f × I', example: '1A 电流：普通二极管 0.7V×1A=0.7W（烫），肖特基 0.35V×1A=0.35W——省下一半发热。' },
-      { title: '电池端有效电压', formula: 'V_out = V_电池 − V_f', example: '3.7V 锂电经肖特基防反接：3.7−0.3=3.4V 给后级；换普通二极管只剩 3.0V，低压设备可能直接罢工。' },
+      { title: '导通损耗对比', formula: 'P = Vf × I', example: '1A 电流：普通二极管 0.7V×1A=0.7W（烫），肖特基 0.35V×1A=0.35W——省下一半发热。' },
+      { title: '电池端有效电压', formula: 'Vout = V(电池) − Vf', example: '3.7V 锂电经肖特基防反接：3.7−0.3=3.4V 给后级；换普通二极管只剩 3.0V，低压设备可能直接罢工。' },
     ],
     selection: ['防反接/续流优先肖特基（低压差、快）', '耐压需求 >100V 或漏流敏感场合换回 PN 结/快恢复', 'SS14(1A)/SS34(3A) 贴片最常用，1N5819 直插'],
     pitfalls: [
       '老周：拿肖特基做高压整流——反向耐压 40V 的管子接 60V，反向击穿直接短路。',
       '小焊：高温环境用肖特基当防反接，漏流大得把电池偷偷放空，查了一个月。',
+      '老周：拿 SS34 去替 1N4148 做小信号检波，结电容和漏流都大，效率反而更差——压降低不等于处处合适。',
     ],
     pkg: {
       packages: ['1N5819 直插 DO-41（1A）', 'SS14/SS34 贴片 SMA', 'BAT54 小信号 SOT-23（0.2A）'],
-      note: '实物照片位：SS34 黑色贴片二极管，一端白色阴极环，背面金属散热焊盘。',
+      note: '实物照片位：SS34 黑色贴片二极管，一端白色阴极环（不同厂家丝印可能是一道或两道环，都表示阴极），背面金属散热焊盘。',
     },
-    usedIn: [{ chapter: 3, label: '低压差整流与防反接' }],
+    usedIn: [
+      { chapter: 3, label: '支线 sb-8 矿石收音机：检波用肖特基' },
+    ],
     keywords: ['肖特基', 'schottky', 'SS34', '1N5819', '防反接', '续流', '低压降'],
-    schematic: { fig: 'diode-or', title: '双电源 OR-ing 切换', note: '两路电源各串一颗肖特基再汇合：电压高的一路自动接管，互相不倒灌，代价只是 0.3V。' },
   },
   {
     id: 'ldo7805',
@@ -1930,7 +1951,8 @@ ENTRIES.push(
     tagline: '把高电压「捏」成稳定 5V。',
     essence: '线性稳压器：输入高于输出的电压，多余部分变热消耗掉，输出稳定电压。',
     plain: '大白话：它像水库的闸门——不管上游水多高（7~35V），都只放出固定的 5V，多出来的「水压」变成热量从它身上散掉。',
-    unlockChapter: 6,
+    schematic: { fig: 'ldo-7805', title: '7805 稳压电路', note: '输入输出各一颗电容保命，压差×电流就是发热——超过 1W 记得给它配散热片。' },
+    unlockChapter: 7,
     principle: [
       '7805 内部用功率管当可变电阻，实时调节把输出钉在 5V：输入必须高于输出约 2V 以上（压差），多余的 (Vin−5V)×I 全部变成热。',
       'LDO（低压差稳压器，如 AMS1117）是改良版：压差只需 1V 左右，效率更高些。',
@@ -1938,9 +1960,9 @@ ENTRIES.push(
     ],
     analogy: '线性稳压器像捏水管的人：上游水压再大，他都捏着管子只放出稳定的水流——多余的劲儿全变成他手心的汗（热量）。',
     params: [
-      { param: '输出电压', symbol: 'V_out', unit: 'V', guide: '7805=5V，1117-3.3=3.3V，型号即输出' },
-      { param: '压差', symbol: 'V_drop', unit: 'V', guide: '7805 需 ≥2V，LDO 可低至 1V' },
-      { param: '输出电流', symbol: 'I_out', unit: 'A', guide: '7805 标称 1A（带散热片），1117 约 0.8A' },
+      { param: '输出电压', symbol: 'Vout', unit: 'V', guide: '7805=5V，1117-3.3=3.3V，型号即输出' },
+      { param: '压差', symbol: 'V(drop)', unit: 'V', guide: '7805 需 ≥2V，LDO 可低至 1V' },
+      { param: '输出电流', symbol: 'Iout', unit: 'A', guide: '7805 标称 1A（带散热片），1117 约 0.8A' },
       { param: '耗散功率', symbol: 'P', unit: 'W', guide: '(Vin−Vout)×I，超 1W 必须散热片' },
     ],
     wiring: {
@@ -1954,21 +1976,25 @@ ENTRIES.push(
       note: '老周：7805 的两个电容不是摆设——省了输出电容它会振荡，输出波形跟抽风一样。',
     },
     calc: [
-      { title: '发热功率', formula: 'P = (V_in − V_out) × I', example: '12V 输入、0.5A 负载：(12−5)×0.5 = 3.5W——不装散热片一分钟就能烫到保护关断。' },
-      { title: '效率估算', formula: 'η ≈ V_out / V_in', example: '12V→5V：η ≈ 5/12 ≈ 42%，一半多能量都变成热了——这种场合该用开关电源。' },
+      { title: '发热功率', formula: 'P = (Vin − Vout) × I', example: '12V 输入、0.5A 负载：(12−5)×0.5 = 3.5W——不装散热片一分钟就能烫到保护关断。' },
+      { title: '效率估算', formula: 'η ≈ Vout / Vin', example: '12V→5V：η ≈ 5/12 ≈ 42%，一半多能量都变成热了——这种场合该用开关电源。' },
+      { title: '温升校核（散热片够不够）', formula: 'ΔT = P × θJA，且 Tj = Ta + ΔT 要小于 Tj(max)', example: '12V→5V、0.5A：P = 3.5W。TO-220 不加散热片时 θJA 约 60~70°C/W，ΔT ≈ 3.5 × 65 ≈ 230°C——远超允许温升，芯片会直接热保护关断；加散热片把 θJA 压到 10°C/W，ΔT 才降到 35°C。θJA 是量级参考值，具体查手册。' },
     ],
     selection: ['小电流、要干净电源（模拟/音频）选线性稳压', '压差大或电流大选 DC-DC 开关电源模块', '3.3V 系统选 AMS1117-3.3，5V 选 7805'],
     pitfalls: [
       '老周：24V 进 7805 带 0.5A——(24−5)×0.5=9.5W，封装直接烧毁，线性稳压不是这么用的。',
       '小焊：AMS1117 输入只给 4V 想要 3.3V 输出——压差不够，输出只有 2.8V 还不稳。',
+      '老周：输出电容省了，或者拿高 ESR 的老电解凑数——LDO 环路不稳、输出自激，万用表看不出来，得上示波器。',
     ],
     pkg: {
       packages: ['TO-220 直插（7805，可装散热片）', 'SOT-223 贴片（AMS1117）', 'SOT-23-5 小电流 LDO（如 XC6206，150mA）'],
       note: '实物照片位：TO-220 封装的 7805，黑色三脚本体 + 顶部金属散热片安装孔，丝印 L7805CV。',
     },
-    usedIn: [{ chapter: 6, label: '板载电源设计' }],
+    usedIn: [
+      { chapter: 7, label: 'LDO 选型：冷静供电（c7-2）' },
+      { chapter: 7, label: 'BOM 出炉（c7-4）：3.3V 供电选型' },
+    ],
     keywords: ['7805', 'LDO', 'AMS1117', '稳压', '线性电源', '压差', '散热'],
-    schematic: { fig: 'ldo-7805', title: '7805 稳压电路', note: '输入输出各一颗电容保命，压差×电流就是发热——超过 1W 记得给它配散热片。' },
   },
   {
     id: 'timer555',
@@ -1979,6 +2005,7 @@ ENTRIES.push(
     tagline: '一颗芯片承包所有方波。',
     essence: '555：经典定时芯片，外接电阻电容就能产生方波、延时、PWM。',
     plain: '大白话：它是电子界的「节拍器」——外接两个电阻一个电容，就能按你设定的节奏不停输出「嘀-嗒-嘀-嗒」的方波。',
+    schematic: { fig: 'a555', title: '555 无稳态振荡', note: '电容经 RA+RB 充电、经 RB 放电：三个元件定节奏，公式 f=1.44/((RA+2RB)C) 直接算频率。' },
     unlockChapter: 3,
     principle: [
       '内部两个比较器盯着电容电压：充到 2/3 VCC 翻转为低，放到 1/3 VCC 翻转为高——电容充放电的节奏就变成了输出方波。',
@@ -1987,8 +2014,8 @@ ENTRIES.push(
     ],
     analogy: '555 像自动翻面的沙漏：沙子（电容）装满就翻过来（输出翻转），倒空再翻回去——调节 RA/RB 就是调节沙漏的大小口。',
     params: [
-      { param: '工作电压', symbol: 'V_CC', unit: 'V', guide: '4.5~16V，5V/12V 都皮实' },
-      { param: '输出电流', symbol: 'I_out', unit: 'mA', guide: '±200mA，可直驱 LED/小继电器' },
+      { param: '工作电压', symbol: 'Vcc', unit: 'V', guide: '4.5~16V，5V/12V 都皮实' },
+      { param: '输出电流', symbol: 'Iout', unit: 'mA', guide: '±200mA，可直驱 LED/小继电器' },
       { param: '频率范围', symbol: 'f', unit: 'Hz', guide: '0.1Hz~500kHz，由 RA/RB/C 决定' },
       { param: 'CMOS 版', symbol: '—', unit: '—', guide: 'TLC555/LMC555 低功耗，可达 2MHz' },
     ],
@@ -2003,21 +2030,21 @@ ENTRIES.push(
       note: '老周：这个结构占空比必然 >50%，想要精准 50% 就在输出加触发器分频，或者 RB 上并二极管绕路。',
     },
     calc: [
-      { title: '振荡频率', formula: 'f = 1.44 / ((R_A + 2R_B) × C)', example: 'RA=1kΩ、RB=10kΩ、C=100nF：f = 1.44/(21k×100n) ≈ 686Hz。' },
-      { title: '占空比', formula: 'D = (R_A + R_B) / (R_A + 2R_B)', example: '同上参数：D = 11k/21k ≈ 52%。RA 越小越接近 50%。' },
+      { title: '振荡频率', formula: 'f = 1.44 / ((R(A) + 2R(B)) × C)', example: 'RA=1kΩ、RB=10kΩ、C=100nF：f = 1.44/(21k×100n) ≈ 686Hz。' },
+      { title: '占空比', formula: 'D = (R(A) + R(B)) / (R(A) + 2R(B))', example: '同上参数：D = 11k/21k ≈ 52%。RA 越小越接近 50%。' },
     ],
     selection: ['要方波不想写代码选 555（硬件党首选）', '低功耗便携设备选 CMOS 版 TLC555', '频率要准（>1%）选晶振方案，555 受 RC 精度限制'],
     pitfalls: [
       '老周：5 脚（CTRL）悬空——抗干扰能力打折，频率莫名其妙漂移，并颗 10nF 就老实了。',
       '小焊：C 用电解电容还大阻值 RA/RB——漏电把阈值全打乱，振荡器变「振荡不起来器」。',
+      '老周：拿 555 直推继电器/电机不做去耦也不加缓冲，开关瞬间电源被拉塌，芯片自己把自己复位——8 脚并 10µF、5 脚并 10nF。',
     ],
     pkg: {
       packages: ['DIP-8 直插 NE555（面包板老朋友）', 'SOP-8 贴片', '双定时器 NE556（一颗顶两颗）'],
       note: '实物照片位：DIP-8 黑色直插 NE555，顶部圆点标记 1 脚，丝印 NE555P。',
     },
-    usedIn: [{ chapter: 3, label: '方波与定时电路' }],
+    usedIn: [{ chapter: 3, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['555', 'NE555', '定时器', '振荡器', '方波', '无稳态', 'PWM'],
-    schematic: { fig: 'a555', title: '555 无稳态振荡', note: '电容经 RA+RB 充电、经 RB 放电：三个元件定节奏，公式 f=1.44/((RA+2RB)C) 直接算频率。' },
   },
   {
     id: 'transformer',
@@ -2028,6 +2055,7 @@ ENTRIES.push(
     tagline: '交流电压的升降电梯。',
     essence: '变压器：靠电磁感应改变交流电压，匝数比就是电压比。',
     plain: '大白话：它是交流电的「变档器」——初级线圈多少圈、次级多少圈，电压就按比例变：圈数砍十倍，220V 变 22V。',
+    schematic: { fig: 'xfmr-bridge', title: '变压器 + 整流滤波', note: '匝比定交流电压，整流桥变直流方向，大电容把脉动填平——记住输出是交流的 1.414 倍。' },
     unlockChapter: 2,
     principle: [
       '初级线圈通交流产生交变磁场，铁芯把磁场「送」到次级线圈，感应出电压：V₂/V₁ = N₂/N₁（匝数比）。只对交流有效，直流怼进去等于短路。',
@@ -2053,20 +2081,20 @@ ENTRIES.push(
     },
     calc: [
       { title: '匝比换算', formula: 'V₂ = V₁ × N₂/N₁', example: '初级 2200 匝、次级 120 匝：V₂ = 220×120/2200 = 12V。' },
-      { title: '整流滤波后电压', formula: 'V_DC ≈ V₂ × 1.414 − 2×0.7V', example: '12V 交流：12×1.414−1.4 ≈ 15.6V（空载）。' },
+      { title: '整流滤波后电压', formula: 'V(DC) ≈ V₂ × 1.414 − 2×0.7V', example: '12V 交流：12×1.414−1.4 ≈ 15.6V（空载）。' },
     ],
     selection: ['工频铁芯变压器皮实抗造但笨重', '小体积需求选开关电源模块（内部是高频变压器）', '功率余量留 1.5 倍，长期满载会发烫'],
     pitfalls: [
       '老周：给 50Hz 铁芯变压器通直流——没有交变磁场，初级相当于一根导线，直接烧。',
       '小焊：按交流 12V 选后级电容耐压（16V），整流后 15.6V 贴着上限，高温天电容鼓包。',
+      '老周：变压器只标 VA 就按 VA ÷ 电压 满打满算地用——实际可用次级电流还看负载类型与温升，容性/感性负载要降额。',
     ],
     pkg: {
       packages: ['EI 工频铁芯变压器（3~50VA）', '环形变压器（漏磁小、效率高）', 'PCB 针式小变压器（2~5VA）'],
       note: '实物照片位：EI 铁芯小变压器，初级两根（市电侧）、次级两根（低压侧），铭牌标功率与输出电压。',
     },
-    usedIn: [{ chapter: 2, label: '市电降压与隔离' }],
+    usedIn: [{ chapter: 2, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['变压器', 'transformer', '匝比', '整流', '市电', '铁芯', '隔离'],
-    schematic: { fig: 'xfmr-bridge', title: '变压器 + 整流滤波', note: '匝比定交流电压，整流桥变直流方向，大电容把脉动填平——记住输出是交流的 1.414 倍。' },
   },
   {
     id: 'speaker',
@@ -2077,6 +2105,7 @@ ENTRIES.push(
     tagline: '把电信号吼出来的纸盆。',
     essence: '扬声器：音频电流驱动音圈在磁场中振动，推动纸盆发声。',
     plain: '大白话：它和麦克风是「反向兄弟」——给线圈通上声音电流，线圈带着纸盆一推一拉，空气就被推成了声音。',
+    schematic: { fig: 'spk-cap', title: '电容耦合驱动喇叭', note: '耦合电容把直流挡在门外，只放行音频摆动；阻抗 8Ω 意味着几百 mA 的电流，得靠功放推。' },
     unlockChapter: 6,
     principle: [
       '音圈套在永磁体磁场里：通入音频电流受安培力前后运动，带动纸盆推拉空气形成声波。频率响应决定音色，纸盆越大低音越好。',
@@ -2102,20 +2131,260 @@ ENTRIES.push(
     },
     calc: [
       { title: '喇叭电流估算', formula: 'I = V / Z', example: '5V 峰值信号推 8Ω：峰值电流 0.63A——这就是为什么需要功放而不是 IO 直驱。' },
-      { title: '电功率', formula: 'P = V_rms² / Z', example: 'PAM8403 输出 3W@4Ω：V_rms = √(3×4) ≈ 3.5V。' },
+      { title: '电功率', formula: 'P = V(rms)² / Z', example: 'PAM8403 输出 3W@4Ω：V(rms) = √(3×4) ≈ 3.5V。' },
     ],
     selection: ['提示音/语音选 Φ40 8Ω 1W 小喇叭', '要音质选全频喇叭 + 箱体（裸喇叭低音漏光）', '功放芯片功率 ≥ 喇叭额定功率的 1.2 倍'],
     pitfalls: [
       '老周：喇叭串联电阻「保护」——功率全耗在电阻上，声音小一半还奇怪功放不行。',
       '小焊：两个喇叭直接并联到 8Ω 功放输出——等效 4Ω，电流翻倍，功放过热保护。',
+      '老周：喇叭裸装在薄塑料壳上、没有密封音腔，低音全被声短路掉，声音又尖又空——小喇叭也要给它一个箱子。',
     ],
     pkg: {
       packages: ['Φ40/Φ50 8Ω 0.5~1W 纸盆小喇叭', '腔体喇叭（带密封音腔，音质好）', '压电片（蜂鸣片，超薄低功耗）'],
       note: '实物照片位：Φ40mm 圆形小喇叭，背面磁铁与两个焊盘，正面纸盆 + 防尘帽，标注 8Ω 0.5W。',
     },
-    usedIn: [{ chapter: 6, label: '声音输出与功放' }],
+    usedIn: [{ chapter: 6, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
     keywords: ['喇叭', '扬声器', 'speaker', '8欧', '功放', '音圈', '阻抗'],
-    schematic: { fig: 'spk-cap', title: '电容耦合驱动喇叭', note: '耦合电容把直流挡在门外，只放行音频摆动；阻抗 8Ω 意味着几百 mA 的电流，得靠功放推。' },
+  },
+);
+
+
+// —— 第五批（W6 新增）：比较器 / 电平转换 / DC-DC 模块 / 光耦隔离 ——
+ENTRIES.push(
+  {
+    id: 'comparator',
+    name: '比较器 / 施密特触发器',
+    en: 'Comparator / Schmitt Trigger',
+    refdes: 'U',
+    category: 'ic',
+    tagline: '只回答「谁大」,带迟滞才不抖。',
+    essence: '比较器：把两个输入的大小关系变成一位数字输出；迟滞让它对噪声免疫。',
+    plain: '大白话：它只回答一个问题——「A 比 B 高吗？」高就输出高、低就输出低；加了迟滞，答案就不会在临界点上反复横跳。',
+    schematic: { fig: 'cmp-schmitt', title: '迟滞比较器（施密特触发）', note: '输出经 Rf 正反馈回同相端，阈值被抬成上下两条线：信号升到上阈值才翻转、降到下阈值才翻回，中间的空档就是迟滞窗口 Vhyst。' },
+    unlockChapter: 5,
+    lab: 'hyst',
+    principle: [
+      '内部是高增益差分放大器，工作在开环或正反馈状态：同相端比反相端高，输出就冲到正电源轨；低就掉到地或负轨。因为没有负反馈，它不满足「虚短」，只认大小、不做线性放大。',
+      '开环比较器的致命弱点是抖动：输入在阈值附近慢慢爬升时，一点噪声就能让输出反复翻转。解决办法是加正反馈制造迟滞（施密特触发器）——翻转点被分成上下两个，中间留一条回差带 Vhyst，噪声幅度小于它就不会误翻转。',
+      '输出形式看型号：LM393/LM339 是开集（OC）输出，只能拉低、必须外接上拉才能给出高电平；推挽输出的比较器（如 TLV7011）能直接给满摆幅，但输出不能「线与」；74HC14 是带迟滞的 CMOS 反相施密特输入门，最适合给慢变信号整形。',
+    ],
+    analogy: '像门卫的「够高才放行」：只认身高线。迟滞就是给门装两道线——进来要够 1.8m、出去才降到 1.5m，免得有人站在线边上反复进出。',
+    params: [
+      { param: '响应时间', symbol: 'tpd', unit: 'ns/µs', guide: 'LM393 约 1.3µs；高速比较器能到 ns 级。别拿它做线性放大，那是运放的活' },
+      { param: '输入失调电压', symbol: 'Vos', unit: 'mV', guide: 'LM393 典型约 2mV，决定了阈值能分辨到多细' },
+      { param: '输出形式', symbol: '—', unit: '开集/推挽', guide: '开集要上拉（1k~10kΩ）；推挽可直接驱动逻辑输入，但不能线与' },
+      { param: '迟滞窗口', symbol: 'Vhyst', unit: 'V', guide: '取噪声幅度的 2~5 倍；太宽会「粘住」不翻转，太窄等于没加' },
+      { param: '供电范围', symbol: 'Vs', unit: 'V', guide: 'LM393 单电源 2~36V 或双电源；注意共模输入范围到不了正轨' },
+    ],
+    wiring: {
+      title: '单阈值比较（过压检测 / 光控都用它）',
+      steps: [
+        '被比较的信号接一个输入端，参考电压（电阻分压或用基准）接另一个输入端，先用万用表确认两个直流电平。',
+        'LM393 是开集输出：输出脚必须经 1k~10kΩ 上拉到逻辑电源，否则永远是低电平。',
+        '上拉电阻决定拉高速度：上拉越小边沿越快，但低电平时灌电流越大（LM393 能灌十几 mA）。',
+        '要抗抖动就加正反馈做迟滞：Rf 从输出接回同相端、Rth 从同相端接参考，窗口 Vhyst = Vout_pp × Rth ÷ (Rth + Rf)。',
+        '输出接 MCU 时，上拉电源要和 MCU 的 IO 电平一致（3.3V 系统就上拉到 3.3V），别用 5V 上拉去怼 3.3V 的脚。',
+      ],
+      note: '老周：拿运放当比较器用？多数运放输出在两端之间慢吞吞地爬，输入差压超限还可能倒相；要比大小，就用专款专用的比较器。',
+    },
+    calc: [
+      { title: '分压参考电压', formula: 'Vref = Vcc × R2 ÷ (R1 + R2)', example: '5V 电源、R1=R2=10kΩ：Vref = 2.5V。要和传感器输出的中点对齐，就把下臂换成可调电位器。' },
+      { title: '迟滞窗口', formula: 'Vhyst = Vout_pp × Rth ÷ (Rth + Rf)', example: '3.3V 供电、开集输出上拉到 3.3V（Vout_pp = 3.3V），取 Rf = 100kΩ、Rth = 10kΩ：Vhyst = 3.3 × 10 ÷ 110 = 0.30V，两个阈值约 1.5V / 1.8V（中心 1.65V）。把 Rth 换成 100kΩ，窗口直接变成 1.65V——太宽会把信号「粘」住。' },
+      { title: '上拉电阻与上升时间', formula: 't(上升) ≈ 2.2 × Rpull × C(负载)', example: '上拉 10kΩ、负载电容 20pF：约 0.44µs，比 LM393 本身 1.3µs 的延迟还快，够用；上拉 100kΩ 就会慢到 4.4µs，边沿发软。' },
+    ],
+    selection: [
+      '阈值检测/比大小：LM393（双路）、LM339（四路）最便宜好用；要直接驱动功率负载就加一级 MOS。',
+      '给慢变信号整形（光电、热敏、按键）：74HC14 施密特反相器最省事，一颗顶六路。',
+      '要轨到轨、低电压工作：选推挽输出比较器（TLV7011 类），注意它不能线与。',
+      '迟滞窗口按噪声峰峰值的 2~5 倍设；没有噪声数据就先按信号的 1%~5% 试，再用示波器看边沿有没有毛刺。',
+    ],
+    pitfalls: [
+      '老周：比较器输出忘了上拉，一直读到 0V，还怀疑芯片坏了——开集输出天生给不出高电平。',
+      '老周：单阈值不带迟滞，输出在阈值附近「哒哒哒」乱跳，MCU 中断被刷爆——加正反馈，别指望软件去抖硬扛。',
+      '老周：迟滞电阻取太小，窗口宽到 1V 以上，信号被「粘」住不翻转——Vhyst 取噪声幅度的 2~5 倍就够。',
+    ],
+    pkg: {
+      packages: ['DIP-8 / SOP-8（LM393 双比较器）', 'DIP-14 / SOP-14（LM339 四比较器）', 'SOT-23-5（TLV7011 等推挽比较器）', 'DIP-14 / SOP-14（74HC14 六路施密特反相器）'],
+      note: '实物照片位：DIP-8 的 LM393 与 DIP-14 的 74HC14 并排，标注 1 脚圆点。提醒：LM393 的输出脚是开集，图纸上别忘了上拉电阻。',
+    },
+    usedIn: [{ chapter: 5, label: '暂未进入关卡（支线 sb-4 用运放搭迟滞，概念与本条目对应）', pending: true }],
+    keywords: ['比较器', 'comparator', 'LM393', 'LM339', '施密特', '迟滞', '开集', '阈值', '74HC14'],
+  },
+  {
+    id: 'levelshift',
+    name: '电平转换（3.3V ↔ 5V）',
+    en: 'Level Shifter (3.3V ↔ 5V)',
+    refdes: 'U / Q',
+    category: 'ic',
+    tagline: '两套电平之间的翻译官。',
+    essence: '电平转换：让 3.3V 与 5V 器件互相听懂，又不把低压器件打坏。',
+    plain: '大白话：3.3V 的芯片说话小声，5V 的芯片听不见；5V 芯片回话又太大声，会把 3.3V 芯片喊坏——中间得有个翻译。',
+    schematic: { fig: 'level-shift', title: '双向 MOS 电平转换（I²C 常用）', note: '每根信号线一颗 N-MOS + 两侧各自上拉：任一侧拉低都能把另一侧跟着拉低，两侧都不动作时各自回到自己的高电平——天然双向，不需要方向控制脚。' },
+    unlockChapter: 6,
+    principle: [
+      '两个方向要分开看：3.3V 输出 → 5V 输入（低压驱高压）通常没问题，很多 5V 器件的 VIH 认得 3.3V；5V 输出 → 3.3V 输入才危险，必须降压，否则超过低压器件的绝对最大额定值。',
+      '常用四种方案：① 电阻分压（两颗电阻，只适合单向、低速、输入阻抗高的场合）；② 双向 MOS（一颗 N-MOS + 两侧上拉，I²C/1-Wire 这类开漏总线的标准解法）；③ 专用电平转换芯片（TXS0108E/TXB0104 等，自动方向、速度快）；④ 开漏 + 上拉（两端都是开漏时，把上拉统一接到较低的那一档电源，前提是高压侧器件能接受这个高电平）。',
+      'I²C 的禁忌：SDA/SCL 是开漏总线，不能只串两颗电阻——串阻只限流、不改变高电平，上拉电压仍是 5V，会把 3.3V 器件拉爆。正确做法是双向 MOS 转换，或两侧分别上拉到各自电源。',
+    ],
+    analogy: '像两国边境的翻译岗：不是不让你过，而是把「音量」调到对方能接受的范围——喊太大声（5V 灌进 3.3V），对方直接失聪。',
+    params: [
+      { param: '通道数', symbol: '—', unit: '路', guide: '单路（分立 MOS）到 8 路（TXS0108E）都有，按总线数量选' },
+      { param: '方向', symbol: '—', unit: '单向/双向', guide: 'UART/SPI 可用单向方案；I²C、1-Wire 必须双向' },
+      { param: '最高速率', symbol: 'fmax', unit: 'Mbps', guide: '电阻分压几十 kHz；双向 MOS 约 1~2MHz；专用芯片可到 24Mbps 以上' },
+      { param: 'MOS 阈值', symbol: 'Vgs(th)', unit: 'V', guide: '双向 MOS 要选低阈值管（BSS138/2N7002 量级），栅极接低压侧电源' },
+      { param: '上拉电阻', symbol: 'Rpull', unit: 'kΩ', guide: '两侧各 4.7k~10kΩ；总线电容大或速率高时适当减小' },
+    ],
+    wiring: {
+      title: '双向 MOS 电平转换（I²C / 1-Wire 标准接法）',
+      steps: [
+        'N-MOS 源极接低压侧（3.3V），栅极接低压侧电源（3.3V），漏极接高压侧（5V）。',
+        '低压侧信号线经 4.7k~10kΩ 上拉到 3.3V，高压侧信号线经同样的电阻上拉到 5V。',
+        '两侧都无动作时 MOS 关断，各自被上拉到自己的电平——这就是「双向」的由来。',
+        '任一侧拉低：低压侧拉低时体二极管先导通把高压侧带下来、MOS 随后完全导通；高压侧拉低则由 MOS 沟道直接传到低压侧。',
+        'UART/SPI 这类单向或半双工信号可以用带方向控制的缓冲器（74LVC1T45），但别用电阻分压去驱动带 5V 上拉的 I²C 总线。',
+      ],
+      note: '老周：I²C 上串两颗 1kΩ 就当电平转换？电阻分压只在「高阻输入」下成立，总线被上拉钳住时分压比根本不对，5V 照样灌进 3.3V 的引脚。',
+    },
+    calc: [
+      { title: '电阻分压（仅单向低速）', formula: 'Vout = Vin × R2 ÷ (R1 + R2)，且 R1 + R2 要远小于负载阻抗', example: '5V → 3.3V：取 R1=1.8kΩ、R2=3.3kΩ，5 × 3.3 ÷ 5.1 ≈ 3.24V。分压点必须接在高阻输入上，带不动负载，速率也就百 kHz 级。' },
+      { title: '上拉与上升时间', formula: 't(上升) ≈ 2.2 × Rpull × C(总线)', example: 'I²C 标准模式 100kHz 要求上升沿 < 1µs、总线电容 200pF：上拉 4.7kΩ 算出来约 2.1µs 超标，换成 2.2kΩ 约 0.97µs 才合格；若总线电容只有 100pF，4.7kΩ 也能过。' },
+      { title: '上拉电流校核', formula: 'I = Vcc ÷ Rpull', example: '3.3V 配 4.7kΩ：拉低时灌电流 0.7mA，远低于 I²C 规定的 3mA 上限；若用 1kΩ 上拉，电流 3.3mA 已经超规格。' },
+    ],
+    selection: [
+      'I²C / 1-Wire 等双向开漏总线：双向 MOS（BSS138 方案）或 TXS0102/TXS0108E。',
+      'SPI / UART：74LVC1T45、74AHCT125 这类带方向控制的缓冲器更快更稳。',
+      '只降不升、低速、高阻输入：两颗电阻分压最省事，但先确认对方接受分压后的电平。',
+      '通道多、空间紧：直接选专用电平转换芯片，别用一堆分立管堆出来。',
+    ],
+    pitfalls: [
+      '老周：I²C 只串电阻不换电平，5V 上拉把 3.3V 器件的 IO 保护二极管长期导通——先是通信不稳，然后就冒烟。',
+      '老周：双向 MOS 的源漏接反、栅极又接了 5V，管子一直导通，两侧电平直接短在一起，等于没隔离。',
+      '老周：两侧上拉都取 10kΩ，总线电容又大，波形上升沿圆成馒头——示波器一看就知道要减小上拉或降速。',
+    ],
+    pkg: {
+      packages: ['BSS138/2N7002 + 4 颗电阻（分立双向 MOS）', '4 路双向模块（蓝色小板，标 LV1~4 / HV1~4）', 'TXS0108E / TXB0104（SOP-20 / TSSOP-20）', '74LVC1T45 单路双向（SOT-23-6）'],
+      note: '实物照片位：一块 4 路双向电平转换小板（丝印 LV/HV/GND 与通道号），旁边一颗 BSS138 和四颗 4.7kΩ 电阻。',
+    },
+    usedIn: [{ chapter: 6, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
+    keywords: ['电平转换', 'level shift', '3.3V', '5V', 'I2C', 'BSS138', 'TXS0108E', '开漏'],
+  },
+  {
+    id: 'dcdc',
+    name: 'DC-DC 开关电源模块',
+    en: 'DC-DC Converter (Buck/Boost)',
+    refdes: 'U / MOD',
+    category: 'supply',
+    tagline: '高效降压升压，代价是纹波。',
+    essence: 'DC-DC：用电感和开关把能量「搬」到另一个电压，效率可达 90% 以上。',
+    plain: '大白话：它不把多余的电压烧掉（那是 LDO 干的），而是把电能切碎了重新拼成另一个电压，所以不烫、效率高。',
+    schematic: { fig: 'buck-module', title: 'Buck 降压模块接线', note: 'IN+/IN− 进、OUT+/OUT− 出：Buck 要求 VIN 高于 VOUT，输入输出各并一颗大电容且就近放置，开关电流的热回路越小越好。' },
+    unlockChapter: 7,
+    principle: [
+      'Buck（降压）：开关管把输入斩成方波，电感把方波「平均」成连续电流，输出电容再把它滤成平稳电压，Vout ≈ D × Vin。Boost（升压）：电感先储能、再与输入串联放电，输出高于输入。',
+      '效率高的原因是开关管只在导通时承受很小的压降（I²Rds(on)），关断时几乎不耗电；而线性稳压器是把压差全部变成热。代价是开关噪声：输出纹波、输入电流脉动和 EMI 都来了。',
+      '关键外围：电感（感量与饱和电流）、输出电容（容值与 ESR）、续流二极管（或同步整流 MOS）。布局上「输入电容 → 开关管 → 续流管 → 地」这个热回路（hot loop）面积必须最小，否则噪声与 EMI 直接爆表。',
+    ],
+    analogy: '像用传送带搬沙：一铲一铲地运（开关），靠飞轮的惯性把断续的沙流变成连续输出（电感 + 电容）——比一勺勺倒掉多余的沙（LDO 发热）高效得多。',
+    params: [
+      { param: '输入/输出电压', symbol: 'Vin/Vout', unit: 'V', guide: 'Buck 必须 Vin > Vout（留 1~2V 余量）；Boost 反过来，Vout > Vin' },
+      { param: '输出电流', symbol: 'Iout', unit: 'A', guide: '模块标的是持续电流，注意散热与实际降额，峰值还要另看' },
+      { param: '开关频率', symbol: 'fsw', unit: 'kHz/MHz', guide: '常见 300kHz~2MHz：频率高→电感电容小、纹波小，但开关损耗和 EMI 大' },
+      { param: '效率', symbol: 'η', unit: '%', guide: '好的 Buck 中等负载下 90%+；轻载效率会掉，静态电流也要看' },
+      { param: '输出纹波', symbol: 'Vrip', unit: 'mVpp', guide: '几十 mVpp 是常态；给 ADC/运放供电时后面再补一级 LDO' },
+      { param: '电感饱和电流', symbol: 'Isat', unit: 'A', guide: '必须大于峰值电流（Iout + ΔIL/2）并留 20~30% 余量' },
+    ],
+    wiring: {
+      title: 'Buck 模块上板（最省事的电源方案）',
+      steps: [
+        'IN+/IN− 接输入电源，OUT+/OUT− 接负载；接线尽量短粗，输入回路的面积越小越好。',
+        '输入端就近并 10~100µF 电解 + 100nF 陶瓷：开关电源的输入电流是脉动的，靠电容本地供给。',
+        '输出端并 22~220µF 低 ESR 电解/固态 + 100nF 陶瓷，纹波立刻下降；电容耐压按输出电压的 1.5 倍以上选。',
+        '输出还要给模拟/射频供电时，再串一级 LDO（或 LC 滤波）把开关纹波压下去。',
+        '模块的地与负载地单点汇合，别让开关电流从敏感的模拟地里穿过。',
+      ],
+      note: '老周：把电感、开关管和输入电容摆得老远，热回路面积一大，辐射噪声能让旁边的收音机都听见——DC-DC 布局就四个字：回路要小。',
+    },
+    calc: [
+      { title: '占空比与压比', formula: 'Vout ≈ D × Vin（理想 Buck）', example: '12V 降到 5V：D ≈ 5 ÷ 12 ≈ 42%，模块自己会调；输入掉到 6V 时 D 要到 83%，接近极限、效率变差——所以 Vin 必须留余量。' },
+      { title: '损耗与效率', formula: 'η = Pout ÷ Pin，Ploss = Pout × (1/η − 1)', example: '5V/2A 输出（10W）、效率 90%：损耗 10 × (1/0.9 − 1) ≈ 1.1W，模块温热；同样 10W 若用 LDO 从 12V 降下来，损耗 (12−5) × 2 = 14W——差别就在这。' },
+      { title: '电感选型（自己设计时）', formula: 'L = (Vin − Vout) × D ÷ (fsw × ΔIL)', example: '12V→5V、fsw = 500kHz、取 ΔIL = 0.6A（约为 2A 输出的 30%）：L = (12−5) × 0.42 ÷ (500k × 0.6) ≈ 9.8µH，就近取 10µH，Isat 选 3A 以上。' },
+    ],
+    selection: [
+      '压差大或电流大（ΔV × I 超过 1W）优先 DC-DC；小电流、要干净电源（ADC/音频/射频）用 LDO。',
+      '常见组合：DC-DC 先降到 3.6~4V，再用 LDO 出干净的 3.3V。',
+      '模块选型看四件事：输入范围、持续输出电流、效率曲线、纹波；标称电流往往是理想散热下的数字。',
+      '电感量越大纹波越小、但瞬态响应越慢；对负载跳变敏感的应用别一味加大电感。',
+    ],
+    pitfalls: [
+      '老周：拿 DC-DC 直接给 ADC/运放供电，纹波全进了采样结果，还怪传感器不行——数字电源和模拟电源要分开，或者后面补 LDO。',
+      '老周：电感只看感量不看饱和电流，满载时电感饱和，电流飙升、效率崩塌、芯片发烫——Isat 至少留 20% 余量。',
+      '老周：输出电容用普通高 ESR 电解，纹波压不下去还自己发热；换低 ESR 固态电容，纹波立刻小一半。',
+    ],
+    pkg: {
+      packages: ['可调降压模块（LM2596/MP1584 类，带电位器）', '同步整流降压模块（MP2315/TPS56xxx 类，效率更高）', '升压模块（MT3608 类，小电流）', 'SOT-23-6 / SOP-8 芯片 + 外部电感电容（板载设计）'],
+      note: '实物照片位：一块蓝色降压模块（可见电感、电解电容、可调电位器与 IN/OUT 焊盘）与一颗 SOP-8 的 DC-DC 芯片对比，标注热回路（输入电容—开关管—续流管—地）的位置。',
+    },
+    usedIn: [{ chapter: 7, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
+    keywords: ['DC-DC', '开关电源', 'Buck', 'Boost', '降压', '升压', '电感', '纹波', '效率', 'LM2596'],
+  },
+  {
+    id: 'opto',
+    name: '光耦与电气隔离',
+    en: 'Optocoupler / Isolation',
+    refdes: 'OC / U',
+    category: 'ic',
+    tagline: '用一束光把两侧电路彻底分开。',
+    essence: '光耦：内部一颗红外 LED 照一颗光敏管，输入输出之间只有光、没有电的连接。',
+    plain: '大白话：两块电路本来要共地才能通信，光耦用「发光的二极管 + 感光的管子」隔空传话——地不用连，高压也过不来。',
+    schematic: { fig: 'opto-iso', title: 'PC817 隔离输入（两侧地分开）', note: '左侧信号经限流电阻驱动红外 LED，右侧光敏三极管把光变成电流、经上拉电阻给出逻辑电平；两侧的地各画各的，绝不能连在一起。' },
+    unlockChapter: 6,
+    principle: [
+      '输入端是一颗红外 LED（阳极/阴极），输出端是一颗光敏三极管（集电极/发射极），中间隔着透明绝缘层。电流→光→电流的转换天然把两侧隔开：两侧可以有不同的地、不同的电压域，甚至一侧是市电热地。',
+      '核心指标是 CTR（电流传输比）= Ic ÷ If，PC817 常见分档 50%~600%。CTR 离散大，还随温度和老化下降，设计要按最小 CTR 并留 2 倍以上余量。',
+      '隔离家族还有：数字隔离器（电容/磁耦合，速度快、寿命长，不再讲 CTR）、SSR 固态继电器（光耦 + 功率器件，直接开关交流负载）、隔离电源模块（给隔离侧供电）。隔离的关键不是器件而是「隔离带」：爬电距离、电气间隙，以及两侧之间那条不允许有任何连接的缝隙。',
+    ],
+    analogy: '像两间隔着玻璃的房间：这边打手电（LED），那边看到光就动手（光敏管）——人（电）从没过去，消息却传到了。',
+    params: [
+      { param: '电流传输比', symbol: 'CTR', unit: '%', guide: 'PC817 分档 50~600%；按最小档并留 2 倍余量，高温老化还会让它继续掉' },
+      { param: '正向电流', symbol: 'If', unit: 'mA', guide: '常用 5~20mA；太小则输出驱动不足，太大伤 LED 寿命' },
+      { param: '正向压降', symbol: 'Vf', unit: 'V', guide: '红外 LED 约 1.1~1.4V（比可见光 LED 低），限流按它算' },
+      { param: '集电极电流', symbol: 'Ic', unit: 'mA', guide: 'PC817 上限约 50mA，实际按 CTR × If 取，还要算上拉电阻上的压降' },
+      { param: '集射耐压', symbol: 'Vceo', unit: 'V', guide: 'PC817 约 35V；高压侧要选高压型号或另加器件' },
+      { param: '隔离电压', symbol: 'Viso', unit: 'Vrms', guide: 'PC817 约 5000Vrms（1 分钟）；安规还要看爬电距离与电气间隙' },
+    ],
+    wiring: {
+      title: 'PC817 做数字隔离输入',
+      steps: [
+        '低压侧：信号（或 GPIO）→ 限流电阻 R → PC817 的 1 脚（阳极），2 脚（阴极）接低压侧地。',
+        '高压侧：4 脚（集电极）经上拉电阻接高压侧逻辑电源，3 脚（发射极）接高压侧地，4 脚同时就是输出信号。',
+        '两侧电源和地各自独立（隔离侧由隔离电源模块供电），中间不允许任何电气连接——包括示波器地夹，测量要用隔离/差分探头。',
+        '输出是反相的：If 有电流 → 光敏管导通 → 集电极被拉低。需要同相就在 MCU 里取反，或再加一级三极管。',
+        '高速信号别用 PC817（µs 级）：要 Mbps 级用 6N137 或数字隔离器（ADuM/ISO77xx 系列）。',
+      ],
+      note: '老周：隔离电路里手一抖把两侧的地连在一起，隔离就白做了——那个「地」往往是通过示波器探头或者一颗多余的螺丝连上的。',
+    },
+    calc: [
+      { title: '输入限流电阻', formula: 'R = (Vin − Vf) ÷ If', example: '3.3V 驱动、Vf = 1.2V、取 If = 10mA：R = (3.3 − 1.2) ÷ 0.01 = 210Ω，就近取 220Ω；电阻功耗 0.01² × 220 = 22mW，0603 就够。' },
+      { title: '输出上拉与 CTR 校核', formula: 'Ic = CTR × If，且 Ic ≥ 负载需要的电流 × 2', example: 'If = 10mA、按最小 CTR = 50% 算：Ic ≥ 5mA。上拉到 3.3V、要拉到 0.4V 以下，上拉电阻 R ≤ (3.3 − 0.4) ÷ 5mA = 580Ω，取 470Ω。' },
+      { title: '老化余量', formula: 'Ic(长期) = CTR(min) × If ÷ 2', example: 'If = 10mA、CTR 最小 50%：新件能供 5mA，按一半算长期只剩 2.5mA——所以别指望光耦直推继电器，后面加三极管或 MOS 更稳。' },
+    ],
+    selection: [
+      '普通数字隔离（低速、便宜）：PC817 / LTV-817，几毛钱一颗。',
+      '高速（>100kHz）：6N137、EL357 高速档，或数字隔离器 ADuM1201 / ISO7721。',
+      '开关交流负载：直接用 SSR（光耦 + 可控硅/MOS），注意过零型与随机型的区别。',
+      '需要隔离供电：配一颗隔离 DC-DC 模块（如 B0505S），否则隔离侧没有电源。',
+    ],
+    pitfalls: [
+      '老周：光耦两侧共地还谈「隔离」，等于门锁着但钥匙插在门上——地一连，浪涌和噪声照旧串过去。',
+      '老周：限流电阻按 20mA 顶着上限设计，LED 光衰快，半年后 CTR 掉一半，电路开始时好时坏。',
+      '老周：拿 PC817 传 115200 的串口，边沿糊成一团，收到一堆乱码——它是 µs 级，高速请换 6N137 或数字隔离器。',
+    ],
+    pkg: {
+      packages: ['DIP-4（PC817，最常见的直插光耦）', 'SOP-4 / SSOP-4 贴片（PC817 贴片版）', 'DIP-8 高速光耦（6N137，带使能脚）', '数字隔离器 SOP-8/16（ADuM / ISO77xx）'],
+      note: '实物照片位：DIP-4 的 PC817 特写，标注 1 脚阳极（圆点）、2 脚阴极、4 脚集电极、3 脚发射极；旁边一颗 6N137 对比。',
+    },
+    usedIn: [{ chapter: 6, label: '暂未进入关卡（图鉴延伸知识）', pending: true }],
+    keywords: ['光耦', 'optocoupler', 'PC817', '隔离', 'CTR', 'SSR', '数字隔离器', '爬电距离'],
   },
 );
 

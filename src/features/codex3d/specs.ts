@@ -1,6 +1,6 @@
 // 图鉴 3D —— 条目 → 模型映射
 // 优先复用 features/pcb3d/models.ts 的 buildComponent()（引擎 ComponentType 分支）；
-// 非引擎类型的条目（relay/dcmotor/servo/seg7/ldo7805）由本层 extras.ts 实物重建。
+// 非引擎类型的条目（relay/dcmotor/servo/seg7/ldo7805 + W6 的 levelshift/dcdc/opto）由本层 extras.ts 实物重建。
 import type { ComponentSpec } from '@/engine/types';
 import type { ExtraModelKind } from './extras';
 
@@ -40,9 +40,11 @@ const MAP: Record<string, ComponentSpec> = {
   ldr: { ...BASE, type: 'ldr' }, // 光敏电阻：陶瓷圆盘 + 蛇形电极（原误映射 sensor）
   thermistor: { ...BASE, type: 'thermistor' }, // NTC 玻璃珠（原误映射 sensor）
   buzzer: { ...BASE, type: 'buzzer' }, // 黑色圆柱腔体 + 顶部发音孔（原误映射 sensor）
-  schottky: { ...BASE, type: 'schottky' }, // 双白环阴极二极管（原误映射 diode）
+  schottky: { ...BASE, type: 'schottky' }, // 阴极色环二极管（模型画双环，图鉴正文说明一道/两道都表阴极）
   transformer: { ...BASE, type: 'transformer' }, // EI 铁芯变压器（原走通用兜底）
   speaker: { ...BASE, type: 'speaker' }, // 盆架 + 纸盆 + 磁缸（原走通用兜底）
+  timer555: { ...BASE, type: 'ic' }, // NE555 是 DIP-8：复用 DIP-8 分支（此前只有标注、没有模型）
+  comparator: { ...BASE, type: 'ic' }, // LM393/LM339 也是 DIP-8 造型
 };
 
 /** 非 ComponentType 的条目 → extras 实物重建模型 */
@@ -52,6 +54,9 @@ const EXTRA_MAP: Record<string, ExtraModelKind> = {
   servo: 'servo',
   seg7: 'seg7',
   ldo7805: 'ldo7805',
+  levelshift: 'levelshift',
+  dcdc: 'dcdc',
+  opto: 'opto',
 };
 
 /**

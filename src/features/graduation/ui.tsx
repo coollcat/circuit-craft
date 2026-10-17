@@ -128,7 +128,7 @@ export function LaoZhouNote({ children, onClose }: { children: ReactNode; onClos
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative mt-3 rounded-md border border-danger/50 bg-[#1a0d0d]/80 p-3"
+      className="relative mt-3 rounded-md border border-danger/50 bg-danger/10 p-3"
     >
       <div className="mb-1 flex items-center justify-between">
         <span className="font-mono text-[10px] uppercase tracking-widest text-danger">
@@ -140,7 +140,8 @@ export function LaoZhouNote({ children, onClose }: { children: ReactNode; onClos
           </button>
         )}
       </div>
-      <p className="text-sm leading-relaxed text-[#f0b8b8]" style={{ fontFamily: '"Noto Sans SC",sans-serif' }}>
+      {/* 红笔字色走主题令牌：亮色主题下不再是「近黑块 + 浅红字」的失配 */}
+      <p className="text-sm leading-relaxed text-danger" style={{ fontFamily: '"Noto Sans SC",sans-serif' }}>
         {children}
       </p>
     </motion.div>

@@ -61,5 +61,19 @@ export interface LevelDef {
   stars: StarCondition[];
   hints: [string, string, string];
   knowledge: { title: string; body: string };
-  sim?: { duration?: number; probes?: PortRef[] };
+  sim?: {
+    /** 作者侧验收窗口（毫秒）：levels.test.ts 的动态关瞬态判定用它作参考时长。
+     *  不是示波器时基——时基由 WaveformPanel 的 defaultTimebase 按信号频率自适应。 */
+    duration?: number;
+    probes?: PortRef[];
+  };
+  /* ---------- 教学增强字段（均可选，向后兼容；由 lead 冻结接口） ---------- */
+  /** 本关考察的概念标签，供内容审计测试核对「教 A 考 B」 */
+  concept?: string[];
+  /** 本关主导公式：验收台「公式辅助」展示，expr 为通式、vars 说明符号、note 一句话用法 */
+  formula?: { expr: string; vars: string; note: string };
+  /** 相关图鉴条目 id（可深链到 /codex#<id>） */
+  codex?: string[];
+  /** 通关后 3 行小结（提取练习用）；缺省时界面回落到 knowledge 摘要 */
+  recap?: [string, string, string];
 }

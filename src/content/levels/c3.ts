@@ -11,7 +11,7 @@ export const C3_LEVELS: LevelDef[] = [
     title: '分压器：把电压切开用',
     subtitle: '两个电阻的魔法比例',
     briefing:
-      '老周要一个 6V 的参考点，但台上只有 9V 电池。用两颗电阻搭一个分压器：上方已固定 1kΩ，你来选下方的电阻，让中点电压落在 5.7~6.3V。',
+      '老周要一个 6V 的参考点，但台上只有 9V 电池。用两颗电阻搭一个分压器：上方已固定 1kΩ，下方那颗出厂是 4.7kΩ——先算比例，再把它调成你要的阻值，让中点电压落在 5.7~6.3V。',
     intro: [
       { speaker: 'laozhou', text: '原理图设计第一课：分压器。两个电阻一串，中点电压 = 电源 × 下电阻 ÷（上电阻＋下电阻）。这个式子比欧姆定律还常用。' },
       { speaker: 'xiaohan', text: '9V 要变 6V？6 = 9 × R下 ÷ (1k + R下)，算算算……R下 = 2k！' },
@@ -22,7 +22,8 @@ export const C3_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：示波器探头里的 10× 衰减，本质就是一颗 9MΩ 配 1MΩ 的分压器。你手里每支探头都藏着今天这个电路。' },
     ],
     palette: [
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 2000 } },
+      // P1 修复：出厂 4.7kΩ 不是答案（中点 7.4V 偏高），分压比要玩家自己算
+      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 4700 } },
     ],
     preset: {
       components: [
@@ -46,6 +47,9 @@ export const C3_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '4 分钟内完成', check: 'time', value: 240 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['分压', '欧姆定律'],
+    formula: { expr: 'Vout = Vin × R下 / (R上 + R下)', vars: 'Vin 电源(V)、R上/R下 上臂/下臂电阻(Ω)', note: '要 6V 就是 2/3 分压：上臂 1kΩ 固定，下臂算得 2kΩ' },
     hints: [
       '分压公式：V中点 = 9V × R下 ÷ (1k + R下)。目标是 6V。',
       '6 ÷ 9 = 2/3，也就是 R下 占总阻值的 2/3。R下 = 2kΩ 时比例正好。',
@@ -53,7 +57,7 @@ export const C3_LEVELS: LevelDef[] = [
     ],
     knowledge: {
       title: '分压器的能与不能',
-      body: '电阻分压器输出 Vout = Vin × R下 ÷ (R上 + R下)，是提供参考电压、电平缩放、传感器读取的第一选择。但它有个致命软肋：不能带负载。一旦中点接出电流，下电阻等效阻值变小，电压立刻塌陷——比如本关的 6V 中点接上 1kΩ 负载，等效下阻变成 667Ω，输出跌到 5.1V。所以分压器只做「给人看的电压」（给运放、ADC 这些高阻输入），不做「给人用的电源」。经验法则：分压器自身电流至少要是负载电流的 10 倍，电压才算稳。真要降压供电，请用 LDO 或 DC-DC——第 7 章见分晓。',
+      body: '电阻分压器输出 Vout = Vin × R下 ÷ (R上 + R下)，是提供参考电压、电平缩放、传感器读取的第一选择。但它有个致命软肋：不能带负载。一旦中点接出电流，下电阻等效阻值变小，电压立刻塌陷——比如本关的 6V 中点接上 1kΩ 负载，下阻变成 2k∥1k = 667Ω，输出跌到 9 × 667 ÷ (1000 + 667) ≈ 3.60V。所以分压器只做「给人看的电压」（给运放、ADC 这些高阻输入），不做「给人用的电源」。经验法则：分压器自身电流至少要是负载电流的 10 倍，电压才算稳。真要降压供电，请用 LDO 或 DC-DC——第 7 章见分晓。',
     },
     // 验算: V中点=9×R2/(1k+R2)；R2=2k → 6.0V ∈ [5.7,6.3] ✓；R2∈[1800,2200] → V∈[5.79,6.19] ⊂ [5.7,6.3] ✓
   },
@@ -76,8 +80,9 @@ export const C3_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：圣诞灯串是串联的，一颗烧了整串灭——所以现在的灯串里每颗都藏了个并联的小分流器。工程里的每个「奇怪设计」，背后都是一次烧出来的教训。' },
     ],
     palette: [
-      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
-      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 220 } },
+      // P1 修复：出厂 1kΩ 让支路只有 3mA（远低于 10~18mA），220Ω 要玩家自己算
+      { id: 'RP1', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
+      { id: 'RP2', type: 'resistor', x: 0, y: 0, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -105,6 +110,9 @@ export const C3_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['并联', '限流电阻'],
+    formula: { expr: 'I支路 = (Vcc − Vf) / R', vars: 'Vcc 电源(V)、Vf LED 压降(V)、R 支路限流电阻(Ω)', note: '(5−2) ÷ 220Ω ≈ 13.6mA；每条支路各配一颗电阻，严禁共用' },
     hints: [
       '并联 = 两条独立支路接在同一对电源节点之间。每条支路 = 一颗电阻 + 一颗 LED。',
       '每条支路的算法和上一章一样：(5−2)÷220 ≈ 13.6mA。两颗电阻都用 220Ω。',
@@ -155,6 +163,9 @@ export const C3_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '4 分钟内完成', check: 'time', value: 240 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['RC 充放电', '示波器观测'],
+    formula: { expr: 'τ = R × C', vars: 'R 电阻(Ω)、C 电容(F)', note: 'τ = 1kΩ × 1µF = 1ms；方波半周期 5ms = 5τ，刚好充满又放完' },
     hints: [
       'RC 低通结构：信号从电阻进，电容上取出。和 c2-1 的充电回路拓扑一样，只是电源换成了信号发生器。',
       'FG1.out → R1 → C1 → 地；信号发生器的地也要接到公共地。',
@@ -175,7 +186,7 @@ export const C3_LEVELS: LevelDef[] = [
     title: 'RC 滤波：给信号顺顺毛',
     subtitle: '截止频率 fc = 1/(2πRC)',
     briefing:
-      '信号发生器输出 1kHz 方波（0~5V），方波里全是你不想要的高频毛刺。设计一个 RC 低通滤波器：R 用 10kΩ，C 用 1µF，把输出变成一条平稳的直流（目标均值 2.3~2.7V）。',
+      '信号发生器输出 1kHz 方波（0~5V），方波里全是你不想要的高频毛刺。台上已经放好一颗电阻和一颗电容——先读出它们的参数、估一估截止频率 fc，再把它们接成 RC 低通（谁串在信号路上、谁对地，自己判断），把输出变成一条平稳的直流（目标均值 2.3~2.7V）。',
     intro: [
       { speaker: 'laozhou', text: '低通滤波器，让低频过、把高频拦下。分界线叫截止频率 fc = 1/(2πRC)。1kHz 的方波撞上一堵 16Hz 的墙，会剩下什么？' },
       { speaker: 'xiaohan', text: '剩下……它的平均值！2.5V！毛刺全被电容吃掉了！' },
@@ -207,8 +218,11 @@ export const C3_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['RC 低通', '截止频率'],
+    formula: { expr: 'fc = 1 / (2πRC)', vars: 'R 电阻(Ω)、C 电容(F)、fc 截止频率(Hz)', note: 'fc ≈ 15.9Hz ≪ 1kHz：跳变沿被磨平，输出只剩均值 2.5V' },
     hints: [
-      '拓扑和上一关完全一样（RC 低通），不同的是参数：τ 要远大于信号周期，输出才平。',
+      '接法就是上一关的 RC 低通；关键在参数：先读出 R、C 算出 τ，τ 要远大于信号周期，输出才平。',
       'τ = 10k × 1µ = 10ms，而 1kHz 方波半周期只有 0.5ms —— 电容来不及跟随，只能停在平均值。',
       '连线四条同 c3-3。输出均值 = 5V × 50% 占空比 = 2.5V，纹波约 ±60mV，稳落在目标区间。',
     ],
@@ -266,6 +280,9 @@ export const C3_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['三极管开关', '输入-控制-输出'],
+    formula: { expr: 'Ib = (Vcc − Vbe) / Rb ≥ Ic / β', vars: 'Rb 基极电阻(Ω)、Ic 负载电流(A)、β 放大倍数', note: 'Ib = (5−0.7)/10k = 0.43mA ≫ 12.7/100 = 0.127mA，深度饱和' },
     hints: [
       '这是两条回路：控制回路（电源→按键→R1→基极→发射极→地）和功率回路（电源→R2→LED→集电极→发射极→地）。',
       '两条回路共用发射极和电源。LED 电流 (5−2−0.2)/220 ≈ 12.7mA，基流 (5−0.7)/10k = 0.43mA 足够驱动。',

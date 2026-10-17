@@ -2,6 +2,7 @@
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMotionOn } from '@/hooks/useMotionOn';
 import { STEP_LABELS } from './store';
 
 export default function StepTrace({
@@ -15,6 +16,8 @@ export default function StepTrace({
   onJump: (s: number) => void;
   visitor: boolean;
 }) {
+  // 设置里关掉「动效」（或系统 prefers-reduced-motion）后不再跑循环动画（脉冲/走线流光）
+  const motionOn = useMotionOn();
   return (
     <div className="border-b border-ink-700 bg-ink-900/60">
       <div className="mx-auto flex max-w-[1280px] items-center gap-0 px-6 py-3">
@@ -44,7 +47,7 @@ export default function StepTrace({
                         : 'border-ink-600 bg-ink-800 text-silk-700',
                   )}
                   style={
-                    current
+                    current && motionOn
                       ? { animation: 'grad-pulse 1.6s ease-in-out infinite' }
                       : done
                         ? { boxShadow: '0 0 8px rgba(63,196,127,0.55)' }
@@ -81,7 +84,7 @@ export default function StepTrace({
                     stroke={i < step ? '#3FC47F' : '#26402F'}
                     strokeWidth="2"
                   />
-                  {i < step && (
+                  {i < step && motionOn && (
                     <motion.circle
                       r="2.5"
                       fill="#6FE3A1"
@@ -93,6 +96,7 @@ export default function StepTrace({
                       } as React.CSSProperties}
                     />
                   )}
+                  {i < step && !motionOn && <circle r="2.5" cx="50" cy="7" fill="#6FE3A1" />}
                 </svg>
               )}
             </div>

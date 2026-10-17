@@ -23,7 +23,8 @@ export const C5_LEVELS: LevelDef[] = [
     ],
     palette: [
       // 反馈电阻手写落位：从运放上方馈入 inn，与 R1 的下方馈线上下分离
-      { id: 'RP2', type: 'resistor', x: 232, y: 56, params: { resistance: 9000 } },
+      // P1 修复：出厂 1kΩ 只有 2 倍增益（0.4V）；9kΩ 要玩家自己算
+      { id: 'RP2', type: 'resistor', x: 232, y: 56, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -50,6 +51,9 @@ export const C5_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['同相放大', '运放虚短虚断'],
+    formula: { expr: 'G = 1 + R2 / R1，Vout = G × Vin', vars: 'R1 接地电阻(Ω)、R2 反馈电阻(Ω)、Vin 输入(V)', note: '要 10 倍：R2 = (G−1) × R1 = 9kΩ，0.2V × 10 = 2.0V' },
     hints: [
       '要 10 倍增益：G = 1 + R2/R1 = 10，R1 已经是 1kΩ。',
       'R2 = (G−1) × R1 = 9 × 1k = 9kΩ。输出 = 0.2V × 10 = 2.0V。',
@@ -104,6 +108,9 @@ export const C5_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['有源滤波', '电压跟随器'],
+    formula: { expr: 'fc = 1 / (2πRC)', vars: 'R 滤波电阻(Ω)、C 滤波电容(F)', note: 'fc ≈ 10Hz ≪ 1kHz：输出只剩均值 2.5V，跟随器负责带载不塌' },
     hints: [
       '两级结构：FG1 → R1 → C1（到地）完成低通；C1 上的电压送进运放 inp，运放 out 直接回接 inn 构成跟随器。',
       '方波 0~5V、50% 占空比，经过 fc≈10Hz 的低通后（≪ 1kHz 信号），跳变沿被衰减约百倍，输出贴着平均值。',
@@ -136,7 +143,8 @@ export const C5_LEVELS: LevelDef[] = [
       { speaker: 'laozhou', text: '冷知识：ADC 读数跳动几个字是正常的——那叫量化噪声。工程师的对策：多读几次取平均，或者加一颗小电容滤波。数字世界的「稳」，都是平均出来的。' },
     ],
     palette: [
-      { id: 'RP1', type: 'pot', x: 0, y: 0, params: { resistance: 10000, wiper: 0.5 } },
+      // P1 修复：出厂 wiper=0.2（0.5V）不是中点，0.5 要玩家自己调
+      { id: 'RP1', type: 'pot', x: 0, y: 0, params: { resistance: 10000, wiper: 0.2 } },
     ],
     preset: {
       components: [
@@ -161,6 +169,9 @@ export const C5_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '5 分钟内完成', check: 'time', value: 300 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['电位器分压', 'ADC 量化'],
+    formula: { expr: 'Vw = Vcc × wiper', vars: 'Vcc 电源(V)、wiper 抽头位置(0~1)', note: 'wiper = 0.5 → 2.5V，12 位 ADC 读数约 2048（量程中点）' },
     hints: [
       '电位器三个脚：a、b 接电源两端，w（抽头）输出分压。wiper 参数就是抽头位置（0~1）。',
       '要 2.5V，即一半：wiper = 0.5。允许 0.45~0.55 的微调空间。',
@@ -193,7 +204,8 @@ export const C5_LEVELS: LevelDef[] = [
     ],
     palette: [
       // 反馈电阻手写落位（同 c5-1）：上方馈入 inn
-      { id: 'RP2', type: 'resistor', x: 232, y: 56, params: { resistance: 19000 } },
+      // P1 修复：出厂 1kΩ 只有 2 倍增益（0.2V）；19kΩ 要玩家自己算
+      { id: 'RP2', type: 'resistor', x: 232, y: 56, params: { resistance: 1000 } },
     ],
     preset: {
       components: [
@@ -220,6 +232,9 @@ export const C5_LEVELS: LevelDef[] = [
       { id: 'no-hint', label: '不使用任何提示', check: 'no-hint' },
       { id: 'time', label: '6 分钟内完成', check: 'time', value: 360 },
     ],
+    // 教学元数据（W5）：概念标签 + 本关主导公式
+    concept: ['同相放大', '信号链'],
+    formula: { expr: 'G = 1 + R2 / R1', vars: 'R1 接地电阻(Ω)、R2 反馈电阻(Ω)', note: '要 20 倍：R2 = 19kΩ，0.1V × 20 = 2.0V，用满 ADC 量程的六成' },
     hints: [
       '和 c5-1 是同一个电路，只是增益目标变成 20 倍。',
       'R2 = (20 − 1) × 1k = 19kΩ。输出 = 0.1V × 20 = 2.0V。',

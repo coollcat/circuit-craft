@@ -57,10 +57,13 @@ export const useProgress = create<ProgressState>()(
           const completed = state.completed.includes(id)
             ? state.completed
             : [...state.completed, id];
+          // 星数语义（P6）：0 星是合法结果（通关但没达成任何星条件），与「未通关」（stars 无此键）必须可区分。
+          // 同时防御 NaN / 越界：夹到 0~3 的整数后再取历史最好。
+          const gained = Number.isFinite(stars) ? Math.max(0, Math.min(3, Math.round(stars))) : 0;
           const prev = state.stars[id] ?? 0;
           return {
             completed,
-            stars: { ...state.stars, [id]: Math.max(prev, stars) },
+            stars: { ...state.stars, [id]: Math.max(prev, gained) },
           };
         }),
 
@@ -85,9 +88,14 @@ export const useProgress = create<ProgressState>()(
         const level = ALL().find(l => l.id === id);
         if (!level) return false;
         const { completed } = get();
-        // 支线入口门槛：side-a 需主线第 2 章完成，side-b 需主线第 5 章完成
+        // 已通关的关卡永远保持解锁：门槛调整（P5）不得回收历史存档的进度
+        if (completed.includes(id)) return true;
+        // 支线入口门槛：side-a 需主线第 2 章完成
         if (level.track === 'side-a' && !mainChapterDone(completed, 2)) return false;
-        if (level.track === 'side-b' && !mainChapterDone(completed, 5)) return false;
+        // sa-6（无线第一课）用到第 6 章知识，单独要求第 6 章完成
+        if (level.id === 'sa-6' && !mainChapterDone(completed, 6)) return false;
+        // side-b 后段（sb-6/7/8）依赖第 6 章无线知识，整条支线统一要求第 6 章完成
+        if (level.track === 'side-b' && !mainChapterDone(completed, 6)) return false;
         // 同轨道前一关完成即解锁，首关默认解锁
         const seq = trackLevels(level.track);
         const idx = seq.findIndex(l => l.id === id);

@@ -1,4 +1,4 @@
-﻿/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-refresh/only-export-components */
 // IEC 风格自绘元件原理图符号
 // 统一约定：viewBox 0 0 96 48，2px 线宽，silk-100 描边，端口圆点 sig-cyan
 // 颜色走 --col-* 主题变量（经 style 消费，SVG 属性不支持 var()），明暗主题自动跟随
@@ -444,6 +444,57 @@ export const SymSpeaker = () => (
   </Frame>
 );
 
+/** 比较器 / 施密特（三角 + 迟滞回线） */
+export const SymComparator = () => (
+  <Frame ports={[[6, 15], [6, 33], [90, 24]]}>
+    <path d="M24 6 L24 42 L74 24 Z" />
+    <path d="M6 15 H24 M6 33 H24" />
+    <path d="M74 24 H90" />
+    <path d="M28 15 h7" />
+    <path d="M28 33 h7 M31.5 29.5 v7" />
+    <path d="M42 30 h6 v-12 h8 v12 h6" strokeWidth={1.5} />
+  </Frame>
+);
+
+/** 电平转换（双向 MOS：两侧各自上拉） */
+export const SymLevelShift = () => (
+  <Frame ports={[[6, 24], [90, 24]]}>
+    <path d="M6 24 H40 M56 24 H90" />
+    <path d="M40 14 V34 M56 14 V34" />
+    <path d="M48 14 V24" />
+    <path d="M44 12 h8 M44 34 h8" />
+    <path d="M20 8 V18 M20 8 H40" strokeWidth={1.5} />
+    <path d="M76 8 V18 M76 8 H56" strokeWidth={1.5} />
+    <path d="M28 8 h8 M68 8 h8" strokeWidth={1.5} />
+  </Frame>
+);
+
+/** DC-DC 开关电源模块（方框 + 电感 + 输入输出） */
+export const SymDcdc = () => (
+  <Frame ports={[[6, 16], [6, 32], [90, 16], [90, 32]]}>
+    <rect x="26" y="8" width="44" height="32" rx="3" />
+    <path d="M6 16 H26 M6 32 H26 M70 16 H90 M70 32 H90" />
+    <path d="M36 24 a4 4 0 0 1 8 0 a4 4 0 0 1 8 0 a4 4 0 0 1 8 0" strokeWidth={1.5} />
+    <path d="M36 14 h24 M42 34 h12" strokeWidth={1.5} />
+  </Frame>
+);
+
+/** 光耦（左发光二极管、右光敏管、中间隔离带） */
+export const SymOpto = () => (
+  <Frame ports={[[6, 16], [6, 32], [90, 16], [90, 32]]}>
+    <path d="M6 16 H14 M6 32 H14" />
+    <path d="M14 16 V32" />
+    <path d="M14 20 L26 24 L14 28 Z" />
+    <path d="M26 16 V32" />
+    <path d="M26 24 H38" />
+    <path d="M42 8 V40 M46 8 V40" strokeWidth={1.5} strokeDasharray="3 3" />
+    <path d="M54 24 H60" />
+    <path d="M60 14 V34" />
+    <path d="M60 18 L72 14 M60 30 L72 34" />
+    <path d="M72 14 H90 M72 34 H90" />
+  </Frame>
+);
+
 export const SYMBOLS: Record<string, () => JSX.Element> = {
   resistor: SymResistor,
   capacitor: SymCapacitor,
@@ -484,6 +535,11 @@ export const SYMBOLS: Record<string, () => JSX.Element> = {
   timer555: Sym555,
   transformer: SymTransformer,
   speaker: SymSpeaker,
+  // W6 新增条目符号
+  comparator: SymComparator,
+  levelshift: SymLevelShift,
+  dcdc: SymDcdc,
+  opto: SymOpto,
 };
 
 export function ComponentSymbol({ id, className }: { id: string; className?: string }) {

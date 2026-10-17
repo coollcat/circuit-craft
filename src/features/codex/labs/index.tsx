@@ -5,6 +5,7 @@ import RcLab from './RcLab';
 import LedLab from './LedLab';
 import OpAmpLab from './OpAmpLab';
 import PullUpLab from './PullUpLab';
+import HystLab from './HystLab';
 
 export const LAB_TITLES: Record<LabKind, string> = {
   bands: '色环电阻练习器',
@@ -12,6 +13,7 @@ export const LAB_TITLES: Record<LabKind, string> = {
   led: 'LED 限流电阻计算器',
   opamp: '运放增益与削顶演示',
   pullup: '上拉 / 下拉电阻',
+  hyst: '迟滞比较器（施密特）',
 };
 
 export const LAB_DESCS: Record<LabKind, string> = {
@@ -20,6 +22,7 @@ export const LAB_DESCS: Record<LabKind, string> = {
   led: '输入 Vcc / Vf / 目标电流，推荐 E24 阻值并校核功耗。',
   opamp: '反相 / 同相增益调节，输出波形与削顶饱和实时可视。',
   pullup: '上拉 / 下拉 / 悬空三种接法对比，按住按键看节点电压。',
+  hyst: '拖 Rf/Rth/噪声，看迟滞回线与翻转次数：噪声被窗口吃掉。',
 };
 
 export default function Lab({ kind }: { kind: LabKind }) {
@@ -46,5 +49,7 @@ export default function Lab({ kind }: { kind: LabKind }) {
       return <OpAmpLab />;
     case 'pullup':
       return <PullUpLab />;
+    case 'hyst':
+      return <HystLab />;
   }
 }

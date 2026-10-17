@@ -344,12 +344,13 @@ export const PARAM_SCHEMA: Partial<Record<ComponentType, ParamField[]>> = {
   inductor: [{ key: 'inductance', label: '感值', unit: 'H', min: 1e-6, max: 1, log: true }],
   pot: [
     { key: 'resistance', label: '总阻值', unit: 'Ω', min: 100, max: 1e6, log: true },
-    { key: 'wiper', label: '抽头位置', min: 0, max: 1, step: 0.01, help: '0 = 靠近 b 端，1 = 靠近 a 端' },
+    { key: 'wiper', label: '抽头位置', min: 0.001, max: 0.999, step: 0.01, help: '0 = 靠近 b 端，1 = 靠近 a 端（两端极限等于短路，仿真钳位到 0.001/0.999）' },
   ],
   diode: [{ key: 'vf', label: '正向压降', unit: 'V', min: 0.2, max: 1.2, step: 0.05 }],
   led: [
     { key: 'vf', label: '正向压降', unit: 'V', min: 1.6, max: 3.6, step: 0.1, help: '红光≈2V，蓝白光≈3V' },
-    { key: 'imax', label: '额定电流', unit: 'A', min: 0.005, max: 0.05, step: 0.005 },
+    // 上限放宽到 0.5A：功率 LED（如 c4-5 的 0.12A）也要能在弹窗里正常编辑，否则 B6 钳位会把额定值改坏
+    { key: 'imax', label: '额定电流', unit: 'A', min: 0.005, max: 0.5, step: 0.005, help: '普通指示 LED ≈0.02A（20mA），功率 LED 可到 0.1A 以上' },
   ],
   zener: [
     { key: 'vf', label: '正向压降', unit: 'V', min: 0.5, max: 1, step: 0.05 },
@@ -385,7 +386,11 @@ export const PARAM_SCHEMA: Partial<Record<ComponentType, ParamField[]>> = {
     { key: 'p0', label: 'P0 输出高', toggle: true }, { key: 'p1', label: 'P1 输出高', toggle: true },
     { key: 'p2', label: 'P2 输出高', toggle: true }, { key: 'p3', label: 'P3 输出高', toggle: true },
   ],
-  ic: [{ key: 'vout', label: '输出电压', unit: 'V', min: 1.2, max: 12, step: 0.1 }],
+  ic: [
+    { key: 'vout', label: '输出电压', unit: 'V', min: 1.2, max: 12, step: 0.1 },
+    // LDO 选型关（c7-2 等）要把额定电流改成玩家任务：0.05 = 50mA，0.15 = 150mA
+    { key: 'imax', label: '额定电流', unit: 'A', min: 0.01, max: 1, step: 0.01, help: '选型要按最大负载留 1.2~1.5 倍裕量（0.11 = 110mA）' },
+  ],
   antenna: [{ key: 'impedance', label: '阻抗', unit: 'Ω', min: 10, max: 600, step: 1, help: '教学近似：对地纯阻' }],
   fuse: [{ key: 'rating', label: '熔断电流', unit: 'A', min: 0.05, max: 5, step: 0.05 }],
   crystal: [{ key: 'capacitance', label: '等效电容', unit: 'F', min: 1e-12, max: 100e-12, log: true }],

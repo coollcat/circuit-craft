@@ -1,6 +1,6 @@
 // 元件图鉴 Codex（路由 /codex）
 // 元件百科 + 可交互小实验 + 公式速查 + 术语表 + 老手角落，支持 /codex#<entryId> 直达
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import SilkTag from '@/components/SilkTag';
@@ -16,7 +16,7 @@ import Lab, { LAB_DESCS, LAB_TITLES } from '@/features/codex/labs/index';
 import type { LabKind } from '@/features/codex/data/entries';
 import { cn } from '@/lib/utils';
 
-const LAB_ORDER: LabKind[] = ['bands', 'rc', 'led', 'opamp', 'pullup'];
+const LAB_ORDER: LabKind[] = ['bands', 'rc', 'led', 'opamp', 'pullup', 'hyst'];
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -47,7 +47,7 @@ function LabsSection() {
   const [active, setActive] = useState<LabKind>('bands');
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-6 gap-3">
         {LAB_ORDER.map(k => (
           <button
             key={k}
@@ -77,26 +77,58 @@ export default function Codex() {
   const completed = useProgress(s => s.completed);
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  /** 进入条目前的网格滚动位置（关闭条目时恢复） */
+  const scrollRef = useRef(0);
+  /** 待恢复的滚动位置（null 表示这次关闭不需要恢复） */
+  const restoreRef = useRef<number | null>(null);
+  /** 当前条目状态是不是「从网格 pushState 进来的」，是的话关闭时用 back() 保持历史对称 */
+  const pushedRef = useRef(false);
 
-  // /codex#<entryId> 直达（关卡内 📖 跳转）
+  // /codex#<entryId> 直达（关卡内 📖 跳转）+ 浏览器前进/后退同步
   useEffect(() => {
     const fromHash = () => {
       const id = window.location.hash.replace('#', '');
+      pushedRef.current = false; // popstate 之后这个状态不再是我们压入的
       setSelected(ENTRY_MAP[id] ? id : null);
     };
     fromHash();
     window.addEventListener('hashchange', fromHash);
-    return () => window.removeEventListener('hashchange', fromHash);
+    window.addEventListener('popstate', fromHash);
+    return () => {
+      window.removeEventListener('hashchange', fromHash);
+      window.removeEventListener('popstate', fromHash);
+    };
   }, []);
 
+  // 关闭条目后把网格滚动位置放回去
+  useEffect(() => {
+    if (selected !== null || restoreRef.current == null) return;
+    const y = restoreRef.current;
+    restoreRef.current = null;
+    const raf = requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'auto' }));
+    return () => cancelAnimationFrame(raf);
+  }, [selected]);
+
+  /** 打开条目：真实 push 导航（含 hash），浏览器后退会回到条目网格 */
   const openEntry = (id: string) => {
+    if (selected === id) return;
+    const fromGrid = selected === null;
+    if (fromGrid) scrollRef.current = window.scrollY; // 只在从网格进入时记录位置
     setSelected(id);
-    window.history.replaceState(null, '', `#${id}`);
+    window.history.pushState(null, '', `#${id}`);
+    pushedRef.current = fromGrid;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const closeEntry = () => {
+  /** 关闭条目：回到网格并恢复滚动位置（从网格 push 进来的用 back()，保持后退栈干净） */
+  const closeEntry = (restoreScroll = true) => {
+    if (restoreScroll) restoreRef.current = scrollRef.current;
+    if (pushedRef.current) {
+      pushedRef.current = false;
+      window.history.back(); // popstate → fromHash → setSelected(null)
+      return;
+    }
+    if (window.location.hash) window.history.replaceState(null, '', window.location.pathname);
     setSelected(null);
-    window.history.replaceState(null, '', window.location.pathname);
   };
 
   const unlockedMap = useMemo(
@@ -190,7 +222,7 @@ export default function Codex() {
                 <button
                   key={id}
                   onClick={() => {
-                    closeEntry();
+                    closeEntry(false); // 工具箱要滚到自己的区块，别恢复网格位置
                     window.setTimeout(() => scrollToId(id), 60);
                   }}
                   className="block w-full border-l-[3px] border-transparent py-1 pl-3 text-left text-sm text-silk-500 transition-colors hover:border-ink-600 hover:text-copper-300"
@@ -214,7 +246,7 @@ export default function Codex() {
         {/* 主区域 */}
         <main className="min-w-0 flex-1">
           {entry ? (
-            <EntryDetail entry={entry} unlocked={unlockedMap[entry.id]} onBack={closeEntry} />
+            <EntryDetail entry={entry} unlocked={unlockedMap[entry.id]} onBack={() => closeEntry()} />
           ) : (
             <div className="space-y-16">
               {/* S2 条目网格 */}
