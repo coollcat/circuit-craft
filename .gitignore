@@ -23,5 +23,8 @@ coverage/
 .npm-cache/
 .tmp-build/
 .verify/
+# 临时文件（提交信息、探针脚本等）：一律不入库
+.tmp-*
+tmp-*
 # 教学插图的离线预览产物（源码与构建脚本入库，HTML 可随时 node figures/build.mjs 重新生成）
 figures/out/
