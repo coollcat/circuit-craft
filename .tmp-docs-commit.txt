@@ -1,0 +1,23 @@
+docs: 整理项目资料文档（docs/ 四篇 + README/AGENTS 收敛），删除两个独立预览 HTML
+
+一、删除
+- figures/out/breadboard-led.html、figures/out/servo-sg90.html（图解离线预览产物，未入库）。
+  需要时 `node figures/build.mjs <name>` 可原样重建；站点里的 /figures 页与图鉴实验不受影响。
+
+二、新增 docs/（把散落在 README/AGENTS 与本地验证报告里的资料整理成四篇）
+- docs/ARCHITECTURE.md  目录职责、关键数据流（关卡/教学展示/图鉴图解三条链）、前端工程约定、
+  已装 53 个 shadcn 组件清单（原 info.md 的过期清单已并入并核对）、工程债务
+- docs/ENGINE.md        单位与端口口径、MNA 与参考地/接地检查/收敛位、器件模型表（含"stamp 与读回
+  必须同一判据"这条历史教训）、explain 教学展示层、测试覆盖
+- docs/CONTENT.md       关卡/走线/编辑器防呆/图鉴/实物图解五部分规范 + 三套自动审计的阈值与当前实测值
+- docs/AUDIT.md         本次全面审查的完整记录：做法、修掉的关键问题（带证据数字）、独立验证的
+  确认/证伪/无法验证三类结论、遗留 TODO、复现命令。原文在 .verify/（不入库），结论已沉淀于此
+
+三、收敛
+- README.md：补「文档」索引表；功能项更新为 7 个图鉴实验（新增舵机）、图解两张；审计描述与新规则对齐
+- AGENTS.md：从 63 行压到速查版（命令 + 11 条硬约束 + 改动后必做），细节改为链接 docs/，消除两处副本分叉
+- info.md：原文是过期的脚手架提示（写着 /mnt/agents/output/app、40+ 组件、与实际结构不符），
+  改写为「快速索引：改什么去哪里」——按需求找文件 + 路由地图 + 存档键与调试方法 + 环境备注
+
+验证：tsc -b 零输出；vitest 9 文件 292 例全绿；本轮只动 Markdown 与两个未入库的 HTML，
+未触碰任何源码，故上次已通过的 vite build 结论继续有效。
